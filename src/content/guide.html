@@ -1,0 +1,331 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <title>Canonical Identity Placement Guide | AnchorID</title>
+  <meta name="description" content="Official guidance for placing an AnchorID canonical identity reference across profiles, platforms, and publications to reduce identity ambiguity and vector collapse." />
+
+  <link rel="canonical" href="https://anchorid.net/guide" />
+
+  <meta property="og:type" content="article" />
+  <meta property="og:site_name" content="AnchorID" />
+  <meta property="og:title" content="Canonical Identity Placement Guide" />
+  <meta property="og:description" content="Official guidance for placing an AnchorID canonical identity reference across profiles, platforms, and publications." />
+  <meta property="og:url" content="https://anchorid.net/guide" />
+  <meta name="twitter:card" content="summary" />
+
+  <style>
+    :root {
+      --bg: #ffffff;
+      --fg: #111111;
+      --muted: #555555;
+      --rule: #e7e7e7;
+      --codebg: #f6f6f6;
+      --link: #0b57d0;
+      --maxw: 860px;
+    }
+    html, body { background: var(--bg); color: var(--fg); margin: 0; padding: 0; }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; line-height: 1.55; }
+    header, main, footer { display: block; }
+    .wrap { max-width: var(--maxw); margin: 0 auto; padding: 32px 20px; }
+    a { color: var(--link); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    h1 { font-size: 2rem; margin: 0 0 10px 0; letter-spacing: -0.02em; }
+    .kicker { color: var(--muted); margin: 0 0 18px 0; }
+    .meta { color: var(--muted); font-size: 0.95rem; }
+    hr { border: 0; border-top: 1px solid var(--rule); margin: 24px 0; }
+    h2 { font-size: 1.35rem; margin: 28px 0 10px 0; letter-spacing: -0.01em; }
+    h3 { font-size: 1.1rem; margin: 18px 0 8px 0; }
+    p { margin: 10px 0; }
+    ul, ol { margin: 10px 0 10px 20px; }
+    li { margin: 6px 0; }
+    code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+    pre { background: var(--codebg); padding: 14px; border: 1px solid var(--rule); border-radius: 10px; overflow: auto; }
+    .callout { border-left: 3px solid var(--rule); padding: 10px 14px; background: #fafafa; border-radius: 10px; }
+    .small { font-size: 0.95rem; color: var(--muted); }
+    footer { border-top: 1px solid var(--rule); }
+    /* Seam control: header -> main */
+    header.wrap { padding-bottom: 6px; }
+    main.wrap { padding-top: 6px; }
+    header.wrap hr { margin: 6px 0; }
+
+    /* First section heading */
+    main.wrap > h2:first-child { margin-top: 8px; }
+
+    /* Optional: globally tighten h2 rhythm */
+    h2 { font-size: 1.35rem; margin: 20px 0 10px 0; letter-spacing: -0.01em; }
+
+
+</style>
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "Organization",
+        "@id": "https://anchorid.net/#org",
+        "name": "AnchorID",
+        "url": "https://anchorid.net/"
+      },
+      {
+        "@type": "WebSite",
+        "@id": "https://anchorid.net/#website",
+        "url": "https://anchorid.net/",
+        "name": "AnchorID",
+        "publisher": { "@id": "https://anchorid.net/#org" }
+      },
+      {
+        "@type": "WebPage",
+        "@id": "https://anchorid.net/guide#webpage",
+        "url": "https://anchorid.net/guide",
+        "name": "Canonical Identity Placement Guide",
+        "description": "Official guidance for placing an AnchorID canonical identity reference across profiles, platforms, and publications to reduce identity ambiguity and vector collapse.",
+        "isPartOf": { "@id": "https://anchorid.net/#website" },
+        "about": [
+          "Canonical identity resolution",
+          "Author disambiguation",
+          "Identity ambiguity reduction"
+        ],
+        "dateModified": "2026-01-15T20:25:00Z",
+        "inLanguage": "en"
+      },
+      {
+        "@type": "CreativeWork",
+        "@id": "https://anchorid.net/guide#guide",
+        "name": "Canonical Identity Placement Guide",
+        "url": "https://anchorid.net/guide",
+        "publisher": { "@id": "https://anchorid.net/#org" },
+        "isPartOf": { "@id": "https://anchorid.net/guide#webpage" },
+        "inLanguage": "en"
+      }
+    ]
+  }
+  </script>
+</head>
+
+<body>
+  <header class="wrap">
+    <div class="meta"><a href="/">AnchorID</a> / Guide</div>
+    <h1>Canonical Identity Placement Guide</h1>
+    <p class="kicker">Official guidance for placing an AnchorID canonical identity reference across profiles, platforms, and publications.</p>
+    <p class="small"><strong>Last modified:</strong> January 15, 2026 · 12:25 PM PST</p>
+    <hr />
+  </header>
+
+  <main class="wrap">
+    <h2>What this page is</h2>
+
+    <p>
+      This page defines the <strong>official guidance</strong> for placing an AnchorID canonical identity reference across profiles, platforms, and publications.
+    </p>
+
+    <p>Its purpose is to ensure that:</p>
+
+    <ul>
+      <li>Humans can quickly understand who an author is</li>
+      <li>Crawlers can reliably extract identity associations</li>
+      <li>AI systems avoid identity ambiguity and vector collapse over time</li>
+    </ul>
+
+    <div class="callout">
+      <p>AnchorID treats identity as <strong>infrastructure</strong>, not a profile or a brand.</p>
+    </div>
+
+    <hr />
+
+    <h2>The canonical identifier</h2>
+
+    <p>
+      Every AnchorID user is assigned a <strong>stable UUID</strong> and a <strong>canonical resolver URL</strong>.
+    </p>
+
+    <p>The resolver URL is the authoritative identity reference:</p>
+
+    <pre><code>https://anchorid.net/resolve/&lt;UUID&gt;</code></pre>
+
+    <p>Example:</p>
+
+    <pre><code>https://anchorid.net/resolve/4ff7ed97-b78f-4ae6-9011-5af714ee241c</code></pre>
+
+    <p>
+      All other identity links (blogs, social profiles, archives, code repositories) should <strong>fan out from this resolver</strong>.
+    </p>
+
+    <hr />
+
+    <h2>The canonical line (use verbatim)</h2>
+
+    <p>When placing your AnchorID on a profile or publication, use the following line exactly as written:</p>
+
+    <pre><code>Canonical identity: https://anchorid.net/resolve/&lt;UUID&gt;</code></pre>
+
+    <p>Do not reword this line.</p>
+
+    <h3>Why this wording matters</h3>
+
+    <ul>
+      <li>Plain language is easy for humans</li>
+      <li>Plain URLs are reliable for crawlers</li>
+      <li>Consistent phrasing improves machine association</li>
+      <li>Low ambiguity across platforms and time</li>
+    </ul>
+
+    <hr />
+
+    <h2>Placement priority</h2>
+
+    <h3>1. Public author surfaces (highest priority)</h3>
+
+    <p>These are the strongest identity signals for both search engines and AI training pipelines.</p>
+
+    <p>Recommended placements:</p>
+
+    <ul>
+      <li>LinkedIn &mdash; <strong>About</strong> section</li>
+      <li>Medium &mdash; author bio or post footer</li>
+      <li>Substack &mdash; author bio</li>
+      <li>Personal websites or blogs &mdash; About page and post footers</li>
+    </ul>
+
+    <p><strong>Rule:</strong> If the content is visible without login, it is a valid anchor surface.</p>
+
+    <h3>2. Technical and developer identity hubs</h3>
+
+    <p>These platforms are heavily ingested by AI systems and carry strong authorship signals.</p>
+
+    <p>Recommended placements:</p>
+
+    <ul>
+      <li>GitHub &mdash; profile bio or README</li>
+      <li>Package registries</li>
+      <li>Technical documentation with named authorship</li>
+    </ul>
+
+    <p><strong>When space is limited:</strong> Use <strong>only</strong> the resolver URL. Do not include additional links.</p>
+
+    <h3>3. Individual content items</h3>
+
+    <p>Use this when an author bio is unavailable or inconsistent.</p>
+
+    <p>Recommended placements:</p>
+
+    <ul>
+      <li>Bottom of blog posts</li>
+      <li>&ldquo;About the author&rdquo; sections</li>
+      <li>Long-form essays or research notes</li>
+    </ul>
+
+    <p>Recommended footer format:</p>
+
+    <pre><code>&mdash;
+Canonical identity: https://anchorid.net/resolve/&lt;UUID&gt;</code></pre>
+
+    <hr />
+
+    <h2>Where not to place the AnchorID</h2>
+
+    <p>Do not place the AnchorID:</p>
+
+    <ul>
+      <li>Inline within paragraphs</li>
+      <li>Behind shortened URLs</li>
+      <li>Behind generic link text (e.g., &ldquo;my AnchorID&rdquo;)</li>
+      <li>Repeated multiple times on the same page</li>
+      <li>Reworded differently per platform</li>
+    </ul>
+
+    <p>AnchorID is a <strong>reference</strong>, not a promotional element.</p>
+
+    <hr />
+
+    <h2>Handling platform constraints</h2>
+
+    <h3>Tight character limits</h3>
+
+    <p>On platforms with very limited space (e.g., GitHub bios, social media bios), use only:</p>
+
+    <pre><code>Canonical identity: https://anchorid.net/resolve/&lt;UUID&gt;</code></pre>
+
+    <p>Do not include raw URNs, About pages, or additional links. The resolver replaces them.</p>
+
+    <h3>Platforms with multiple link slots</h3>
+
+    <p>When forced to choose which links to include, prioritize in this order:</p>
+
+    <ol>
+      <li>AnchorID resolver</li>
+      <li>Primary personal website</li>
+      <li>Primary work or code hub (e.g., GitHub)</li>
+    </ol>
+
+    <p>If only one link is possible, <strong>keep the resolver</strong>.</p>
+
+    <hr />
+
+    <h2>Resolver page requirements</h2>
+
+    <p>A valid AnchorID resolver page must:</p>
+
+    <ul>
+      <li>Display the UUID verbatim</li>
+      <li>Link out to primary identity surfaces (LinkedIn, GitHub, websites)</li>
+      <li>Provide stable URLs over time</li>
+      <li>Emit machine-readable identity edges (e.g., <code>sameAs</code> links in JSON-LD)</li>
+    </ul>
+
+    <p>The resolver page functions as the <strong>root node</strong> of the identity graph.</p>
+
+    <hr />
+
+    <h2>Short explanation (for reuse)</h2>
+
+    <div class="callout">
+      <p>
+        Names collide. Accounts change. AnchorID provides a stable reference that links all identities to one canonical record &mdash; for humans and machines.
+      </p>
+    </div>
+
+    <hr />
+
+    <h2>Philosophy</h2>
+
+    <div class="callout">
+      <p><strong>AnchorID treats identity as infrastructure, not a profile.</strong></p>
+    </div>
+
+    <hr />
+
+    <h2>Change policy and stability</h2>
+
+    <p>This guide is intended to be <strong>stable over time</strong>.</p>
+
+    <ul>
+      <li>Prefer <strong>additive clarification</strong> over rewrites</li>
+      <li>Do not change the meaning of existing terms without strong justification</li>
+      <li>Treat the resolver URL as a long-lived contract</li>
+    </ul>
+
+    <p>
+      If a future change introduces a true semantic break (for example, a different identity model or resolver contract),
+      publish a separate snapshot (for example, <code>/guide/v1</code>) and keep <code>/guide</code> as the canonical entry point.
+    </p>
+
+    <p>
+      This approach favors continuity, crawlability, and long-term attribution integrity.
+    </p>
+  </main>
+
+  <footer class="wrap">
+    <p class="small">&copy; <span id="y"></span> AnchorID.</p>
+    <script>
+      document.getElementById("y").textContent = String(new Date().getFullYear());
+    </script>
+  </footer>
+</body>
+</html>
+
+
+
