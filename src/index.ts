@@ -48,6 +48,22 @@ export default {
       );
     }
 
+    // Public guide page
+    if (path === "/guide" || path === "/guide/") {
+      const html = await env.ANCHOR_KV.get("page:guide");
+      if (!html) {
+        return new Response("Guide not found", { status: 404 });
+      }
+      return new Response(html, {
+        headers: {
+          "content-type": "text/html; charset=utf-8",
+          "cache-control":
+            "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400",
+        },
+      });
+    }
+
+
     // Resolver (v1): /resolve/<uuid>
     if (path.startsWith("/resolve/")) {
       return handleResolve(request, env);
