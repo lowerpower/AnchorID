@@ -7,6 +7,7 @@ import {
   handlePostClaimVerify,
 } from "./claims/handlers";
 
+import { loadClaims } from "./claims/store";
 
 export interface Env {
   // Rquired: KV storage for profiles/sessions
@@ -136,8 +137,23 @@ async function handleResolve(request: Request, env: Env): Promise<Response> {
     if (profile) {
       // Ensure @id is correct even if stored object is older
       profile["@id"] = `https://anchorid.net/resolve/${u}`;
+  
+	  // ✅ ADD THIS BLOCK
+  	  if (env.ANCHOR_KV) {
+         const claims = await loadClaims(env, u);
+         const verified = claims
+           .filter((c) => c.status === "verified")
+           .map((c) => c.url);
 
-      return ldjson(profile, 200, {
+      if (verified.length) {
+         const existing = Array.isArray(profile.sameAs) ? profile.sameAs : [];
+         const merged = new Set<string>(existing);
+         for (const v of verified) merged.add(v);
+            profile.sameAs = Array.from(merged);
+       }
+     }
+
+     return ldjson(profile, 200, {
         "cache-control": "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400",
       });
     }
@@ -145,7 +161,7 @@ async function handleResolve(request: Request, env: Env): Promise<Response> {
 
   // 2) Fallback: founder hardcode (keeps existing behavior while KV is empty)
   const founderUuid = "4ff7ed97-b78f-4ae6-9011-5af714ee241c";
-  if (u !== founderUuid) {
+  if (u !== founderUuid.toLowerCase()) {
     return ldjson(
       { error: "not_found" },
       404,
