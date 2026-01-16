@@ -1,9 +1,16 @@
 
 
 
+import {
+  handleGetClaims,
+  handlePostClaim,
+  handlePostClaimVerify,
+} from "./claims/handlers";
+
+
 export interface Env {
-  // Optional for later: KV storage for profiles/sessions
-  ANCHOR_KV?: KVNamespace;
+  // Rquired: KV storage for profiles/sessions
+  ANCHOR_KV: KVNamespace;
 
   // If you enable email login/update
   RESEND_API_KEY?: string;
@@ -62,6 +69,25 @@ export default {
         },
       });
     }
+
+	// Public claims list
+	if (path.startsWith("/claims/") && request.method === "GET") {
+  		const uuid = path.slice("/claims/".length);
+  		return handleGetClaims(request, env as any, uuid);
+	}
+
+	// Token-gated: add/update claim
+	if (path === "/claim" && request.method === "POST") {
+  		// your existing auth guard here
+  		return handlePostClaim(request, env as any);
+	}
+
+	// Token-gated: verify claim
+	if (path === "/claim/verify" && request.method === "POST") {
+  		// your existing auth guard here
+  		return handlePostClaimVerify(request, env as any);
+	}
+
 
 
     // Resolver (v1): /resolve/<uuid>
