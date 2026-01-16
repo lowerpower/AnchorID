@@ -25,6 +25,36 @@ export interface Env {
 
 const FOUNDER_UUID = "4ff7ed97-b78f-4ae6-9011-5af714ee241c";
 
+function requireAdmin(request: Request, env: Env): Response | null {
+  const auth = request.headers.get("authorization") || "";
+  const token = auth.startsWith("Bearer ") ? auth.slice(7).trim() : "";
+
+  if (!env.ANCHOR_ADMIN_TOKEN) {
+    return ldjson({ error: "not_configured" }, 500, { "cache-control": "no-store" });
+  }
+
+  if (token !== env.ANCHOR_ADMIN_TOKEN) {
+    return ldjson({ error: "unauthorized" }, 401, { "cache-control": "no-store" });
+  }
+
+  return null;
+}
+
+function canonicalSameAs(u: string): string {
+  try {
+    const x = new URL(u);
+    // If it's exactly the origin with a trailing slash, normalize
+    if (x.pathname === "/" && !x.search && !x.hash) {
+      return x.origin;
+    }
+    return u;
+  } catch {
+    return u;
+  }
+}
+
+
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
@@ -80,16 +110,20 @@ export default {
 	// Token-gated: add/update claim
 	if (path === "/claim" && request.method === "POST") {
   		// your existing auth guard here
-  		return handlePostClaim(request, env as any);
+  		const denied = requireAdmin(request, env);
+  		if (denied) return denied;
+	    
+        return handlePostClaim(request, env as any);
 	}
 
 	// Token-gated: verify claim
 	if (path === "/claim/verify" && request.method === "POST") {
   		// your existing auth guard here
-  		return handlePostClaimVerify(request, env as any);
+  		const denied = requireAdmin(request, env);
+		if (denied) return denied;
+
+		return handlePostClaimVerify(request, env as any);
 	}
-
-
 
     // Resolver (v1): /resolve/<uuid>
     if (path.startsWith("/resolve/")) {
@@ -146,10 +180,14 @@ async function handleResolve(request: Request, env: Env): Promise<Response> {
            .map((c) => c.url);
 
       if (verified.length) {
-         const existing = Array.isArray(profile.sameAs) ? profile.sameAs : [];
-         const merged = new Set<string>(existing);
-         for (const v of verified) merged.add(v);
-            profile.sameAs = Array.from(merged);
+		 const existing = Array.isArray(profile.sameAs) ? profile.sameAs : [];
+		 const merged = new Set<string>(existing.map(canonicalSameAs));
+
+		 for (const v of verified) {
+  			merged.add(canonicalSameAs(v));
+		 }
+
+		 profile.sameAs = Array.from(merged);
        }
      }
 
