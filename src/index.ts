@@ -53,6 +53,27 @@ function canonicalSameAs(u: string): string {
   }
 }
 
+function upsertSubjectOf(entity: any, claimsUrl: string) {
+  const node = {
+    "@type": "WebPage",
+    "@id": claimsUrl,
+    "url": claimsUrl,
+    "name": "AnchorID Claims",
+  };
+
+  const cur = entity.subjectOf;
+  const arr = Array.isArray(cur) ? cur : cur ? [cur] : [];
+
+  // Dedup by @id/url
+  const exists = arr.some((x: any) => x?.["@id"] === claimsUrl || x?.url === claimsUrl);
+  if (!exists) arr.push(node);
+
+  entity.subjectOf = arr.length === 1 ? arr[0] : arr;
+}
+
+
+
+
 
 
 export default {
@@ -102,8 +123,16 @@ export default {
     }
 
 	// Public claims list
-	if (path.startsWith("/claims/") && request.method === "GET") {
+	if (path.startsWith("/claims/") && (request.method === "GET" || request.method === "HEAD")) {
   		const uuid = path.slice("/claims/".length);
+        
+        const res = await handleGetClaims(request, env, uuid);
+
+        // HEAD should return headers/status only
+        if (request.method === "HEAD") {
+            return new Response(null, { status: res.status, headers: res.headers });
+        }
+
   		return handleGetClaims(request, env as any, uuid);
 	}
 
@@ -172,7 +201,7 @@ async function handleResolve(request: Request, env: Env): Promise<Response> {
       // Ensure @id is correct even if stored object is older
       profile["@id"] = `https://anchorid.net/resolve/${u}`;
   
-	  // ✅ ADD THIS BLOCK
+	  //
   	  if (env.ANCHOR_KV) {
          const claims = await loadClaims(env, u);
          const verified = claims
@@ -190,6 +219,10 @@ async function handleResolve(request: Request, env: Env): Promise<Response> {
 		 profile.sameAs = Array.from(merged);
        }
      }
+
+     // add link to claims audit log
+     const claimsUrl = `https://anchorid.net/claims/${u}`;
+	 upsertSubjectOf(profile, claimsUrl);
 
      return ldjson(profile, 200, {
         "cache-control": "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400",
@@ -226,6 +259,9 @@ async function handleResolve(request: Request, env: Env): Promise<Response> {
     "dateCreated": "2026-01-13T00:00:00Z",
     "dateModified": "2026-01-13T00:00:00Z"
   };
+//
+//  const claimsUrl = `https://anchorid.net/claims/${u}`;
+//  upsertSubjectOf(profile, claimsUrl)
 
   return ldjson(body, 200, {
     "cache-control": "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400",
