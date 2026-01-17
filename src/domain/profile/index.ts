@@ -1,4 +1,5 @@
 
-import { buildProfile } from "./domain/profile/anchorid_profile";
+// src/domain/profile/index.ts
+export * from "./anchorid_profile";
 
 
