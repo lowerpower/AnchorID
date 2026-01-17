@@ -1,0 +1,17 @@
+name = "anchorid"
+main = "src/index.ts"
+compatibility_date = "2026-01-17"
+compatibility_flags = ["nodejs_compat"]
+
+# Optional but recommended
+workers_dev = true
+
+# KV bindings
+[[kv_namespaces]]
+binding = "ANCHOR_KV"
+id = "813539ddad014d25b787ecb551dbe51b"
+
+# You can add preview_id later if you want separate preview KV
+# preview_id = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+
+
