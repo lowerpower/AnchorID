@@ -70,12 +70,21 @@ export type BuildProfileOptions = {
    * Default false (nice optimization).
    */
   bumpOnNoop?: boolean;
+
+  /**
+   * If true, do not modify dateCreated/dateModified during a "read build"
+   * (i.e., when input is null/undefined). This keeps /resolve stable even if
+   * we recompute structured fields like mainEntityOfPage/subjectOf/isPartOf.
+   */
+  preserveStoredTimestampsOnRead?: boolean;
+
 };
 
 const DEFAULTS: Required<BuildProfileOptions> = {
   nowIso: () => new Date().toISOString(),
   persistMergedSameAs: false,
   bumpOnNoop: false,
+  preserveStoredTimestampsOnRead: true,
 };
 
 const WEBSITE: WebSiteRef = {
@@ -304,17 +313,39 @@ function sanitizeSameAsForProfileStorage(urls: string[]): string[] | undefined {
   return out.length ? out : undefined;
 }
 
+
+
+
+
 /**
- * buildProfile(uuid, stored?, input?, verifiedUrls?) -> canonical Person JSON-LD
+ * buildProfile(uuid, stored?, input?, verifiedUrls?, options?) -> canonical Person JSON-LD
  *
- * Enforces:
- * - required fields always present
- * - dateCreated immutable once set
- * - dateModified updated only when changes occur (unless bumpOnNoop)
- * - URL canonicalization + dedupe policies
- * - structured mainEntityOfPage / subjectOf / isPartOf per spec
+ * Purpose
+ * - Produce a canonical schema.org Person object suitable for KV storage at `profile:<uuid>`
+ *   and for public output from `/resolve/<uuid>`.
  *
- * Note: verifiedUrls affects output.sameAs depending on persistMergedSameAs.
+ * Enforces (always)
+ * - Required fields present and correct:
+ *   @context, @type, @id, identifier, mainEntityOfPage, subjectOf, isPartOf
+ * - `dateCreated` is immutable after first write
+ * - URL normalization + dedupe for `url` and `sameAs`
+ * - `sameAs` merge policy:
+ *   - manual sameAs comes from stored (or input on writes)
+ *   - verifiedUrls are merged in as an effective/public union set
+ *
+ * Timestamp rules
+ * - On write (input provided):
+ *   - if canonical stored profile would change, bump `dateModified`
+ *   - if no-op and bumpOnNoop=false, preserve stored `dateModified`
+ * - On read (input null/undefined):
+ *   - by default preserve stored timestamps (dateCreated/dateModified) even if we recompute
+ *     structured fields; this keeps `/resolve` stable and makes timestamps represent KV state.
+ *   - can be overridden via `preserveStoredTimestampsOnRead=false`
+ *
+ * Returns
+ * - profile: canonical Person JSON-LD (what you may store; `sameAs` depends on persistMergedSameAs)
+ * - changed: whether storing `profile` would change KV state (taking bumpOnNoop into account)
+ * - effectiveSameAs: the public union (manual ∪ verified) after canonicalization/dedupe
  */
 export function buildProfile(
   uuid: string,
@@ -328,12 +359,13 @@ export function buildProfile(
 
   const refs = buildRefs(uuid);
 
-  // Start from stored if provided, but we will overwrite canonical fields
-  const baseDateCreated = stored?.dateCreated ?? now;
+  const isReadBuild = input == null;
+  const preserveOnRead = !!opt.preserveStoredTimestampsOnRead && isReadBuild;
 
-  // Canonicalize optional inputs
+  // Canonicalize optional inputs (input wins if present)
   const name = canonicalizeString(input?.name) ?? stored?.name;
-  const alternateName = canonicalizeStringArray(input?.alternateName) ?? stored?.alternateName;
+  const alternateName =
+    canonicalizeStringArray(input?.alternateName) ?? stored?.alternateName;
   const description = canonicalizeString(input?.description) ?? stored?.description;
 
   const url = (() => {
@@ -342,12 +374,9 @@ export function buildProfile(
     return canon ?? undefined;
   })();
 
-  // Manual sameAs is editable (stored field)
+  // Manual sameAs is editable (stored field). If input.sameAs is present, it replaces manual.
   const manualSameAs = (() => {
-    // If input.sameAs provided, canonicalize it; else keep stored.sameAs
-    if (input && "sameAs" in (input as any)) {
-      return canonicalizeUrlList(input.sameAs);
-    }
+    if (input && "sameAs" in (input as any)) return canonicalizeUrlList(input.sameAs);
     return canonicalizeUrlList(stored?.sameAs ?? []);
   })();
 
@@ -355,8 +384,12 @@ export function buildProfile(
   const effectiveSameAs = mergeSameAs(manualSameAs, verifiedUrls);
 
   // What do we store in profile.sameAs?
-  const storedSameAs = opt.persistMergedSameAs ? effectiveSameAs : manualSameAs;
-  const sameAs = sanitizeSameAsForProfileStorage(storedSameAs);
+  const sameAsForStorage = opt.persistMergedSameAs ? effectiveSameAs : manualSameAs;
+  const sameAs = sanitizeSameAsForProfileStorage(sameAsForStorage);
+
+  // Baseline timestamps
+  const baseDateCreated = stored?.dateCreated ?? now;
+  const baseDateModified = stored?.dateModified ?? now;
 
   const candidate: PersonProfile = {
     "@context": "https://schema.org",
@@ -365,10 +398,10 @@ export function buildProfile(
 
     identifier: buildIdentifier(uuid),
 
+    // timestamps are set after change detection
     dateCreated: baseDateCreated,
-    dateModified: now,
+    dateModified: baseDateModified,
 
-    // optional fields only if defined
     ...(name ? { name } : {}),
     ...(alternateName && alternateName.length ? { alternateName } : {}),
     ...(description ? { description } : {}),
@@ -380,26 +413,30 @@ export function buildProfile(
     isPartOf: WEBSITE,
   };
 
-  // Determine if changed compared to stored (ignoring dateModified difference)
-  // We'll compare against a normalized stored clone with dateModified forced to candidate's dateModified.
-  const storedComparable = stored
-    ? { ...stored, dateModified: candidate.dateModified }
-    : null;
+  // Detect change compared to stored (ignore dateModified drift by aligning it for comparison)
+  const storedComparable = stored ? { ...stored, dateModified: candidate.dateModified } : null;
+  const structurallyChanged = storedComparable ? !deepEqual(candidate, storedComparable) : true;
 
-  const changed = storedComparable ? !deepEqual(candidate, storedComparable) : true;
+  // Apply timestamp policy
+  if (preserveOnRead) {
+    if (stored?.dateCreated) candidate.dateCreated = stored.dateCreated;
+    if (stored?.dateModified) candidate.dateModified = stored.dateModified;
+  } else {
+    // Always preserve stored dateCreated if present (immutable)
+    if (stored?.dateCreated) candidate.dateCreated = stored.dateCreated;
 
-  // Handle no-op optimization: if not changed, keep stored.dateModified unless bumpOnNoop
-  if (!changed && stored && !opt.bumpOnNoop) {
-    candidate.dateModified = stored.dateModified;
+    if (structurallyChanged || opt.bumpOnNoop) {
+      candidate.dateModified = now;
+    } else if (stored?.dateModified) {
+      candidate.dateModified = stored.dateModified;
+    }
   }
 
-  // dateCreated immutability (belt-and-suspenders)
-  if (stored?.dateCreated) {
-    candidate.dateCreated = stored.dateCreated;
-  }
+  const changed = structurallyChanged || (!!stored && opt.bumpOnNoop);
 
-  return { profile: candidate, changed: changed || (!!stored && opt.bumpOnNoop), effectiveSameAs };
+  return { profile: candidate, changed, effectiveSameAs };
 }
+
 
 
 

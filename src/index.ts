@@ -2,6 +2,18 @@
 
 
 import {
+  handleAdminLoginPage,
+  handleAdminLoginPost,
+  handleAdminLogoutPost,
+  handleAdminHome,
+  handleAdminNewGet,
+  handleAdminNewPost,
+  handleAdminEditGet,
+  handleAdminSavePost,
+} from "./admin/handlers";
+
+
+import {
   handleGetClaims,
   handleGetClaimsHtml,
   handlePostClaim,
@@ -29,6 +41,8 @@ export interface Env {
 
 const FOUNDER_UUID = "4ff7ed97-b78f-4ae6-9011-5af714ee241c";
 
+
+// helpers, maybe move to the bottom later
 function requireAdmin(request: Request, env: Env): Response | null {
   const auth = request.headers.get("authorization") || "";
   const token = auth.startsWith("Bearer ") ? auth.slice(7).trim() : "";
@@ -80,16 +94,62 @@ function wantsHtml(request: Request): boolean {
   return accept.includes("text/html") || accept.includes("application/xhtml+xml");
 }
 
+function requireAdminCookie(request: Request, env: Env): Response | null {
+  const expected = env.ANCHOR_ADMIN_COOKIE || env.ANCHOR_ADMIN_TOKEN || "";
+  if (!expected) return new Response("Admin not configured", { status: 500 });
 
+  const cookie = request.headers.get("cookie") || "";
+  const m = cookie.match(/(?:^|;\s*)anchor_admin=([^;]+)/);
+  const token = m ? decodeURIComponent(m[1]) : "";
 
+  if (token !== expected) {
+    return new Response(null, { status: 303, headers: { Location: "/admin/login" } });
+  }
+  return null;
+}
 
+function setAdminCookie(env: Env): string {
+  const token = env.ANCHOR_ADMIN_COOKIE || env.ANCHOR_ADMIN_TOKEN || "";
+  return `anchor_admin=${encodeURIComponent(token)}; Path=/; HttpOnly; Secure; SameSite=Strict`;
+}
 
+function clearAdminCookie(): string {
+  return `anchor_admin=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Strict`;
+}
+
+function wantsPostForm(request: Request): boolean {
+  const ct = request.headers.get("content-type") || "";
+  return ct.includes("application/x-www-form-urlencoded") || ct.includes("multipart/form-data");
+}
+
+function uuidV4(): string {
+  // Workers supports crypto.randomUUID()
+  return crypto.randomUUID();
+}
 
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
     const path = url.pathname;
+
+
+    // Admin routes
+    if (path === "/admin/login" && request.method === "GET") return handleAdminLoginPage(request, env);
+    if (path === "/admin/login" && request.method === "POST") return handleAdminLoginPost(request, env);
+    if (path === "/admin/logout" && request.method === "POST") return handleAdminLogoutPost(request, env);
+
+    if (path === "/admin" && request.method === "GET") return handleAdminHome(request, env);
+
+    if (path === "/admin/new" && request.method === "GET") return handleAdminNewGet(request, env);
+    if (path === "/admin/new" && request.method === "POST") return handleAdminNewPost(request, env);
+
+    const mEdit = path.match(/^\/admin\/edit\/([0-9a-f-]{36})$/i);
+    if (mEdit && request.method === "GET") return handleAdminEditGet(request, env, mEdit[1].toLowerCase());
+
+    const mSave = path.match(/^\/admin\/save\/([0-9a-f-]{36})$/i);
+    if (mSave && request.method === "POST") return handleAdminSavePost(request, env, mSave[1].toLowerCase());
+
 
     // Homepage
     if (path === "/" || path === "/index.html") {
