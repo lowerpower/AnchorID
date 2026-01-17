@@ -3,11 +3,22 @@
 
 **TL;DR:** AnchorID provides a durable, UUID-based identity anchor that lets people prove who they are across websites and platforms without relying on any single service.
 
-**AnchorID** is a minimal, durable identity resolver for people — built on UUIDs, JSON-LD, and verifiable external claims.
+
+**AnchorID** is a minimal identity resolver for people — built on UUIDs, JSON-LD, and verifiable external claims.
 
 It provides a stable, canonical identity record (`/resolve/<uuid>`) that can be linked to websites, GitHub profiles, and other public identities using simple, auditable proofs.
 
 AnchorID is designed for **longevity, decentralization, and crawlability**, not account silos or proprietary identity systems.
+
+## Design Note
+
+This design note explains why AnchorID intentionally favors simple, durable primitives over novel identity frameworks.
+
+For a deeper explanation of the philosophy behind AnchorID, see:
+
+- **[Why AnchorID Is Deliberately Boring](docs/why-anchorid-is-deliberately-boring.md)**
+
+This document explains why AnchorID favors simple, durable primitives over novel identity frameworks.
 
 ---
 
