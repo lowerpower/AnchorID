@@ -10,6 +10,9 @@ import {
 
 import { loadClaims } from "./claims/store";
 
+import { buildProfile, mergeSameAs } from "./domain/profile";
+
+
 export interface Env {
   // Rquired: KV storage for profiles/sessions
   ANCHOR_KV: KVNamespace;
@@ -207,42 +210,35 @@ async function handleResolve(request: Request, env: Env): Promise<Response> {
   const u = uuid.toLowerCase();
 
   // 1) KV-first: profile:<uuid>
-  if (env.ANCHOR_KV) {
-    const kvKey = `profile:${u}`;
-    const profile = await env.ANCHOR_KV.get(kvKey, { type: "json" }) as any | null;
+  if (profile) {
+      // Pull verified URLs from claims ledger
+      const claims = await loadClaims(env, u);
+      const verifiedUrls = claims
+        .filter((c) => c.status === "verified")
+        .map((c) => c.url);
 
-    if (profile) {
-      // Ensure @id is correct even if stored object is older
-      profile["@id"] = `https://anchorid.net/resolve/${u}`;
-  
-	  //
-  	  if (env.ANCHOR_KV) {
-         const claims = await loadClaims(env, u);
-         const verified = claims
-           .filter((c) => c.status === "verified")
-           .map((c) => c.url);
+      // Build canonical profile output + effective merged sameAs
+      const { profile: canonical, effectiveSameAs } = buildProfile(
+        u,
+        profile,
+        null,
+        verifiedUrls,
+        {
+          // Recommended: keep KV profile.sameAs as "manual"; merge verified at resolve-time.
+          persistMergedSameAs: false,
+          bumpOnNoop: false,
+        }
+      );
 
-      if (verified.length) {
-		 const existing = Array.isArray(profile.sameAs) ? profile.sameAs : [];
-		 const merged = new Set<string>(existing.map(canonicalSameAs));
+      // Return merged sameAs publicly (without persisting)
+      const resolved = { ...canonical, sameAs: effectiveSameAs };
 
-		 for (const v of verified) {
-  			merged.add(canonicalSameAs(v));
-		 }
-
-		 profile.sameAs = Array.from(merged);
-       }
-     }
-
-     // add link to claims audit log
-     const claimsUrl = `https://anchorid.net/claims/${u}`;
-	 upsertSubjectOf(profile, claimsUrl);
-
-     return ldjson(profile, 200, {
-        "cache-control": "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400",
+      return ldjson(resolved, 200, {
+        "cache-control":
+          "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400",
       });
-    }
   }
+
 
   // 2) Fallback: founder hardcode (keeps existing behavior while KV is empty)
   const founderUuid = "4ff7ed97-b78f-4ae6-9011-5af714ee241c";
@@ -322,6 +318,7 @@ async function handleLogin(request: Request, env: Env): Promise<Response> {
   return json({ ok: true }, 200, { "cache-control": "no-store" });
 }
 
+
 async function handleEditPage(request: Request, env: Env): Promise<Response> {
   if (!env.ANCHOR_KV) return new Response("Not configured", { status: 501 });
 
@@ -329,13 +326,42 @@ async function handleEditPage(request: Request, env: Env): Promise<Response> {
   const token = (url.searchParams.get("token") || "").trim();
   if (!token) return new Response("Missing token", { status: 400 });
 
-  const session = await env.ANCHOR_KV.get(`login:${token}`, { type: "json" }) as any | null;
+  const session = (await env.ANCHOR_KV.get(`login:${token}`, {
+    type: "json",
+  })) as any | null;
   if (!session?.uuid) return new Response("Link expired", { status: 410 });
 
   const uuid = String(session.uuid).toLowerCase();
-  const profile = await env.ANCHOR_KV.get(`profile:${uuid}`, { type: "json" }) as any | null;
 
-  const current = profile || { url: "", sameAs: [], description: "" };
+  // Stored profile (manual fields live here)
+  const stored = (await env.ANCHOR_KV.get(`profile:${uuid}`, {
+    type: "json",
+  })) as any | null;
+
+  // Verified URLs from claims ledger (read-only)
+  const claims = await loadClaims(env, uuid);
+  const verifiedUrls = claims
+    .filter((c) => c.status === "verified")
+    .map((c) => c.url);
+
+  // Canonicalize for display (does not persist)
+  const { profile: canonical } = buildProfile(uuid, stored, null, verifiedUrls, {
+    persistMergedSameAs: false,
+    bumpOnNoop: false,
+  });
+
+  const manualSameAs = Array.isArray(stored?.sameAs) ? stored.sameAs : [];
+  const effectiveSameAs = mergeSameAs(manualSameAs, verifiedUrls);
+
+  const current = {
+    name: canonical.name || "",
+    alternateName: Array.isArray(canonical.alternateName) ? canonical.alternateName : [],
+    url: canonical.url || "",
+    description: canonical.description || "",
+    manualSameAs,
+    verifiedSameAs: verifiedUrls,
+    effectiveSameAs,
+  };
 
   const html = `<!doctype html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -343,32 +369,63 @@ async function handleEditPage(request: Request, env: Env): Promise<Response> {
 <body style="font-family:system-ui;max-width:720px;margin:40px auto;padding:0 16px;line-height:1.45">
 <h1>Edit AnchorID</h1>
 <p><code>${escapeHtml(uuid)}</code></p>
+
 <form method="post" action="/update" onsubmit="return submitForm(event)">
   <input type="hidden" name="token" value="${escapeHtml(token)}" />
-  <label>URL<br><input style="width:100%" name="url" value="${escapeHtml(current.url || "")}"></label><br><br>
-  <label>sameAs (one per line)<br>
-    <textarea style="width:100%;height:120px" name="sameAs">${escapeHtml((current.sameAs || []).join("\\n"))}</textarea>
+
+  <label>Name<br>
+    <input style="width:100%" name="name" value="${escapeHtml(current.name)}">
   </label><br><br>
+
+  <label>Alternate names (one per line)<br>
+    <textarea style="width:100%;height:90px" name="alternateName">${escapeHtml(current.alternateName.join("\n"))}</textarea>
+  </label><br><br>
+
+  <label>URL (canonical “about me” page)<br>
+    <input style="width:100%" name="url" value="${escapeHtml(current.url)}">
+  </label><br><br>
+
+  <label>Manual sameAs (stored, one per line)<br>
+    <textarea style="width:100%;height:120px" name="sameAs">${escapeHtml(current.manualSameAs.join("\n"))}</textarea>
+  </label>
+  <p style="color:#555;margin-top:8px">
+    Verified URLs are added automatically via claims and are not edited here.
+  </p>
+
+  <h3 style="margin-top:18px">Verified sameAs (from claims)</h3>
+  <pre style="background:#f6f6f6;padding:12px;border-radius:8px;white-space:pre-wrap">${escapeHtml(current.verifiedSameAs.join("\n") || "(none)")}</pre>
+
+  <h3 style="margin-top:18px">Effective sameAs (public)</h3>
+  <pre style="background:#f6f6f6;padding:12px;border-radius:8px;white-space:pre-wrap">${escapeHtml(current.effectiveSameAs.join("\n") || "(none)")}</pre>
+
   <label>Description (optional)<br>
-    <textarea style="width:100%;height:80px" name="description">${escapeHtml(current.description || "")}</textarea>
+    <textarea style="width:100%;height:80px" name="description">${escapeHtml(current.description)}</textarea>
   </label><br><br>
+
   <button type="submit">Save</button>
 </form>
+
 <pre id="out" style="margin-top:20px;white-space:pre-wrap"></pre>
 <script>
 async function submitForm(e){
   e.preventDefault();
   const fd = new FormData(e.target);
+
   const token = fd.get("token");
-  const url = fd.get("url");
-  const sameAs = (fd.get("sameAs")||"").toString().split(/\\r?\\n/).map(s=>s.trim()).filter(Boolean);
-  const description = (fd.get("description")||"").toString().trim();
+  const name = (fd.get("name") || "").toString().trim();
+  const alternateName = (fd.get("alternateName") || "").toString().split(/\\r?\\n/).map(s=>s.trim()).filter(Boolean);
+
+  const url = (fd.get("url") || "").toString().trim();
+  const sameAs = (fd.get("sameAs") || "").toString().split(/\\r?\\n/).map(s=>s.trim()).filter(Boolean);
+
+  const description = (fd.get("description") || "").toString().trim();
 
   const res = await fetch("/update", {
     method: "POST",
     headers: {"content-type":"application/json"},
-    body: JSON.stringify({ token, patch: { url, sameAs, description } })
+    body: JSON.stringify({ token, patch: { name, alternateName, url, sameAs, description } })
   });
+
   document.getElementById("out").textContent = await res.text();
   return false;
 }
@@ -385,48 +442,66 @@ async function submitForm(e){
   });
 }
 
+
 async function handleUpdate(request: Request, env: Env): Promise<Response> {
   if (!env.ANCHOR_KV) return json({ error: "not_configured" }, 501);
 
-  const body = await request.json().catch(() => null) as { token?: string; patch?: any } | null;
+  const body = (await request.json().catch(() => null)) as
+    | { token?: string; patch?: any }
+    | null;
+
   const token = (body?.token || "").trim();
   const patch = body?.patch || null;
 
-  if (!token || !patch) return json({ error: "bad_request" }, 400, { "cache-control": "no-store" });
+  if (!token || !patch) {
+    return json({ error: "bad_request" }, 400, { "cache-control": "no-store" });
+  }
 
-  const session = await env.ANCHOR_KV.get(`login:${token}`, { type: "json" }) as any | null;
-  if (!session?.uuid) return json({ error: "expired" }, 410, { "cache-control": "no-store" });
+  const session = (await env.ANCHOR_KV.get(`login:${token}`, {
+    type: "json",
+  })) as any | null;
+  if (!session?.uuid) {
+    return json({ error: "expired" }, 410, { "cache-control": "no-store" });
+  }
 
   const uuid = String(session.uuid).toLowerCase();
 
   const maxPerHour = parseInt(env.UPDATE_RL_PER_HOUR || "20", 10);
   const rl = await incrWithTtl(env.ANCHOR_KV, `rl:update:${uuid}`, 3600);
-  if (rl > maxPerHour) return json({ error: "rate_limited" }, 429, { "cache-control": "no-store" });
-
-  const key = `profile:${uuid}`;
-  const current = await env.ANCHOR_KV.get(key, { type: "json" }) as any | null;
-  if (!current) return json({ error: "not_found" }, 404, { "cache-control": "no-store" });
-
-  const next = { ...current };
-
-  if (typeof patch.url === "string") next.url = patch.url.trim().slice(0, 512);
-  if (typeof patch.description === "string") next.description = patch.description.trim().slice(0, 512);
-
-  if (Array.isArray(patch.sameAs)) {
-    next.sameAs = patch.sameAs
-      .map((s: any) => String(s).trim())
-      .filter((s: string) => s.startsWith("http://") || s.startsWith("https://"))
-      .slice(0, 50);
+  if (rl > maxPerHour) {
+    return json({ error: "rate_limited" }, 429, { "cache-control": "no-store" });
   }
 
-  next.dateModified = new Date().toISOString();
+  const key = `profile:${uuid}`;
+  const current = (await env.ANCHOR_KV.get(key, { type: "json" })) as any | null;
+  if (!current) {
+    return json({ error: "not_found" }, 404, { "cache-control": "no-store" });
+  }
 
-  await env.ANCHOR_KV.put(key, JSON.stringify(next));
+  // Build canonical next profile (manual fields only; verified merge happens at /resolve)
+  const input = {
+    name: patch.name,
+    alternateName: patch.alternateName,
+    url: patch.url,
+    sameAs: patch.sameAs,
+    description: patch.description,
+  };
+
+  const { profile: next, changed } = buildProfile(uuid, current, input, [], {
+    persistMergedSameAs: false,
+    bumpOnNoop: false,
+  });
+
+  if (changed) {
+    await env.ANCHOR_KV.put(key, JSON.stringify(next));
+  }
 
   // One-time token
   await env.ANCHOR_KV.delete(`login:${token}`);
 
-  return json({ ok: true, uuid, profile: next }, 200, { "cache-control": "no-store" });
+  return json({ ok: true, uuid, profile: next }, 200, {
+    "cache-control": "no-store",
+  });
 }
 
 // ------------------ Utilities ------------------
