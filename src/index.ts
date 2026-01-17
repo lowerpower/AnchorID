@@ -210,35 +210,35 @@ async function handleResolve(request: Request, env: Env): Promise<Response> {
   const u = uuid.toLowerCase();
 
   // 1) KV-first: profile:<uuid>
-  if (profile) {
-      // Pull verified URLs from claims ledger
+  if (env.ANCHOR_KV) {
+    const kvKey = `profile:${u}`;
+    const profile = (await env.ANCHOR_KV.get(kvKey, { type: "json" })) as any | null;
+
+    if (profile) {
       const claims = await loadClaims(env, u);
       const verifiedUrls = claims
         .filter((c) => c.status === "verified")
         .map((c) => c.url);
 
-      // Build canonical profile output + effective merged sameAs
       const { profile: canonical, effectiveSameAs } = buildProfile(
         u,
         profile,
         null,
         verifiedUrls,
         {
-          // Recommended: keep KV profile.sameAs as "manual"; merge verified at resolve-time.
           persistMergedSameAs: false,
           bumpOnNoop: false,
         }
       );
 
-      // Return merged sameAs publicly (without persisting)
       const resolved = { ...canonical, sameAs: effectiveSameAs };
 
       return ldjson(resolved, 200, {
         "cache-control":
           "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400",
       });
+    }
   }
-
 
   // 2) Fallback: founder hardcode (keeps existing behavior while KV is empty)
   const founderUuid = "4ff7ed97-b78f-4ae6-9011-5af714ee241c";
