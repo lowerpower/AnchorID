@@ -3,6 +3,7 @@
 
 import {
   handleGetClaims,
+  handleGetClaimsHtml,
   handlePostClaim,
   handlePostClaimVerify,
 } from "./claims/handlers";
@@ -71,6 +72,12 @@ function upsertSubjectOf(entity: any, claimsUrl: string) {
   entity.subjectOf = arr.length === 1 ? arr[0] : arr;
 }
 
+function wantsHtml(request: Request): boolean {
+  const accept = request.headers.get("accept") || "";
+  return accept.includes("text/html") || accept.includes("application/xhtml+xml");
+}
+
+
 
 
 
@@ -125,16 +132,23 @@ export default {
 	// Public claims list
 	if (path.startsWith("/claims/") && (request.method === "GET" || request.method === "HEAD")) {
   		const uuid = path.slice("/claims/".length);
-        
-        const res = await handleGetClaims(request, env, uuid);
 
-        // HEAD should return headers/status only
-        if (request.method === "HEAD") {
-            return new Response(null, { status: res.status, headers: res.headers });
-        }
+  		// If browser asks for HTML, serve the human page (GET only)
+  		if (request.method === "GET" && wantsHtml(request)) {
+    	return handleGetClaimsHtml(request, env, uuid);
+  		}
 
-  		return handleGetClaims(request, env as any, uuid);
+  		// Otherwise serve JSON (GET/HEAD)
+  		const res = await handleGetClaims(request, env, uuid);
+
+  		if (request.method === "HEAD") {
+    		return new Response(null, { status: res.status, headers: res.headers });
+  		}
+
+  		return res;
 	}
+
+
 
 	// Token-gated: add/update claim
 	if (path === "/claim" && request.method === "POST") {

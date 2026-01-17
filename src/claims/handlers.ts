@@ -35,6 +35,121 @@ export async function handleGetClaims(
   });
 }
 
+
+export async function handleGetClaimsHtml(
+  request: Request,
+  env: Env,
+  uuid: string
+): Promise<Response> {
+  if (!isUuid(uuid)) return new Response("Bad UUID", { status: 400 });
+
+  const claims = await loadClaims(env, uuid);
+  const verified = claims.filter((c) => c.status === "verified");
+  const others = claims.filter((c) => c.status !== "verified");
+
+  const resolveUrl = `https://anchorid.net/resolve/${uuid}`;
+  const claimsUrl = `https://anchorid.net/claims/${uuid}`;
+
+  function esc(s: string): string {
+    return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+
+  function badge(status: string): string {
+    const t = status.toUpperCase();
+    return `<span class="badge ${esc(status)}">${esc(t)}</span>`;
+  }
+
+  function renderClaim(c: any): string {
+    return `
+      <div class="claim">
+        <div class="row">
+          <div class="id">${esc(c.id)}</div>
+          <div class="right">${badge(c.status)}</div>
+        </div>
+        <div class="url"><a href="${esc(c.url)}" rel="me noopener" target="_blank">${esc(c.url)}</a></div>
+        <div class="meta">
+          <span>${esc(c.type)}</span>
+          ${c.verifiedAt ? `<span>Verified: <code>${esc(c.verifiedAt)}</code></span>` : ""}
+          ${c.lastCheckedAt ? `<span>Checked: <code>${esc(c.lastCheckedAt)}</code></span>` : ""}
+          ${c.failReason ? `<span class="fail">Fail: <code>${esc(c.failReason)}</code></span>` : ""}
+        </div>
+        <details>
+          <summary>Proof</summary>
+          <div class="proof">
+            <div><strong>kind</strong>: <code>${esc(c.proof?.kind || "")}</code></div>
+            <div><strong>url</strong>: <a href="${esc(c.proof?.url || "")}" target="_blank" rel="noopener">${esc(c.proof?.url || "")}</a></div>
+            <div><strong>mustContain</strong>: <code>${esc(c.proof?.mustContain || "")}</code></div>
+          </div>
+        </details>
+      </div>
+    `;
+  }
+
+  const html = `<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AnchorID Claims • ${esc(uuid)}</title>
+  <style>
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,sans-serif;margin:24px;max-width:920px;line-height:1.4}
+    header{display:flex;gap:12px;align-items:baseline;flex-wrap:wrap}
+    h1{font-size:20px;margin:0}
+    .muted{color:#666}
+    .links a{margin-right:12px}
+    .box{background:#f6f7f9;border:1px solid #e4e6ea;border-radius:10px;padding:12px;margin:16px 0}
+    .claim{border:1px solid #e4e6ea;border-radius:12px;padding:12px;margin:10px 0}
+    .row{display:flex;justify-content:space-between;gap:12px;align-items:center}
+    .id{font-weight:600}
+    .url{margin:6px 0 8px}
+    .meta{display:flex;gap:12px;flex-wrap:wrap;color:#555;font-size:13px}
+    code{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace}
+    .badge{font-size:12px;padding:2px 8px;border-radius:999px;border:1px solid #ddd}
+    .badge.verified{background:#e7f7ee;border-color:#bfe8cf}
+    .badge.self_asserted{background:#fff7e6;border-color:#ffe0a6}
+    .badge.failed{background:#fdecec;border-color:#f6b7b7}
+    .fail{color:#a00}
+    details{margin-top:8px}
+    footer{margin-top:24px;color:#777;font-size:12px}
+  </style>
+</head>
+<body>
+  <header>
+    <h1>AnchorID Claims</h1>
+    <div class="muted"><code>${esc(uuid)}</code></div>
+  </header>
+
+  <div class="links box">
+    <div><strong>Resolve</strong>: <a href="${esc(resolveUrl)}">${esc(resolveUrl)}</a></div>
+    <div><strong>Claims JSON</strong>: <a href="${esc(claimsUrl)}">${esc(claimsUrl)}</a></div>
+  </div>
+
+  <div class="box">
+    <div class="muted">Copy/paste proof line:</div>
+    <div><code>${esc(resolveUrl)}</code></div>
+  </div>
+
+  <h2>Verified</h2>
+  ${verified.length ? verified.map(renderClaim).join("") : `<p class="muted">No verified claims.</p>`}
+
+  <h2>Other</h2>
+  ${others.length ? others.map(renderClaim).join("") : `<p class="muted">No other claims.</p>`}
+
+  <footer>
+    Served by AnchorID • <a href="${esc(resolveUrl)}">/resolve</a> • <a href="${esc(claimsUrl)}">/claims</a>
+  </footer>
+</body>
+</html>`;
+
+  return new Response(html, {
+    headers: {
+      "content-type": "text/html; charset=utf-8",
+      "cache-control": "public, max-age=60, s-maxage=300, stale-while-revalidate=86400",
+    },
+  });
+}
+
+
 // Token-gated in router (reuse your existing auth guard there)
 export async function handlePostClaim(request: Request,   env: Env): Promise<Response> {
   const payload = await request.json().catch(() => null);
