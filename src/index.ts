@@ -215,6 +215,9 @@ async function handleResolve(request: Request, env: Env): Promise<Response> {
     const profile = (await env.ANCHOR_KV.get(kvKey, { type: "json" })) as any | null;
 
     if (profile) {
+      const storedDateCreated = typeof profile.dateCreated === "string" ? profile.dateCreated : null;
+      const storedDateModified = typeof profile.dateModified === "string" ? profile.dateModified : null;
+
       const claims = await loadClaims(env, u);
       const verifiedUrls = claims
         .filter((c) => c.status === "verified")
@@ -230,6 +233,10 @@ async function handleResolve(request: Request, env: Env): Promise<Response> {
           bumpOnNoop: false,
         }
       );
+
+      // IMPORTANT: /resolve is a read view. Do not “invent” new timestamps.
+      if (storedDateCreated) canonical.dateCreated = storedDateCreated;
+      if (storedDateModified) canonical.dateModified = storedDateModified;
 
       const resolved = { ...canonical, sameAs: effectiveSameAs };
 
