@@ -245,11 +245,24 @@ export async function handleAdminEditGet(req: Request, env: Env, uuid: string): 
   Modified: <code>${escapeHtml(canonical.dateModified)}</code>
 </p>
 
+
 <div class="row" style="margin-bottom:14px">
-  <a class="card" href="/resolve/${escapeHtml(uuid)}" target="_blank">View <code>/resolve</code></a>
-  <a class="card" href="/claims/${escapeHtml(uuid)}" target="_blank">View <code>/claims</code></a>
+  <a class="card" href="/resolve/${escapeHtml(uuid)}" target="_blank">
+    View <code>/resolve</code>
+  </a>
+
+  <button class="card" type="button"
+    onclick="navigator.clipboard.writeText('${origin}/resolve/${escapeHtml(uuid)}')">
+    Copy resolve URL
+  </button>
+
+  <a class="card" href="/claims/${escapeHtml(uuid)}" target="_blank">
+    View <code>/claims</code>
+  </a>
+
   <a class="card" href="/admin">Back to list</a>
 </div>
+
 
 <form method="post" action="/admin/save/${escapeHtml(uuid)}">
   <div class="grid">
