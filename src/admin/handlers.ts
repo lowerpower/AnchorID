@@ -141,32 +141,64 @@ export async function handleAdminHome(req: Request, env: Env): Promise<Response>
   return htmlResponse(html);
 }
 
+// GET /admin/new
 export async function handleAdminNewGet(req: Request, env: Env): Promise<Response> {
   const denied = requireAdminCookie(req, env);
   if (denied) return denied;
 
   const html = `<!doctype html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Create Profile</title></head>
-<body style="font-family:system-ui;max-width:720px;margin:40px auto;padding:0 16px;line-height:1.45">
+<title>Create Profile</title>
+<style>
+  body { font-family:system-ui; max-width:720px; margin:40px auto; padding:0 16px; line-height:1.45; }
+  .card { background:#f6f6f6; padding:14px; border-radius:10px; }
+  label { font-weight:600; display:block; margin-bottom:6px; }
+  input { width:100%; box-sizing:border-box; padding:10px; border:1px solid #ddd; border-radius:8px; font:inherit; }
+  button { padding:10px 14px; border-radius:10px; border:1px solid #111; background:#111; color:#fff; cursor:pointer; font:inherit; }
+  a { color: inherit; }
+  .hint { color:#555; font-size:13px; margin-top:6px; }
+</style>
+</head>
+<body>
 <h1>Create New Profile</h1>
+
 <form method="post" action="/admin/new">
-  <button type="submit">Create</button>
+  <div class="card">
+    <label>Name (optional)</label>
+    <input name="name" placeholder="e.g., Mycal">
+    <div class="hint">You can change this later.</div>
+  </div>
+
+  <div class="card" style="margin-top:14px">
+    <label>About URL (optional)</label>
+    <input name="url" placeholder="https://example.com/about">
+    <div class="hint">Will be canonicalized (https upgrade, fragments removed, etc.).</div>
+  </div>
+
+  <div style="margin-top:14px">
+    <button type="submit">Create</button>
+    <a href="/admin" style="margin-left:12px">Cancel</a>
+  </div>
 </form>
-<p style="margin-top:18px"><a href="/admin">Back</a></p>
 </body></html>`;
 
   return htmlResponse(html);
 }
 
+// POST /admin/new
 export async function handleAdminNewPost(req: Request, env: Env): Promise<Response> {
   const denied = requireAdminCookie(req, env);
   if (denied) return denied;
 
-  const uuid = uuidV4().toLowerCase();
+  const fd = await req.formData();
+  const input = {
+    name: fd.get("name"),
+    url: fd.get("url"),
+  };
 
-  // Seed required canonical profile, timestamps set here (dateCreated immutable from now on)
-  const { profile: seeded } = buildProfile(uuid, null, {}, [], {
+  const uuid = crypto.randomUUID().toLowerCase();
+
+  const { profile: seeded } = buildProfile(uuid, null, input, [], {
     persistMergedSameAs: false,
     bumpOnNoop: false,
     preserveStoredTimestampsOnRead: false,
@@ -179,6 +211,25 @@ export async function handleAdminNewPost(req: Request, env: Env): Promise<Respon
     headers: { Location: `/admin/edit/${uuid}`, "cache-control": "no-store" },
   });
 }
+
+export async function handleAdminDebugKv(req: Request, env: Env): Promise<Response> {
+
+  const denied = requireAdminCookie(req, env);
+  if (denied) return denied;
+
+  const list = await env.ANCHOR_KV.list({ prefix: "profile:", limit: 100 });
+
+  return new Response(JSON.stringify(list, null, 2), {
+    status: 200,
+    headers: {
+      "content-type": "application/json; charset=utf-8",
+      "cache-control": "no-store",
+      "x-content-type-options": "nosniff",
+    },
+  });
+}
+
+
 
 function isUuid(s: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
@@ -346,6 +397,7 @@ export async function handleAdminEditGet(req: Request, env: Env, uuid: string): 
   return htmlResponse(html);
 }
 
+
 export async function handleAdminSavePost(
   req: Request,
   env: Env,
@@ -365,7 +417,7 @@ export async function handleAdminSavePost(
     name: fd.get("name"),
     alternateName: fd.get("alternateName"), // string with newlines is OK
     url: fd.get("url"),
-    sameAs: fd.get("sameAs"), // string with newlines is OK
+    sameAs: fd.get("sameAs"),               // string with newlines is OK
     description: fd.get("description"),
   };
 
@@ -374,6 +426,14 @@ export async function handleAdminSavePost(
     bumpOnNoop: false,
     preserveStoredTimestampsOnRead: false,
   });
+
+  // Optional safety cleanup: never persist empty arrays
+  if (Array.isArray((next as any).sameAs) && (next as any).sameAs.length === 0) {
+    delete (next as any).sameAs;
+  }
+  if (Array.isArray((next as any).alternateName) && (next as any).alternateName.length === 0) {
+    delete (next as any).alternateName;
+  }
 
   if (changed) {
     await env.ANCHOR_KV.put(`profile:${uuid}`, JSON.stringify(next));
@@ -384,6 +444,5 @@ export async function handleAdminSavePost(
     headers: { Location: `/admin/edit/${uuid}`, "cache-control": "no-store" },
   });
 }
-
 
 

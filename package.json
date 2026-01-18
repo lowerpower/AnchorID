@@ -1,18 +1,21 @@
 {
-	"name": "anchorid",
-	"version": "0.0.0",
-	"private": true,
-	"scripts": {
-		"deploy": "wrangler deploy",
-		"dev": "wrangler dev",
-		"start": "wrangler dev",
-		"test": "vitest",
-		"cf-typegen": "wrangler types"
-	},
-	"devDependencies": {
-		"@cloudflare/vitest-pool-workers": "^0.8.19",
-		"typescript": "^5.5.2",
-		"vitest": "~3.2.0",
-		"wrangler": "^4.59.1"
-	}
+  "name": "anchorid",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev",
+    "start": "wrangler dev",
+    "test": "vitest",
+    "cf-typegen": "wrangler types",
+
+    "kv:list:prod": "wrangler kv key list --namespace-id 813539ddad014d25b787ecb551dbe51b --prefix \"profile:\" --remote",
+    "kv:get:prod": "wrangler kv key get --namespace-id 813539ddad014d25b787ecb551dbe51b --remote"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.8.19",
+    "typescript": "^5.5.2",
+    "vitest": "~3.2.0",
+    "wrangler": "^4.59.1"
+  }
 }

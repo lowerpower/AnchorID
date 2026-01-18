@@ -10,6 +10,9 @@ import {
   handleAdminNewPost,
   handleAdminEditGet,
   handleAdminSavePost,
+  handleAdminNewGet,
+  handleAdminNewPost,  
+  handleAdminDebugKv,
 } from "./admin/handlers";
 
 
@@ -143,6 +146,12 @@ export default {
 
     if (path === "/admin/new" && request.method === "GET") return handleAdminNewGet(request, env);
     if (path === "/admin/new" && request.method === "POST") return handleAdminNewPost(request, env);
+    if (path === "/admin/new" && request.method === "GET") return handleAdminNewGet(request, env);
+    if (path === "/admin/new" && request.method === "POST") return handleAdminNewPost(request, env);
+
+    // Admin debug: KV list (temporary)
+    if (path === "/admin/debug/kv" && request.method === "GET") return handleAdminDebugKv(request, env);  
+
 
     const mEdit = path.match(/^\/admin\/edit\/([0-9a-f-]{36})$/i);
     if (mEdit && request.method === "GET") return handleAdminEditGet(request, env, mEdit[1].toLowerCase());

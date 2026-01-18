@@ -105,6 +105,11 @@ function isNonEmptyString(x: unknown): x is string {
   return typeof x === "string" && x.trim().length > 0;
 }
 
+function normalizeOptionalArray<T>(arr?: T[]): T[] | undefined {
+  return arr && arr.length ? arr : undefined;
+}
+
+
 /**
  * Canonical URL normalization.
  * - Trim
@@ -385,7 +390,10 @@ export function buildProfile(
 
   // What do we store in profile.sameAs?
   const sameAsForStorage = opt.persistMergedSameAs ? effectiveSameAs : manualSameAs;
-  const sameAs = sanitizeSameAsForProfileStorage(sameAsForStorage);
+  const sameAs = normalizeOptionalArray(
+        sanitizeSameAsForProfileStorage(sameAsForStorage)
+    );
+
 
   // Baseline timestamps
   const baseDateCreated = stored?.dateCreated ?? now;
@@ -413,31 +421,48 @@ export function buildProfile(
     isPartOf: WEBSITE,
   };
 
+  //strip empty arrays from the storedComparable before the compare
+  function stripEmptyArrays(obj: any) {
+    if (!obj || typeof obj !== "object") return obj;
+    const out: any = Array.isArray(obj) ? [...obj] : { ...obj };
+    for (const k of Object.keys(out)) {
+      const v = out[k];
+      if (Array.isArray(v) && v.length === 0) delete out[k];
+    }
+    return out;
+  }
+
+  // Strip empty arrays from candidate too (keep canonical output clean)
+  const normalizedCandidate = stripEmptyArrays(candidate);
+
   // Detect change compared to stored (ignore dateModified drift by aligning it for comparison)
-  const storedComparable = stored ? { ...stored, dateModified: candidate.dateModified } : null;
-  const structurallyChanged = storedComparable ? !deepEqual(candidate, storedComparable) : true;
+  const storedComparable = stored
+    ? stripEmptyArrays({ ...stored, dateModified: normalizedCandidate.dateModified })
+    : null;
+
+  const structurallyChanged = storedComparable
+    ? !deepEqual(normalizedCandidate, storedComparable)
+    : true;
 
   // Apply timestamp policy
   if (preserveOnRead) {
-    if (stored?.dateCreated) candidate.dateCreated = stored.dateCreated;
-    if (stored?.dateModified) candidate.dateModified = stored.dateModified;
+    if (stored?.dateCreated) normalizedCandidate.dateCreated = stored.dateCreated;
+    if (stored?.dateModified) normalizedCandidate.dateModified = stored.dateModified;
   } else {
-    // Always preserve stored dateCreated if present (immutable)
-    if (stored?.dateCreated) candidate.dateCreated = stored.dateCreated;
+    if (stored?.dateCreated) normalizedCandidate.dateCreated = stored.dateCreated;
 
     if (structurallyChanged || opt.bumpOnNoop) {
-      candidate.dateModified = now;
+      normalizedCandidate.dateModified = now;
     } else if (stored?.dateModified) {
-      candidate.dateModified = stored.dateModified;
+      normalizedCandidate.dateModified = stored.dateModified;
     }
   }
 
-  const changed = structurallyChanged || (!!stored && opt.bumpOnNoop);
+  const changed = preserveOnRead
+  ? false
+  : (structurallyChanged || (!!stored && opt.bumpOnNoop));
 
-  return { profile: candidate, changed, effectiveSameAs };
+  const cleaned = stripEmptyArrays(candidate);
+  return { profile: cleaned, changed, effectiveSameAs };
 }
-
-
-
-
 
