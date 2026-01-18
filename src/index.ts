@@ -26,6 +26,7 @@ import {
 import { loadClaims } from "./claims/store";
 
 import { buildProfile, mergeSameAs } from "./domain/profile";
+import { sendEmail, hasEmailConfig } from "./email";
 
 
 export interface Env {
@@ -40,9 +41,10 @@ export interface Env {
   ANCHOR_ADMIN_TOKEN?: string;
   ANCHOR_ADMIN_COOKIE?: string;
 
-  // Email login/update
-  RESEND_API_KEY?: string;
-  EMAIL_FROM?: string;
+  // Email providers (at least one required for magic links)
+  MAIL_SEND_SECRET?: string;  // mycal.net relay (preferred)
+  RESEND_API_KEY?: string;    // Resend API (fallback)
+  EMAIL_FROM?: string;        // Sender address (required for Resend)
 
   // TTL + limits
   LOGIN_TTL_SECONDS?: string;    // default 900
@@ -484,7 +486,7 @@ async function handleSignupPage(request: Request, env: Env): Promise<Response> {
 
 // POST /signup - Create new profile (public)
 async function handleSignup(request: Request, env: Env): Promise<Response> {
-  if (!env.ANCHOR_KV || !env.RESEND_API_KEY || !env.EMAIL_FROM) {
+  if (!env.ANCHOR_KV || !hasEmailConfig(env)) {
     return new Response("Email not configured", { status: 501 });
   }
 
@@ -572,7 +574,7 @@ async function handleSignup(request: Request, env: Env): Promise<Response> {
   const origin = new URL(request.url).origin;
   const setupLink = `${origin}/setup?token=${encodeURIComponent(editToken)}&uuid=${encodeURIComponent(uuid)}`;
 
-  await sendResendEmail(env, email, "Complete your AnchorID setup", [
+  await sendEmail(env, email, "Complete your AnchorID setup", [
     "Welcome to AnchorID!",
     "",
     `Complete your setup (expires in ${Math.round(ttl / 60)} minutes):`,
@@ -786,7 +788,7 @@ async function handleLoginPage(request: Request, env: Env): Promise<Response> {
 
 // POST /login - Request magic link (handles both JSON API and form submission)
 async function handleLogin(request: Request, env: Env): Promise<Response> {
-  if (!env.ANCHOR_KV || !env.RESEND_API_KEY || !env.EMAIL_FROM) {
+  if (!env.ANCHOR_KV || !hasEmailConfig(env)) {
     return json({ error: "not_configured" }, 501);
   }
 
@@ -853,7 +855,7 @@ async function handleLogin(request: Request, env: Env): Promise<Response> {
 
   const link = `${new URL(request.url).origin}/edit?token=${encodeURIComponent(token)}`;
 
-  await sendResendEmail(env, email, "Your AnchorID edit link", [
+  await sendEmail(env, email, "Your AnchorID edit link", [
     `Here's your secure edit link (expires in ${Math.round(ttl / 60)} minutes):`,
     link,
     "",
@@ -1324,27 +1326,3 @@ function escapeHtml(s: string): string {
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
   }[c] as string));
 }
-
-async function sendResendEmail(env: Env, to: string, subject: string, text: string) {
-  // Best-effort; don’t hard fail the API for email issues
-  const res = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      "authorization": `Bearer ${env.RESEND_API_KEY}`,
-      "content-type": "application/json",
-    },
-    body: JSON.stringify({
-      from: env.EMAIL_FROM,
-      to,
-      subject,
-      text,
-    }),
-  });
-
-  if (!res.ok) {
-    // optionally: console.log(await res.text());
-  }
-}
-
-
-
