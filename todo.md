@@ -18,46 +18,46 @@
 
 ---
 
-## ⏭️ NEXT: Access & Trust (MVP Gate)
+## ✅ Access & Trust (MVP Gate)
 
 ### 1. Email-based Edit Access (Magic Link)
 
-- [ ] Add email field on profile creation
-- [ ] Normalize + store email hash (not plaintext)
-- [ ] Generate one-time edit token
-- [ ] Email magic edit link (`/edit?token=...`)
-- [ ] Token expires after first use or TTL
-- [ ] Rate-limit token generation per email
+- [x] Add email field on profile creation
+- [x] Normalize + store email hash (not plaintext)
+- [x] Generate one-time edit token
+- [x] Email magic edit link (`/edit?token=...`)
+- [x] Token expires after first use or TTL
+- [x] Rate-limit token generation per email
 
 ### 2. Backup Edit Token (Recovery)
 
-- [ ] Generate backup edit token at creation
-- [ ] Hash + store token (never plaintext)
-- [ ] Display token **once** to creator
-- [ ] Allow token-based edit if email unavailable
-- [ ] Ability to rotate backup token
+- [x] Generate backup edit token at creation
+- [x] Hash + store token (never plaintext)
+- [x] Display token **once** to creator
+- [x] Allow token-based edit if email unavailable
+- [x] Ability to rotate backup token
 
 ---
 
-## 🔐 Security Hardening
+## ✅ Security Hardening
 
-- [ ] Remove admin cookie requirement for normal users
-- [ ] Restrict admin routes to explicit admin secret
-- [ ] Add CSRF protection to POST routes
-- [ ] Add per-IP rate limits on edit + token endpoints
-- [ ] Add audit log (KV or log-only) for edits
+- [x] Remove admin cookie requirement for normal users
+- [x] Restrict admin routes to explicit admin secret
+- [x] Add CSRF protection to POST routes
+- [x] Add per-IP rate limits on edit + token endpoints
+- [x] Add audit log (KV) for edits
 
 ---
 
-## 🧭 UX & Polish
+## ✅ UX & Polish
 
-- [ ] Inline validation errors in admin UI
-- [ ] Clear distinction between:
+- [x] Inline validation errors in admin UI
+- [x] Clear distinction between:
   - Manual sameAs
   - Verified sameAs
   - Published sameAs
-- [ ] Copy explaining identity guarantees
-- [ ] Success + failure states on save
+- [x] Copy explaining identity guarantees
+- [x] Success + failure states on save
 
 ---
 
@@ -82,10 +82,10 @@
 
 ## 🏁 MVP Definition of Done
 
-- [ ] A human can claim an identity via email
-- [ ] They can edit it securely later
-- [ ] They can recover access without admin help
-- [ ] `/resolve` output is stable, canonical, and explainable
+- [x] A human can claim an identity via email
+- [x] They can edit it securely later
+- [x] They can recover access without admin help
+- [x] `/resolve` output is stable, canonical, and explainable
 - [ ] System survives hostile-but-boring internet traffic
 
 ---

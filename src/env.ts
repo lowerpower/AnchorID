@@ -1,18 +1,18 @@
 //
 // src/env.ts
-// src/env.ts
 export interface Env {
   // Required: KV storage for profiles/claims/sessions/pages
   ANCHOR_KV: KVNamespace;
 
-  // Admin token (used today for Authorization: Bearer <token>)
-  ANCHOR_ADMIN_TOKEN?: string;
+  // Admin secret (required for /admin/* routes)
+  // This must be explicitly set - admin routes are disabled without it.
+  ANCHOR_ADMIN_SECRET?: string;
 
-  // Optional: cookie value for browser admin sessions.
-  // If unset, we can reuse ANCHOR_ADMIN_TOKEN as the cookie value.
+  // Legacy: still supported for backward compatibility, but ANCHOR_ADMIN_SECRET takes precedence
+  ANCHOR_ADMIN_TOKEN?: string;
   ANCHOR_ADMIN_COOKIE?: string;
 
-  // Email login/update (legacy flow)
+  // Email login/update
   RESEND_API_KEY?: string;
   EMAIL_FROM?: string;
 
