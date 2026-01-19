@@ -74,7 +74,22 @@
 - [x] `/about` — What is AnchorID, how it works, philosophy
 - [x] `/guide` — Canonical identity placement guide
 - [x] `/privacy` — Privacy policy
+- [x] `/faq` — Skeptic FAQ
 - [x] Consistent navigation across all pages
+
+---
+
+## ✅ Organization Support
+
+- [x] Add `Organization` to allowed `@type` set
+- [x] Update `buildProfile()` to handle Person and Organization
+- [x] Add `founder[]` for Organizations (references to Person UUIDs)
+- [x] Add `affiliation[]` for Persons (references to Organization UUIDs)
+- [x] Add `foundingDate` for Organizations
+- [x] Signup: Person/Organization selector (type immutable after creation)
+- [x] Edit page: conditional fields based on entity type
+- [x] Setup page: shows entity type badge
+- [x] `/resolve/{uuid}` works for both types
 
 ---
 
