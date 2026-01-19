@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <title>Privacy Policy | AnchorID</title>
+  <meta name="description" content="AnchorID privacy policy. How we handle your data." />
+
+  <link rel="canonical" href="https://anchorid.net/privacy" />
+
+  <style>
+    :root {
+      --bg: #ffffff;
+      --fg: #111111;
+      --muted: #555555;
+      --rule: #e7e7e7;
+      --codebg: #f6f6f6;
+      --link: #0b57d0;
+      --maxw: 860px;
+    }
+    html, body { background: var(--bg); color: var(--fg); margin: 0; padding: 0; }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; line-height: 1.55; }
+    .wrap { max-width: var(--maxw); margin: 0 auto; padding: 32px 20px; }
+    a { color: var(--link); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    h1 { font-size: 2rem; margin: 0 0 10px 0; letter-spacing: -0.02em; }
+    .kicker { color: var(--muted); margin: 0 0 18px 0; }
+    .meta { color: var(--muted); font-size: 0.95rem; }
+    hr { border: 0; border-top: 1px solid var(--rule); margin: 24px 0; }
+    h2 { font-size: 1.35rem; margin: 20px 0 10px 0; letter-spacing: -0.01em; }
+    p { margin: 10px 0; }
+    ul { margin: 10px 0 10px 20px; }
+    li { margin: 6px 0; }
+    code { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; background: var(--codebg); padding: 2px 6px; border-radius: 4px; }
+    .callout { border-left: 3px solid var(--rule); padding: 10px 14px; background: #fafafa; border-radius: 10px; }
+    .small { font-size: 0.95rem; color: var(--muted); }
+    footer { border-top: 1px solid var(--rule); }
+    header.wrap { padding-bottom: 6px; }
+    main.wrap { padding-top: 6px; }
+    header.wrap hr { margin: 6px 0; }
+    main.wrap > h2:first-child { margin-top: 8px; }
+
+    /* Nav bar */
+    nav.topnav { font-size: 14px; margin-bottom: 24px; }
+    nav.topnav span { color: #111; font-weight: 500; }
+    nav.topnav a, nav.topnav span { margin-right: 16px; }
+  </style>
+</head>
+
+<body>
+  <header class="wrap">
+    <nav class="topnav">
+      <a href="/">Home</a>
+      <a href="/guide">Guide</a>
+      <span>Privacy</span>
+      <a href="https://github.com/lowerpower/AnchorID">GitHub</a>
+    </nav>
+    <h1>Privacy Policy</h1>
+    <p class="kicker">How AnchorID handles your data.</p>
+    <p class="small"><strong>Last updated:</strong> January 2025</p>
+    <hr />
+  </header>
+
+  <main class="wrap">
+    <h2>Summary</h2>
+
+    <div class="callout">
+      <p><strong>AnchorID is designed for public identity.</strong> Your profile data is intentionally public. We minimize collection of private data and do not sell or share data with third parties.</p>
+    </div>
+
+    <hr />
+
+    <h2>What data is public</h2>
+
+    <p>The following information is publicly visible by design:</p>
+
+    <ul>
+      <li>Your UUID (permanent identifier)</li>
+      <li>Profile fields: name, alternate names, description, URL</li>
+      <li>sameAs links (manual and verified)</li>
+      <li>Claims ledger (claim types, URLs, verification status, timestamps)</li>
+      <li>Profile timestamps (dateCreated, dateModified)</li>
+    </ul>
+
+    <p>This is the core purpose of AnchorID. If you do not want information to be public, do not add it to your profile.</p>
+
+    <hr />
+
+    <h2>What data is private</h2>
+
+    <h3>Email address</h3>
+
+    <p>Your email address is <strong>never stored in plaintext</strong>. We store only a SHA-256 hash of your email, which is used to:</p>
+
+    <ul>
+      <li>Send magic link emails for edit access</li>
+      <li>Prevent duplicate signups</li>
+      <li>Rate limit login requests</li>
+    </ul>
+
+    <p>We cannot recover your email address from the stored hash. If you forget which email you used, we cannot help you find it.</p>
+
+    <h3>Backup token</h3>
+
+    <p>Your backup recovery token is stored as a SHA-256 hash. The plaintext token is shown once at creation and never stored.</p>
+
+    <h3>IP addresses</h3>
+
+    <p>IP addresses are used for:</p>
+
+    <ul>
+      <li>Rate limiting (to prevent abuse)</li>
+      <li>Audit logging (hashed, not plaintext)</li>
+    </ul>
+
+    <p>We do not store plaintext IP addresses. Rate limit counters expire automatically after one hour.</p>
+
+    <hr />
+
+    <h2>Cookies</h2>
+
+    <p>AnchorID uses minimal cookies:</p>
+
+    <ul>
+      <li><strong>CSRF token</strong> — A security token to prevent cross-site request forgery. Session-only, not used for tracking.</li>
+      <li><strong>Admin cookie</strong> — Used only for administrative access, not for regular users.</li>
+    </ul>
+
+    <p>We do not use tracking cookies, analytics cookies, or advertising cookies.</p>
+
+    <hr />
+
+    <h2>Third-party services</h2>
+
+    <h3>Cloudflare</h3>
+
+    <p>AnchorID runs on Cloudflare Workers and uses Cloudflare KV for data storage. Cloudflare may collect standard web server logs (IP addresses, user agents, request URLs) as part of their infrastructure. See <a href="https://www.cloudflare.com/privacypolicy/">Cloudflare's Privacy Policy</a>.</p>
+
+    <h3>Email delivery</h3>
+
+    <p>Magic link emails are sent through an email relay service. Your email address is transmitted to this service solely for delivery purposes.</p>
+
+    <hr />
+
+    <h2>Data retention</h2>
+
+    <ul>
+      <li><strong>Profiles</strong> — Stored indefinitely. Profiles cannot be deleted (this is by design for identity permanence).</li>
+      <li><strong>Claims</strong> — Stored indefinitely as part of the public audit ledger.</li>
+      <li><strong>Audit logs</strong> — Retained up to 100 entries per profile.</li>
+      <li><strong>Rate limit counters</strong> — Expire automatically after one hour.</li>
+      <li><strong>Magic link tokens</strong> — Expire after 15 minutes or first use.</li>
+    </ul>
+
+    <hr />
+
+    <h2>Data access and portability</h2>
+
+    <p>Your public profile data is always accessible at:</p>
+
+    <p><code>https://anchorid.net/resolve/&lt;your-uuid&gt;</code></p>
+
+    <p>This returns a standard JSON-LD document that you can save, archive, or use anywhere.</p>
+
+    <hr />
+
+    <h2>Data deletion</h2>
+
+    <p>AnchorID does not support profile deletion. This is intentional — the identifier is designed to be permanent so other systems can rely on it.</p>
+
+    <p>You can:</p>
+
+    <ul>
+      <li>Clear all optional fields (name, description, URL, sameAs)</li>
+      <li>Remove verified claims by removing proofs from your websites</li>
+    </ul>
+
+    <p>The UUID itself will persist.</p>
+
+    <hr />
+
+    <h2>Security</h2>
+
+    <p>We implement security measures including:</p>
+
+    <ul>
+      <li>HTTPS everywhere</li>
+      <li>CSRF protection on all forms</li>
+      <li>One-time-use authentication tokens</li>
+      <li>Rate limiting to prevent abuse</li>
+      <li>No plaintext storage of sensitive data</li>
+    </ul>
+
+    <p>For details, see our <a href="https://github.com/lowerpower/AnchorID/blob/main/docs/threat-model.md">threat model documentation</a>.</p>
+
+    <hr />
+
+    <h2>Children</h2>
+
+    <p>AnchorID is not intended for use by children under 13. We do not knowingly collect data from children.</p>
+
+    <hr />
+
+    <h2>Changes to this policy</h2>
+
+    <p>We may update this policy occasionally. Significant changes will be noted with an updated "Last updated" date. Continued use of AnchorID after changes constitutes acceptance.</p>
+
+    <hr />
+
+    <h2>Contact</h2>
+
+    <p>For privacy questions, open an issue on <a href="https://github.com/lowerpower/AnchorID">GitHub</a>.</p>
+  </main>
+
+  <footer class="wrap">
+    <p class="small">&copy; <span id="y"></span> AnchorID.</p>
+    <script>
+      document.getElementById("y").textContent = String(new Date().getFullYear());
+    </script>
+  </footer>
+</body>
+</html>

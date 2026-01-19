@@ -206,6 +206,9 @@ export default {
   <style>
     body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; max-width: 720px; margin: 40px auto; padding: 0 16px; line-height: 1.45; }
     a { color: #1a73e8; }
+    nav { font-size: 14px; margin-bottom: 32px; padding-bottom: 16px; border-bottom: 1px solid #eee; }
+    nav span { color: #111; font-weight: 500; }
+    nav a, nav span { margin-right: 16px; }
     .actions { margin-top: 24px; }
     .actions a { display: inline-block; padding: 10px 20px; border-radius: 8px; text-decoration: none; margin-right: 12px; margin-bottom: 8px; }
     .actions a.primary { background: #111; color: #fff; }
@@ -213,6 +216,13 @@ export default {
   </style>
 </head>
 <body>
+  <nav>
+    <span>Home</span>
+    <a href="/guide">Guide</a>
+    <a href="/privacy">Privacy</a>
+    <a href="https://github.com/lowerpower/AnchorID">GitHub</a>
+  </nav>
+
   <h1>AnchorID</h1>
   <p>Canonical UUID identity anchors and resolvers. Create a permanent, decentralized identity anchor that you control.</p>
 
@@ -241,6 +251,21 @@ export default {
       const html = await env.ANCHOR_KV.get("page:guide");
       if (!html) {
         return new Response("Guide not found", { status: 404 });
+      }
+      return new Response(html, {
+        headers: {
+          "content-type": "text/html; charset=utf-8",
+          "cache-control":
+            "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400",
+        },
+      });
+    }
+
+    // Privacy policy page
+    if (path === "/privacy" || path === "/privacy/") {
+      const html = await env.ANCHOR_KV.get("page:privacy");
+      if (!html) {
+        return new Response("Privacy policy not found", { status: 404 });
       }
       return new Response(html, {
         headers: {
@@ -616,8 +641,9 @@ async function handleSetupPage(request: Request, env: Env): Promise<Response> {
     await env.ANCHOR_KV.delete(`signup:${uuid}`);
   }
 
-  // Consume the login token
-  await env.ANCHOR_KV.delete(`login:${token}`);
+  // NOTE: Don't consume the login token here - it stays valid until first save
+  // This allows the user to click "Edit this AnchorID" and make changes
+  // Token will be consumed by handleUpdate() on first successful save
 
   const profile = await env.ANCHOR_KV.get(`profile:${uuid}`, { type: "json" }) as any | null;
   const name = profile?.name || "(unnamed)";
@@ -636,6 +662,9 @@ async function handleSetupPage(request: Request, env: Env): Promise<Response> {
   .hint { color:#555; font-size:13px; margin-top:6px; }
   code { background:#eee; padding:2px 6px; border-radius:4px; font-size:13px; }
   a { color:#1a73e8; }
+  a.btn { display:inline-block; padding:12px 20px; border-radius:10px; background:#1a73e8; color:#fff; text-decoration:none; font-weight:500; }
+  a.btn:hover { background:#1557b0; }
+  .action-box { text-align:center; padding:20px 0; }
 </style>
 </head>
 <body>
@@ -685,6 +714,14 @@ function downloadToken() {
   <p class="hint">The backup token was shown when you first completed setup.</p>
 </div>
 `}
+
+<div class="card action-box">
+  <a href="/edit?token=${escapeHtml(token)}" class="btn">Edit this AnchorID</a>
+  <p class="hint" style="margin-top:12px">
+    This link can be used once to finish setup.<br>
+    After saving, you'll need to request a new edit link by email.
+  </p>
+</div>
 
 <div class="card">
   <strong>What's Next?</strong>
@@ -964,48 +1001,105 @@ async function handleEditPage(request: Request, env: Env): Promise<Response> {
 
   const html = `<!doctype html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Edit AnchorID</title></head>
-<body style="font-family:system-ui;max-width:720px;margin:40px auto;padding:0 16px;line-height:1.45">
+<title>Edit AnchorID</title>
+<style>
+  body { font-family:system-ui; max-width:720px; margin:40px auto; padding:0 16px; line-height:1.5; color:#111; }
+  h1 { margin-bottom:8px; }
+  .intro { color:#555; margin-bottom:24px; }
+  .field { margin-bottom:20px; }
+  .field label { font-weight:500; display:block; margin-bottom:4px; }
+  .field input, .field textarea { width:100%; padding:8px; border:1px solid #ccc; border-radius:6px; font:inherit; box-sizing:border-box; }
+  .field textarea { resize:vertical; }
+  .hint { color:#555; font-size:13px; margin-top:4px; }
+  .hint-secondary { color:#777; font-size:12px; margin-top:2px; }
+  .section { margin-top:24px; padding-top:16px; border-top:1px solid #eee; }
+  .section h3 { margin:0 0 8px 0; font-size:15px; }
+  .readonly-box { background:#f6f6f6; padding:12px; border-radius:8px; white-space:pre-wrap; font-family:monospace; font-size:13px; }
+  .uuid-box { background:#f0f0f0; padding:10px 14px; border-radius:8px; font-family:monospace; font-size:14px; margin:8px 0 20px 0; }
+  button[type="submit"] { padding:12px 24px; background:#111; color:#fff; border:none; border-radius:8px; font:inherit; cursor:pointer; }
+  button[type="submit"]:hover { background:#333; }
+  .save-hint { color:#555; font-size:12px; margin-top:8px; }
+  .footer { margin-top:40px; padding-top:20px; border-top:1px solid #eee; color:#777; font-size:13px; }
+  #out { margin-top:20px; white-space:pre-wrap; }
+  #out:empty { display:none; }
+</style>
+</head>
+<body>
 <h1>Edit AnchorID</h1>
-<p><code>${escapeHtml(uuid)}</code></p>
+<p class="intro">This page edits your canonical identity record.<br>Changes here affect how you are identified across the web.</p>
+
+<div class="field">
+  <label>AnchorID</label>
+  <div class="uuid-box">${escapeHtml(uuid)}</div>
+  <p class="hint">This is your permanent identifier. It never changes, even if everything else does.</p>
+</div>
 
 <form method="post" action="/update" onsubmit="return submitForm(event)">
   <input type="hidden" name="token" value="${escapeHtml(sessionToken)}" />
   <input type="hidden" name="_csrf" value="${escapeHtml(csrfToken)}" />
 
-  <label>Name<br>
-    <input style="width:100%" name="name" value="${escapeHtml(current.name)}">
-  </label><br><br>
+  <div class="field">
+    <label for="name">Name</label>
+    <input id="name" name="name" value="${escapeHtml(current.name)}">
+    <p class="hint">Your primary human-readable name.</p>
+    <p class="hint-secondary">Used by search engines and applications when displaying this identity.</p>
+  </div>
 
-  <label>Alternate names (one per line)<br>
-    <textarea style="width:100%;height:90px" name="alternateName">${escapeHtml(current.alternateName.join("\n"))}</textarea>
-  </label><br><br>
+  <div class="field">
+    <label for="alternateName">Alternate names (one per line)</label>
+    <textarea id="alternateName" name="alternateName" rows="3">${escapeHtml(current.alternateName.join("\n"))}</textarea>
+    <p class="hint">Other names this person is known by.</p>
+    <p class="hint-secondary">Common uses: legal name, handle, transliteration, or historical name.</p>
+  </div>
 
-  <label>URL (canonical “about me” page)<br>
-    <input style="width:100%" name="url" value="${escapeHtml(current.url)}">
-  </label><br><br>
+  <div class="field">
+    <label for="url">URL (canonical about page)</label>
+    <input id="url" name="url" value="${escapeHtml(current.url)}">
+    <p class="hint">The main page that describes this identity.</p>
+    <p class="hint-secondary">URLs are normalized automatically (https enforced, fragments removed).</p>
+  </div>
 
-  <label>Manual sameAs (stored, one per line)<br>
-    <textarea style="width:100%;height:120px" name="sameAs">${escapeHtml(current.manualSameAs.join("\n"))}</textarea>
-  </label>
-  <p style="color:#555;margin-top:8px">
-    Verified URLs are added automatically via claims and are not edited here.
-  </p>
+  <div class="field">
+    <label for="sameAs">sameAs (Manual)</label>
+    <textarea id="sameAs" name="sameAs" rows="4">${escapeHtml(current.manualSameAs.join("\n"))}</textarea>
+    <p class="hint">External profiles you control that represent the same person.</p>
+    <p class="hint-secondary">These links are stored directly in your canonical profile.</p>
+    <p class="hint-secondary">Examples: GitHub profile, personal site, LinkedIn, Mastodon profile</p>
+  </div>
 
-  <h3 style="margin-top:18px">Verified sameAs (from claims)</h3>
-  <pre style="background:#f6f6f6;padding:12px;border-radius:8px;white-space:pre-wrap">${escapeHtml(current.verifiedSameAs.join("\n") || "(none)")}</pre>
+  <div class="section">
+    <h3>sameAs (Verified)</h3>
+    <div class="readonly-box">${escapeHtml(current.verifiedSameAs.join("\n") || "(none)")}</div>
+    <p class="hint">Links proven via verification claims.</p>
+    <p class="hint-secondary">These cannot be edited here. Verification timestamps live in the claims ledger.</p>
+  </div>
 
-  <h3 style="margin-top:18px">Effective sameAs (public)</h3>
-  <pre style="background:#f6f6f6;padding:12px;border-radius:8px;white-space:pre-wrap">${escapeHtml(current.effectiveSameAs.join("\n") || "(none)")}</pre>
+  <div class="section">
+    <h3>sameAs (Public view)</h3>
+    <div class="readonly-box">${escapeHtml(current.effectiveSameAs.join("\n") || "(none)")}</div>
+    <p class="hint">What the public sees from /resolve.</p>
+    <p class="hint-secondary">This is the union of manual links and verified claims. Derived automatically, not stored directly.</p>
+  </div>
 
-  <label>Description (optional)<br>
-    <textarea style="width:100%;height:80px" name="description">${escapeHtml(current.description)}</textarea>
-  </label><br><br>
+  <div class="field" style="margin-top:24px">
+    <label for="description">Description (optional)</label>
+    <textarea id="description" name="description" rows="3">${escapeHtml(current.description)}</textarea>
+    <p class="hint">A short description of this person.</p>
+    <p class="hint-secondary">Keep it concise. The canonical profile is intentionally small.</p>
+  </div>
 
-  <button type="submit">Save</button>
+  <div style="margin-top:24px">
+    <button type="submit">Save</button>
+    <p class="save-hint">Date modified updates only if something actually changes.</p>
+  </div>
 </form>
 
-<pre id="out" style="margin-top:20px;white-space:pre-wrap"></pre>
+<pre id="out"></pre>
+
+<div class="footer">
+  AnchorID favors durability over convenience.<br>
+  Most changes are reversible. The identifier is not.
+</div>
 <script>
 async function submitForm(e){
   e.preventDefault();

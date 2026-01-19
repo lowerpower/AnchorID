@@ -744,17 +744,22 @@ export async function handleAdminEditGet(req: Request, env: Env, uuid: string): 
 </style>
 </head>
 <body>
-<h1>Edit Profile</h1>
+<h1>Edit AnchorID</h1>
+<p class="meta" style="margin-top:0">This page edits your canonical identity record. Changes here affect how you are identified across the web.</p>
 
 ${success ? `<div class="alert alert-success">${escapeHtml(successMessages[success] || success)}</div>` : ""}
 ${error ? `<div class="alert alert-error">${escapeHtml(errorMessages[error] || error)}</div>` : ""}
 
-<p class="meta">
-  <code>${escapeHtml(uuid)}</code><br>
-  Created: <code>${escapeHtml(canonical.dateCreated)}</code>
-  &nbsp;·&nbsp;
-  Modified: <code>${escapeHtml(canonical.dateModified)}</code>
-</p>
+<div class="card" style="margin-bottom:14px;background:#f0f4f8;border:1px solid #d0d7de">
+  <label style="margin-bottom:2px">AnchorID</label>
+  <code style="font-size:15px">${escapeHtml(uuid)}</code>
+  <div class="hint" style="margin-top:4px">This is your permanent identifier. It never changes, even if everything else does.</div>
+  <div style="margin-top:8px;font-size:13px;color:#555">
+    Created: <code>${escapeHtml(canonical.dateCreated)}</code>
+    &nbsp;·&nbsp;
+    Modified: <code>${escapeHtml(canonical.dateModified)}</code>
+  </div>
+</div>
 
 <div class="grid" style="margin-bottom:14px">
   ${emailHash ? `
@@ -823,25 +828,29 @@ ${error ? `<div class="alert alert-error">${escapeHtml(errorMessages[error] || e
     <div class="card">
       <label>Name</label>
       <input name="name" value="${escapeHtml(name)}" placeholder="e.g., Mycal">
-      <div class="hint">Optional. Shown as <code>name</code> in the canonical Person record.</div>
+      <div class="hint">Your primary human-readable name.</div>
+      <div class="hint" style="color:#777;font-size:12px">Used by search engines and applications when displaying this identity.</div>
     </div>
 
     <div class="card">
-      <label>URL <span class="badge">Canonical about page</span></label>
+      <label>URL (canonical about page)</label>
       <input name="url" value="${escapeHtml(urlVal)}" placeholder="https://example.com/about">
-      <div class="hint">Will be canonicalized (https upgrade, hostname lowercase, fragments removed, etc.).</div>
+      <div class="hint">The main page that describes this identity.</div>
+      <div class="hint" style="color:#777;font-size:12px">URLs are normalized automatically (https enforced, fragments removed). You can't break it.</div>
     </div>
 
     <div class="card">
-      <label>Alternate names <span class="badge">Manual</span></label>
+      <label>Alternate names (one per line)</label>
       <textarea name="alternateName" placeholder="One per line">${escapeHtml(alternateName.join("\n"))}</textarea>
-      <div class="hint">Stored as <code>alternateName[]</code>.</div>
+      <div class="hint">Other names this person is known by.</div>
+      <div class="hint" style="color:#777;font-size:12px">Common uses: legal name, handle, transliteration, or historical name.</div>
     </div>
 
     <div class="card">
-      <label>Description <span class="badge">Manual</span></label>
+      <label>Description (optional)</label>
       <textarea name="description" placeholder="Short optional description">${escapeHtml(desc)}</textarea>
-      <div class="hint">Keep this short; profile stays canonical and small.</div>
+      <div class="hint">A short description of this person.</div>
+      <div class="hint" style="color:#777;font-size:12px">Keep it concise. The canonical profile is intentionally small.</div>
     </div>
   </div>
 
@@ -858,33 +867,31 @@ ${error ? `<div class="alert alert-error">${escapeHtml(errorMessages[error] || e
 
   <div class="grid">
     <div class="card sameAs-manual">
-      <label>Manual Links <span class="badge manual">Editable</span></label>
+      <label>sameAs (Manual) <span class="badge manual">Editable</span></label>
       <textarea name="sameAs" placeholder="One URL per line">${escapeHtml(manualSameAs.join("\n"))}</textarea>
-      <div class="hint">
-        Self-declared links you add manually. These are trusted but not cryptographically verified.
-      </div>
+      <div class="hint">External profiles you control that represent the same person.</div>
+      <div class="hint" style="color:#777;font-size:12px">These links are stored directly in your canonical profile.</div>
+      <div class="hint" style="color:#888;font-size:11px;margin-top:8px">Examples: GitHub profile, personal site, LinkedIn, Mastodon profile</div>
     </div>
 
     <div class="card sameAs-verified">
-      <label>Verified Links <span class="badge verified">Proven</span></label>
+      <label>sameAs (Verified) <span class="badge verified">Proven</span></label>
       <pre>${escapeHtml(verifiedUrls.join("\n") || "(none)")}</pre>
-      <div class="hint">
-        Links proven via the claims system. You cannot edit these directly — they come from verified claims.
-      </div>
+      <div class="hint">Links proven via verification claims.</div>
+      <div class="hint" style="color:#777;font-size:12px">These cannot be edited here. Verification timestamps live in the claims ledger.</div>
     </div>
 
     <div class="card sameAs-published" style="grid-column: 1 / -1;">
-      <label>Published Links <span class="badge published">Public</span></label>
+      <label>sameAs (Public view) <span class="badge published">What the world sees</span></label>
       <pre>${escapeHtml(effectiveSameAs.join("\n") || "(none)")}</pre>
-      <div class="hint">
-        What the world sees at <code>/resolve/${escapeHtml(uuid.slice(0,8))}...</code> — the union of manual + verified links.
-      </div>
+      <div class="hint">What the public sees from <code>/resolve</code>.</div>
+      <div class="hint" style="color:#777;font-size:12px">This is the union of manual links and verified claims. This list is derived automatically and not stored directly.</div>
     </div>
   </div>
 
   <div class="actions">
     <button class="primary" type="submit">Save</button>
-    <span class="hint">Save bumps <code>dateModified</code> only if the stored profile changes.</span>
+    <span class="hint">Date modified updates only if something actually changes.</span>
   </div>
 </form>
 
@@ -900,6 +907,10 @@ ${error ? `<div class="alert alert-error">${escapeHtml(errorMessages[error] || e
     The <code>/resolve</code> endpoint returns a stable, canonical JSON-LD Person record that third parties can rely on.
     Claims provide cryptographic proof of account ownership without sharing credentials.
   </div>
+</div>
+
+<div style="margin-top:24px;padding:16px 0;border-top:1px solid #e0e0e0;text-align:center;color:#666;font-size:13px">
+  <p style="margin:0">AnchorID favors durability over convenience.<br>Most changes are reversible. The identifier is not.</p>
 </div>
 
 </body></html>`;

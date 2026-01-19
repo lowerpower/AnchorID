@@ -11,81 +11,244 @@ npm test             # Run tests (vitest with Cloudflare Workers pool)
 npm run cf-typegen   # Generate Cloudflare types
 ```
 
-**Secrets**: Set `ANCHOR_ADMIN_TOKEN` via `npx wrangler secret put ANCHOR_ADMIN_TOKEN` before deploying.
+**Secrets** (set via `npx wrangler secret put <NAME>`):
+- `ANCHOR_ADMIN_TOKEN` — Admin API access
+- `RESEND_API_KEY` — Email delivery (Resend)
+- `MAIL_SEND_SECRET` — Email delivery (mycal.net fallback)
 
-**KV**: Uses Cloudflare KV with binding `ANCHOR_KV`. For production KV operations:
+**KV Operations**:
 ```bash
-npm run kv:list:prod               # List profile keys
-npm run kv:get:prod -- "profile:UUID"  # Get specific profile
+npm run kv:list:prod                              # List profile keys
+npm run kv:get:prod -- "profile:UUID"             # Get specific profile
+npx wrangler kv key put --remote --binding ANCHOR_KV "key" --path ./file  # Upload content
 ```
 
-## Architecture Overview
+---
 
-AnchorID is a minimal identity resolver built on Cloudflare Workers. It provides UUID-based identity anchors that can be verified through external proofs (websites, GitHub profiles).
+## Project Structure
 
-### Key Design Principles
-- **Deliberately boring**: Uses UUIDs, HTTPS URLs, plain JSON, schema.org vocabularies
-- **Proof over trust**: Identity claims are publicly verifiable, not asserted by authority
-- **Longevity-first**: Optimized to remain interpretable decades from now
-- No accounts, no passwords, no OAuth, no database
+```
+AnchorID/
+├── src/
+│   ├── index.ts                 # Main router, all HTTP handlers
+│   ├── env.ts                   # Environment type definitions
+│   ├── domain/
+│   │   └── profile/
+│   │       └── anchorid_profile.ts  # Core profile logic (buildProfile, canonicalizeUrl, mergeSameAs)
+│   ├── claims/
+│   │   ├── types.ts             # Claim type definitions
+│   │   ├── store.ts             # Claims KV operations
+│   │   ├── verify.ts            # Claim verification logic
+│   │   └── handlers.ts          # Claim API handlers
+│   ├── admin/
+│   │   └── handlers.ts          # Admin UI handlers (create, edit, list profiles)
+│   └── content/
+│       ├── README.md            # Instructions for deploying static pages
+│       ├── guide.html           # Placement guide (served at /guide)
+│       └── privacy.html         # Privacy policy (served at /privacy)
+├── docs/
+│   ├── identity-model.md        # How identity works
+│   ├── threat-model.md          # Security model
+│   ├── faq.md                   # Frequently asked questions
+│   ├── why-anchorid-is-deliberately-boring.md  # Design philosophy
+│   └── wrangler-kv-gotchas.md   # KV notes
+├── test/
+│   └── index.spec.ts            # Tests
+├── CLAUDE.md                    # This file
+├── README.md                    # Public readme
+├── todo.md                      # MVP checklist
+├── wrangler.json                # Cloudflare Workers config
+└── package.json
+```
 
-### Route Structure (`src/index.ts`)
+---
 
-**Public (read-only)**:
-- `GET /resolve/<uuid>` — Returns canonical schema.org Person JSON-LD
-- `GET /claims/<uuid>` — Claims ledger (JSON or HTML based on Accept header)
+## Route Handlers (src/index.ts)
 
-**Token-gated (Bearer auth via `ANCHOR_ADMIN_TOKEN`)**:
-- `POST /claim` — Add/upsert a claim
-- `POST /claim/verify` — Trigger claim verification
+### Public Pages
+| Route | Handler | Description |
+|-------|---------|-------------|
+| `GET /` | inline HTML | Homepage with signup/login links |
+| `GET /guide` | KV `page:guide` | Placement guide |
+| `GET /privacy` | KV `page:privacy` | Privacy policy |
+| `GET /resolve/<uuid>` | `handleResolve()` | Canonical Person JSON-LD |
+| `GET /claims/<uuid>` | `handleClaimsGet()` | Claims ledger (JSON or HTML) |
 
-**Admin UI (cookie auth)**:
-- `/admin/*` routes — Create, edit, list profiles
+### Public Auth Flow
+| Route | Handler | Description |
+|-------|---------|-------------|
+| `GET /signup` | inline HTML | Signup form |
+| `POST /signup` | `handleSignup()` | Create profile, send magic link |
+| `GET /setup` | `handleSetupPage()` | Post-signup page, shows backup token |
+| `GET /login` | inline HTML | Login form |
+| `POST /login` | `handleLogin()` | Send magic link email |
+| `GET /edit` | `handleEditPage()` | Edit form (token or backup_token auth) |
+| `POST /update` | `handleUpdate()` | Save profile changes |
 
-**Email magic link flow** (requires `RESEND_API_KEY`):
-- `POST /login` — Send magic link
-- `GET /edit?token=...` — Token-gated edit form
-- `POST /update` — Save profile changes
+### Admin Routes (cookie auth)
+| Route | Handler | Description |
+|-------|---------|-------------|
+| `GET /admin/login` | inline HTML | Admin login form |
+| `POST /admin/login` | `handleAdminLogin()` | Set admin cookie |
+| `GET /admin` | `handleAdminList()` | List all profiles |
+| `GET /admin/new` | inline HTML | New profile form |
+| `POST /admin/new` | `handleAdminCreate()` | Create profile |
+| `GET /admin/created/<uuid>` | `handleAdminCreatedGet()` | Show backup token |
+| `GET /admin/edit/<uuid>` | `handleAdminEdit()` | Edit profile |
+| `POST /admin/edit/<uuid>` | `handleAdminEditPost()` | Save profile |
 
-### Core Domain Logic
+### API Routes (Bearer auth)
+| Route | Handler | Description |
+|-------|---------|-------------|
+| `POST /claim` | `handleClaimUpsert()` | Add/update claim |
+| `POST /claim/verify` | `handleClaimVerify()` | Trigger verification |
 
-**`src/domain/profile/anchorid_profile.ts`** — The heart of the system:
-- `buildProfile()` — Canonicalizes and merges profile data
-- `mergeSameAs()` — Merges manual sameAs URLs with verified claim URLs
-- `canonicalizeUrl()` — URL normalization (HTTPS upgrade, lowercase hostname, remove fragments)
+---
 
-Timestamp semantics:
+## Static Content Pages
+
+HTML pages served from KV storage. Source files in `src/content/`.
+
+**Deploy commands:**
+```bash
+# Guide page
+npx wrangler kv key put --remote --binding ANCHOR_KV "page:guide" --path ./src/content/guide.html
+
+# Privacy policy
+npx wrangler kv key put --remote --binding ANCHOR_KV "page:privacy" --path ./src/content/privacy.html
+```
+
+**To add a new static page:**
+1. Create HTML file in `src/content/`
+2. Add route handler in `src/index.ts` (copy pattern from `/guide` or `/privacy`)
+3. Deploy to KV with wrangler command
+4. Update `src/content/README.md` with deploy command
+
+---
+
+## KV Key Patterns
+
+| Pattern | Contents | TTL |
+|---------|----------|-----|
+| `profile:<uuid>` | Person JSON-LD | Permanent |
+| `claims:<uuid>` | Claims array | Permanent |
+| `email:<sha256>` | UUID lookup by email hash | Permanent |
+| `login:<token>` | Magic link session `{uuid, emailHash?, isSetup?, backupAccess?}` | 15 min |
+| `signup:<uuid>` | Backup token (plaintext, one-time display) | 5 min |
+| `created:<uuid>` | Backup token for admin flow | 60 sec |
+| `audit:<uuid>` | Audit log entries (max 100) | Permanent |
+| `page:<name>` | Static HTML pages (guide, privacy) | Permanent |
+| `rl:login:<hash>` | Rate limit counter | 1 hour |
+| `rl:update:<uuid>` | Rate limit counter | 1 hour |
+| `ip:signup` | IP rate limit | 1 hour |
+| `ip:login` | IP rate limit | 1 hour |
+| `ip:edit` | IP rate limit | 1 hour |
+| `ip:update` | IP rate limit | 1 hour |
+
+---
+
+## Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ANCHOR_ADMIN_TOKEN` | — | Admin API token (secret) |
+| `RESEND_API_KEY` | — | Resend email API key (secret) |
+| `MAIL_SEND_SECRET` | — | mycal.net email relay secret (secret) |
+| `LOGIN_TTL_SECONDS` | 900 | Magic link token lifetime |
+| `LOGIN_RL_PER_HOUR` | 3 | Max login emails per email/hour |
+| `UPDATE_RL_PER_HOUR` | 20 | Max updates per UUID/hour |
+| `IP_LOGIN_RL_PER_HOUR` | 10 | Max login attempts per IP/hour |
+| `IP_EDIT_RL_PER_HOUR` | 30 | Max edit page loads per IP/hour |
+| `IP_UPDATE_RL_PER_HOUR` | 60 | Max update submissions per IP/hour |
+
+---
+
+## Core Domain Logic
+
+### Profile Building (`src/domain/profile/anchorid_profile.ts`)
+
+- `buildProfile(uuid, stored, input, verifiedUrls, options)` — Canonicalizes and merges profile data
+- `canonicalizeUrl(input)` — URL normalization (HTTPS, lowercase hostname, remove fragments)
+- `mergeSameAs(manual, verified)` — Union of manual + verified URLs, deduplicated & sorted
+
+**Timestamp semantics:**
 - `dateCreated` — Immutable, set once at creation
 - `dateModified` — Bumped only on actual structural changes
 
-sameAs merge policy:
+**sameAs merge policy:**
 - Manual sameAs: stored/editable field
 - Verified sameAs: derived from claims at resolve-time
-- Effective sameAs (public): manual ∪ verified, deduplicated & sorted
+- Effective sameAs (public): manual ∪ verified
 
 ### Claims System (`src/claims/`)
 
-Two claim types supported:
-- **Website**: Proof at `https://domain/.well-known/anchorid.txt` must contain resolver URL
-- **GitHub**: Profile README must contain resolver URL
+Two claim types:
+- **Website**: Proof at `https://domain/.well-known/anchorid.txt` containing resolver URL
+- **GitHub**: Profile README containing resolver URL
 
-Claims are stored separately from profiles at `claims:<uuid>` in KV.
+Claim states: `pending` → `verified` or `failed`
 
-### Auth Mechanisms
+---
 
-1. **Admin cookie**: Set via `/admin/login`, guards `/admin/*` routes
-2. **Bearer token**: `Authorization: Bearer <token>` for API endpoints
-3. **Magic link tokens**: One-time tokens stored in KV with TTL, consumed on first use
+## Documentation
 
-### Data Storage (KV Keys)
+| File | Description |
+|------|-------------|
+| `README.md` | Public-facing project overview |
+| `docs/identity-model.md` | How identity, profiles, claims work |
+| `docs/threat-model.md` | Security model and mitigations |
+| `docs/faq.md` | Frequently asked questions |
+| `docs/why-anchorid-is-deliberately-boring.md` | Design philosophy |
+| `todo.md` | MVP implementation checklist |
 
-- `profile:<uuid>` — Person JSON-LD
-- `claims:<uuid>` — Claims array
-- `email:<hash>` — Maps email hash to UUID
-- `login:<token>` — Magic link session
-- `rl:login:<hash>` — Rate limit counter
-- `rl:update:<uuid>` — Rate limit counter
+---
 
-## Current MVP Status
+## Auth Mechanisms
 
-See `todo.md` for the implementation checklist. Core identity resolution and claims verification are complete. Next priority is the email-based edit access flow and backup recovery tokens.
+1. **Admin cookie** — Set via `/admin/login`, guards `/admin/*` routes
+2. **Bearer token** — `Authorization: Bearer <ANCHOR_ADMIN_TOKEN>` for API endpoints
+3. **Magic link tokens** — One-time tokens in KV, consumed on save
+4. **Backup tokens** — SHA-256 hash stored in profile, plaintext shown once at creation
+
+---
+
+## Common Tasks
+
+### Add a new profile field
+1. Update `PersonProfile` type in `src/domain/profile/anchorid_profile.ts`
+2. Update `buildProfile()` to handle the field
+3. Update edit form HTML in `handleEditPage()` (src/index.ts)
+4. Update `handleUpdate()` to accept the field in patch
+
+### Add a new claim type
+1. Add type to `Claim['type']` union in `src/claims/types.ts`
+2. Add proof builder in `src/claims/verify.ts`
+3. Update `handleClaimUpsert()` in `src/claims/handlers.ts`
+
+### Add a new static page
+1. Create `src/content/<page>.html`
+2. Add route in `src/index.ts`:
+   ```typescript
+   if (path === "/<page>" || path === "/<page>/") {
+     const html = await env.ANCHOR_KV.get("page:<page>");
+     if (!html) return new Response("Not found", { status: 404 });
+     return new Response(html, {
+       headers: { "content-type": "text/html; charset=utf-8", "cache-control": "public, max-age=300" }
+     });
+   }
+   ```
+3. Deploy: `npx wrangler kv key put --remote --binding ANCHOR_KV "page:<page>" --path ./src/content/<page>.html`
+4. Update `src/content/README.md`
+
+---
+
+## Current Status
+
+See `todo.md` for the MVP checklist. Core functionality complete:
+- ✅ Identity resolution
+- ✅ Claims verification
+- ✅ Email magic link flow
+- ✅ Backup token recovery
+- ✅ Admin UI
+- ✅ Rate limiting
+- ✅ Documentation

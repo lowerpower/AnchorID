@@ -10,15 +10,13 @@ It provides a stable, canonical identity record (`/resolve/<uuid>`) that can be 
 
 AnchorID is designed for **longevity, decentralization, and crawlability**, not account silos or proprietary identity systems.
 
-## Design Note
+## Documentation
 
-This design note explains why AnchorID intentionally favors simple, durable primitives over novel identity frameworks.
-
-For a deeper explanation of the philosophy behind AnchorID, see:
-
-- **[Why AnchorID Is Deliberately Boring](docs/why-anchorid-is-deliberately-boring.md)**
-
-This document explains why AnchorID favors simple, durable primitives over novel identity frameworks.
+- **[Identity Model](docs/identity-model.md)** — How AnchorID represents identity, profiles, claims, and verification
+- **[Threat Model](docs/threat-model.md)** — Security model, known threats, and mitigations
+- **[FAQ](docs/faq.md)** — Frequently asked questions
+- **[Placement Guide](https://anchorid.net/guide)** — How to place your AnchorID across profiles and platforms
+- **[Why AnchorID Is Deliberately Boring](docs/why-anchorid-is-deliberately-boring.md)** — Design philosophy
 
 ---
 
