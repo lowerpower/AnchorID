@@ -175,7 +175,7 @@ async function appendAuditLog(
 
 // Compute which fields changed between two profile objects
 function computeChangedFields(before: any, after: any): string[] {
-  const fields = ["name", "alternateName", "url", "description", "sameAs"];
+  const fields = ["name", "alternateName", "url", "description", "sameAs", "founder", "foundingDate", "affiliation"];
   const changed: string[] = [];
 
   for (const field of fields) {
@@ -439,7 +439,20 @@ ${error ? `<div class="alert alert-error">${escapeHtml(errorMessages[error] || e
 
 <form method="post" action="/admin/new">
   ${csrf}
-  <div class="card required ${errorField === "email" ? "error" : ""}">
+  <div class="card required">
+    <label>Identity Type <span class="badge">Required</span></label>
+    <div style="display:flex; gap:16px; margin-top:8px;">
+      <label style="font-weight:normal; display:flex; align-items:center; gap:6px; cursor:pointer;">
+        <input type="radio" name="type" value="Person" checked> Person
+      </label>
+      <label style="font-weight:normal; display:flex; align-items:center; gap:6px; cursor:pointer;">
+        <input type="radio" name="type" value="Organization"> Organization
+      </label>
+    </div>
+    <div class="hint">Cannot be changed after creation. Choose Organization for companies, nonprofits, or projects.</div>
+  </div>
+
+  <div class="card required ${errorField === "email" ? "error" : ""}" style="margin-top:14px">
     <label>Email <span class="badge">Required</span></label>
     <input name="email" type="email" placeholder="you@example.com" required
       class="${errorField === "email" ? "error" : ""}"
@@ -450,7 +463,7 @@ ${error ? `<div class="alert alert-error">${escapeHtml(errorMessages[error] || e
 
   <div class="card" style="margin-top:14px">
     <label>Name (optional)</label>
-    <input name="name" placeholder="e.g., Mycal" value="${escapeHtml(prefillName)}">
+    <input name="name" placeholder="e.g., Jane Doe or Acme Corp" value="${escapeHtml(prefillName)}">
     <div class="hint">You can change this later.</div>
   </div>
 
@@ -515,7 +528,10 @@ export async function handleAdminNewPost(req: Request, env: Env): Promise<Respon
     return redirectWithError("email_exists", "email");
   }
 
+  const entityType = fd.get("type") === "Organization" ? "Organization" : "Person";
+
   const input = {
+    "@type": entityType,
     name: fd.get("name"),
     url: fd.get("url"),
   };
@@ -690,12 +706,32 @@ export async function handleAdminEditGet(req: Request, env: Env, uuid: string): 
   const manualSameAs = Array.isArray(stored?.sameAs) ? stored.sameAs : [];
   const effectiveSameAs = mergeSameAs(manualSameAs, verifiedUrls);
 
+  const entityType = canonical["@type"] || "Person";
+  const isOrg = entityType === "Organization";
+
+  // Extract entity refs as UUIDs for editing
+  const extractUuids = (refs: any): string[] => {
+    if (!Array.isArray(refs)) return [];
+    return refs
+      .map((r: any) => {
+        const id = r?.["@id"] || "";
+        const match = id.match(/\/resolve\/([0-9a-f-]{36})$/i);
+        return match ? match[1] : "";
+      })
+      .filter(Boolean);
+  };
+
   const name = canonical.name || "";
   const alternateName = Array.isArray(canonical.alternateName) ? canonical.alternateName : [];
   const urlVal = canonical.url || "";
   const desc = canonical.description || "";
   const emailHash = stored?._emailHash || null;
   const backupTokenHash = stored?._backupTokenHash || null;
+
+  // Entity-specific fields
+  const founder = isOrg ? extractUuids((canonical as any).founder) : [];
+  const foundingDate = isOrg ? ((canonical as any).foundingDate || "") : "";
+  const affiliation = !isOrg ? extractUuids((canonical as any).affiliation) : [];
 
   const successMessages: Record<string, string> = {
     saved: "Profile saved successfully.",
@@ -755,6 +791,8 @@ ${error ? `<div class="alert alert-error">${escapeHtml(errorMessages[error] || e
   <code style="font-size:15px">${escapeHtml(uuid)}</code>
   <div class="hint" style="margin-top:4px">This is your permanent identifier. It never changes, even if everything else does.</div>
   <div style="margin-top:8px;font-size:13px;color:#555">
+    Type: <span class="badge" style="background:#1a73e8;color:#fff">${escapeHtml(entityType)}</span>
+    &nbsp;·&nbsp;
     Created: <code>${escapeHtml(canonical.dateCreated)}</code>
     &nbsp;·&nbsp;
     Modified: <code>${escapeHtml(canonical.dateModified)}</code>
@@ -849,10 +887,38 @@ ${error ? `<div class="alert alert-error">${escapeHtml(errorMessages[error] || e
     <div class="card">
       <label>Description (optional)</label>
       <textarea name="description" placeholder="Short optional description">${escapeHtml(desc)}</textarea>
-      <div class="hint">A short description of this person.</div>
+      <div class="hint">A short description of this ${isOrg ? "organization" : "person"}.</div>
       <div class="hint" style="color:#777;font-size:12px">Keep it concise. The canonical profile is intentionally small.</div>
     </div>
   </div>
+
+${isOrg ? `
+  <h2 style="margin-top:24px;font-size:18px">Organization Fields</h2>
+  <div class="grid">
+    <div class="card">
+      <label>Founders (UUIDs, one per line)</label>
+      <textarea name="founder" placeholder="One UUID per line">${escapeHtml(founder.join("\\n"))}</textarea>
+      <div class="hint">AnchorID UUIDs of people who founded this organization.</div>
+      <div class="hint" style="color:#777;font-size:12px">Enter just the UUID (e.g., 4ff7ed97-b78f-4ae6-9011-5af714ee241c).</div>
+    </div>
+
+    <div class="card">
+      <label>Founding Date (optional)</label>
+      <input type="date" name="foundingDate" value="${escapeHtml(foundingDate)}">
+      <div class="hint">The date this organization was founded.</div>
+    </div>
+  </div>
+` : `
+  <h2 style="margin-top:24px;font-size:18px">Person Fields</h2>
+  <div class="grid">
+    <div class="card">
+      <label>Affiliations (UUIDs, one per line)</label>
+      <textarea name="affiliation" placeholder="One UUID per line">${escapeHtml(affiliation.join("\\n"))}</textarea>
+      <div class="hint">AnchorID UUIDs of organizations this person is affiliated with.</div>
+      <div class="hint" style="color:#777;font-size:12px">Enter just the UUID (e.g., 4ff7ed97-b78f-4ae6-9011-5af714ee241c).</div>
+    </div>
+  </div>
+`}
 
   <h2 style="margin-top:24px;font-size:18px">Identity Links (sameAs)</h2>
 
@@ -939,13 +1005,18 @@ export async function handleAdminSavePost(
     return csrfError();
   }
 
-  const input = {
+  const input: Record<string, unknown> = {
     name: fd.get("name"),
     alternateName: fd.get("alternateName"), // string with newlines is OK
     url: fd.get("url"),
     sameAs: fd.get("sameAs"),               // string with newlines is OK
     description: fd.get("description"),
   };
+
+  // Include entity-specific fields if present in the form
+  if (fd.has("founder")) input.founder = fd.get("founder");
+  if (fd.has("foundingDate")) input.foundingDate = fd.get("foundingDate");
+  if (fd.has("affiliation")) input.affiliation = fd.get("affiliation");
 
   const { profile: next, changed } = buildProfile(uuid, stored, input, [], {
     persistMergedSameAs: false,
