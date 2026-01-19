@@ -5,6 +5,7 @@ Deploy: sync to KV (do not inline into TS).
 
 Publish pages:
   npx wrangler kv key put --remote --binding ANCHOR_KV "page:about" --path ./src/content/about.html
+  npx wrangler kv key put --remote --binding ANCHOR_KV "page:faq" --path ./src/content/faq.html
   npx wrangler kv key put --remote --binding ANCHOR_KV "page:guide" --path ./src/content/guide.html
   npx wrangler kv key put --remote --binding ANCHOR_KV "page:privacy" --path ./src/content/privacy.html
 

@@ -220,6 +220,7 @@ export default {
     <span>Home</span>
     <a href="/about">About</a>
     <a href="/guide">Guide</a>
+    <a href="/faq">FAQ</a>
     <a href="/privacy">Privacy</a>
   </nav>
 
@@ -227,12 +228,13 @@ export default {
   <p>Canonical UUID identity anchors and resolvers. Create a permanent, decentralized identity anchor that you control.</p>
 
   <div class="actions">
-    <a href="/signup" class="primary">Create Your AnchorID</a>
+    <a href="/create" class="primary">Create Your AnchorID</a>
     <a href="/login" class="secondary">Edit Existing</a>
   </div>
 
   <p style="margin-top: 32px; color: #555; font-size: 14px;">
-    Already have a UUID? Try: <code>/resolve/&lt;uuid&gt;</code>
+    Already have a UUID? Try: <code>/resolve/&lt;uuid&gt;</code><br>
+    <a href="/faq" style="color: #555;">Skeptical? Read the FAQ.</a>
   </p>
 </body>
 </html>`,
@@ -288,6 +290,29 @@ export default {
           "cache-control":
             "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400",
         },
+      });
+    }
+
+    // FAQ page
+    if (path === "/faq" || path === "/faq/") {
+      const html = await env.ANCHOR_KV.get("page:faq");
+      if (!html) {
+        return new Response("FAQ not found", { status: 404 });
+      }
+      return new Response(html, {
+        headers: {
+          "content-type": "text/html; charset=utf-8",
+          "cache-control":
+            "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400",
+        },
+      });
+    }
+
+    // /create redirects to /signup (semantic alias)
+    if (path === "/create" || path === "/create/") {
+      return new Response(null, {
+        status: 302,
+        headers: { "location": "/signup" },
       });
     }
 
@@ -492,6 +517,19 @@ async function handleSignupPage(request: Request, env: Env): Promise<Response> {
   <input type="hidden" name="_csrf" value="${escapeHtml(csrfToken)}">
 
   <div class="card required">
+    <label>Identity Type <span class="badge">Required</span></label>
+    <div style="display:flex; gap:16px; margin-top:8px;">
+      <label style="font-weight:normal; display:flex; align-items:center; gap:6px; cursor:pointer;">
+        <input type="radio" name="type" value="Person" checked> Person
+      </label>
+      <label style="font-weight:normal; display:flex; align-items:center; gap:6px; cursor:pointer;">
+        <input type="radio" name="type" value="Organization"> Organization
+      </label>
+    </div>
+    <div class="hint">Cannot be changed after creation. Choose Organization for companies, nonprofits, or projects.</div>
+  </div>
+
+  <div class="card required">
     <label>Email <span class="badge">Required</span></label>
     <input name="email" type="email" placeholder="you@example.com" required>
     <div class="hint">We'll send you a link to complete setup. Never shared, stored as hash only.</div>
@@ -499,7 +537,7 @@ async function handleSignupPage(request: Request, env: Env): Promise<Response> {
 
   <div class="card">
     <label>Name (optional)</label>
-    <input name="name" placeholder="e.g., Jane Doe">
+    <input name="name" placeholder="e.g., Jane Doe or Acme Corp">
     <div class="hint">You can change this later.</div>
   </div>
 
@@ -573,24 +611,23 @@ async function handleSignup(request: Request, env: Env): Promise<Response> {
   // Create new profile
   const uuid = crypto.randomUUID().toLowerCase();
   const name = String(fd.get("name") || "").trim() || undefined;
+  const entityType = fd.get("type") === "Organization" ? "Organization" : "Person";
 
   // Generate backup token
   const backupToken = randomTokenUrlSafe(24);
   const backupTokenHash = await sha256Hex(backupToken);
 
-  const now = new Date().toISOString();
+  // Use buildProfile to create canonical profile
+  const { profile: canonicalProfile } = buildProfile(
+    uuid,
+    null, // no stored profile
+    { "@type": entityType, name }, // input
+    undefined, // no verified URLs yet
+  );
+
+  // Add private fields (not part of public schema)
   const profile = {
-    "@context": "https://schema.org",
-    "@type": "Person",
-    "@id": `https://anchorid.net/resolve/${uuid}`,
-    identifier: {
-      "@type": "PropertyValue",
-      propertyID: "canonical-uuid",
-      value: `urn:uuid:${uuid}`,
-    },
-    dateCreated: now,
-    dateModified: now,
-    ...(name ? { name } : {}),
+    ...canonicalProfile,
     _emailHash: emailHash,
     _backupTokenHash: backupTokenHash,
   };
@@ -662,6 +699,7 @@ async function handleSetupPage(request: Request, env: Env): Promise<Response> {
 
   const profile = await env.ANCHOR_KV.get(`profile:${uuid}`, { type: "json" }) as any | null;
   const name = profile?.name || "(unnamed)";
+  const entityType = profile?.["@type"] || "Person";
 
   const html = `<!doctype html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -676,6 +714,7 @@ async function handleSetupPage(request: Request, env: Env): Promise<Response> {
   button.secondary { background:#fff; color:#111; border:1px solid #ddd; }
   .hint { color:#555; font-size:13px; margin-top:6px; }
   code { background:#eee; padding:2px 6px; border-radius:4px; font-size:13px; }
+  .type-badge { display:inline-block; background:#1a73e8; color:#fff; font-size:11px; padding:2px 8px; border-radius:999px; margin-left:8px; vertical-align:middle; }
   a { color:#1a73e8; }
   a.btn { display:inline-block; padding:12px 20px; border-radius:10px; background:#1a73e8; color:#fff; text-decoration:none; font-weight:500; }
   a.btn:hover { background:#1557b0; }
@@ -686,9 +725,10 @@ async function handleSetupPage(request: Request, env: Env): Promise<Response> {
 <h1>Your AnchorID is Ready</h1>
 
 <div class="card success">
-  <strong>Success!</strong> Your identity anchor has been created.
+  <strong>Success!</strong> Your ${entityType === "Organization" ? "organization" : "identity"} anchor has been created.
   <div class="hint" style="margin-top:8px">
     UUID: <code>${escapeHtml(uuid)}</code><br>
+    Type: <span class="type-badge">${escapeHtml(entityType)}</span><br>
     Name: <strong>${escapeHtml(name)}</strong>
   </div>
 </div>
@@ -1002,6 +1042,21 @@ async function handleEditPage(request: Request, env: Env): Promise<Response> {
   const manualSameAs = Array.isArray(stored?.sameAs) ? stored.sameAs : [];
   const effectiveSameAs = mergeSameAs(manualSameAs, verifiedUrls);
 
+  const entityType = canonical["@type"] || "Person";
+  const isOrg = entityType === "Organization";
+
+  // Extract entity refs as UUIDs for editing
+  const extractUuids = (refs: any): string[] => {
+    if (!Array.isArray(refs)) return [];
+    return refs
+      .map((r: any) => {
+        const id = r?.["@id"] || "";
+        const match = id.match(/\/resolve\/([0-9a-f-]{36})$/i);
+        return match ? match[1] : "";
+      })
+      .filter(Boolean);
+  };
+
   const current = {
     name: canonical.name || "",
     alternateName: Array.isArray(canonical.alternateName) ? canonical.alternateName : [],
@@ -1010,6 +1065,11 @@ async function handleEditPage(request: Request, env: Env): Promise<Response> {
     manualSameAs,
     verifiedSameAs: verifiedUrls,
     effectiveSameAs,
+    // Organization fields
+    founder: isOrg ? extractUuids((canonical as any).founder) : [],
+    foundingDate: isOrg ? ((canonical as any).foundingDate || "") : "",
+    // Person fields
+    affiliation: !isOrg ? extractUuids((canonical as any).affiliation) : [],
   };
 
   const { token: csrfToken, needsSet: needsCsrfCookie } = ensureCsrfToken(request);
@@ -1047,6 +1107,12 @@ async function handleEditPage(request: Request, env: Env): Promise<Response> {
   <label>AnchorID</label>
   <div class="uuid-box">${escapeHtml(uuid)}</div>
   <p class="hint">This is your permanent identifier. It never changes, even if everything else does.</p>
+</div>
+
+<div class="field">
+  <label>Type</label>
+  <div class="uuid-box">${escapeHtml(entityType)}</div>
+  <p class="hint">Cannot be changed after creation.</p>
 </div>
 
 <form method="post" action="/update" onsubmit="return submitForm(event)">
@@ -1099,9 +1165,39 @@ async function handleEditPage(request: Request, env: Env): Promise<Response> {
   <div class="field" style="margin-top:24px">
     <label for="description">Description (optional)</label>
     <textarea id="description" name="description" rows="3">${escapeHtml(current.description)}</textarea>
-    <p class="hint">A short description of this person.</p>
+    <p class="hint">A short description of this ${isOrg ? "organization" : "person"}.</p>
     <p class="hint-secondary">Keep it concise. The canonical profile is intentionally small.</p>
   </div>
+
+${isOrg ? `
+  <div class="section">
+    <h3>Organization Fields</h3>
+  </div>
+
+  <div class="field">
+    <label for="founder">Founders (UUIDs, one per line)</label>
+    <textarea id="founder" name="founder" rows="3">${escapeHtml(current.founder.join("\n"))}</textarea>
+    <p class="hint">AnchorID UUIDs of people who founded this organization.</p>
+    <p class="hint-secondary">Enter just the UUID (e.g., 4ff7ed97-b78f-4ae6-9011-5af714ee241c), not the full URL.</p>
+  </div>
+
+  <div class="field">
+    <label for="foundingDate">Founding Date (optional)</label>
+    <input id="foundingDate" name="foundingDate" type="date" value="${escapeHtml(current.foundingDate)}">
+    <p class="hint">The date this organization was founded (ISO 8601 format).</p>
+  </div>
+` : `
+  <div class="section">
+    <h3>Person Fields</h3>
+  </div>
+
+  <div class="field">
+    <label for="affiliation">Affiliations (UUIDs, one per line)</label>
+    <textarea id="affiliation" name="affiliation" rows="3">${escapeHtml(current.affiliation.join("\n"))}</textarea>
+    <p class="hint">AnchorID UUIDs of organizations this person is affiliated with.</p>
+    <p class="hint-secondary">Enter just the UUID (e.g., 4ff7ed97-b78f-4ae6-9011-5af714ee241c), not the full URL.</p>
+  </div>
+`}
 
   <div style="margin-top:24px">
     <button type="submit">Save</button>
@@ -1130,10 +1226,21 @@ async function submitForm(e){
 
   const description = (fd.get("description") || "").toString().trim();
 
+  // Entity-specific fields
+  const founder = (fd.get("founder") || "").toString().split(/\\r?\\n/).map(s=>s.trim()).filter(Boolean);
+  const foundingDate = (fd.get("foundingDate") || "").toString().trim();
+  const affiliation = (fd.get("affiliation") || "").toString().split(/\\r?\\n/).map(s=>s.trim()).filter(Boolean);
+
+  const patch = { name, alternateName, url, sameAs, description };
+  // Include entity-specific fields if they have input elements
+  if (fd.has("founder")) patch.founder = founder;
+  if (fd.has("foundingDate")) patch.foundingDate = foundingDate;
+  if (fd.has("affiliation")) patch.affiliation = affiliation;
+
   const res = await fetch("/update", {
     method: "POST",
     headers: {"content-type":"application/json"},
-    body: JSON.stringify({ token, _csrf, patch: { name, alternateName, url, sameAs, description } })
+    body: JSON.stringify({ token, _csrf, patch })
   });
 
   document.getElementById("out").textContent = await res.text();
@@ -1204,13 +1311,18 @@ async function handleUpdate(request: Request, env: Env): Promise<Response> {
   }
 
   // Build canonical next profile (manual fields only; verified merge happens at /resolve)
-  const input = {
+  const input: Record<string, unknown> = {
     name: patch.name,
     alternateName: patch.alternateName,
     url: patch.url,
     sameAs: patch.sameAs,
     description: patch.description,
   };
+
+  // Include entity-specific fields if present in the patch
+  if ("founder" in patch) input.founder = patch.founder;
+  if ("foundingDate" in patch) input.foundingDate = patch.foundingDate;
+  if ("affiliation" in patch) input.affiliation = patch.affiliation;
 
   const { profile: next, changed } = buildProfile(uuid, current, input, [], {
     persistMergedSameAs: false,

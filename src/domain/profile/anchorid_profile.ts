@@ -1,9 +1,11 @@
 //
 // anchorid_profile.ts
 // Exact profile canonicalization + merge rules per your spec.
-//
+// Supports both Person and Organization types.
 //
 type ISO8601UTC = string;
+
+export type EntityType = "Person" | "Organization";
 
 export type WebPageRef = {
   "@type": "WebPage";
@@ -25,34 +27,54 @@ export type PropertyValue = {
   value: string; // "urn:uuid:<uuid>"
 };
 
-export type PersonProfile = {
-  "@context": "https://schema.org";
-  "@type": "Person";
+// Reference to another AnchorID entity (for founder/affiliation)
+export type EntityRef = {
   "@id": string;
+};
 
+// Base fields shared by Person and Organization
+type BaseProfile = {
+  "@context": "https://schema.org";
+  "@id": string;
   identifier: PropertyValue;
-
   dateCreated: ISO8601UTC;
   dateModified: ISO8601UTC;
-
-  // optional-but-standard
   name?: string;
   alternateName?: string[];
   description?: string;
   url?: string;
   sameAs?: string[];
-
   mainEntityOfPage: WebPageRef;
   subjectOf: WebPageRef;
   isPartOf: WebSiteRef;
 };
 
+export type PersonProfile = BaseProfile & {
+  "@type": "Person";
+  affiliation?: EntityRef[]; // References to Organization records
+};
+
+export type OrganizationProfile = BaseProfile & {
+  "@type": "Organization";
+  founder?: EntityRef[]; // References to Person records
+  foundingDate?: string; // ISO 8601 date
+};
+
+// Union type for any AnchorID profile
+export type AnchorProfile = PersonProfile | OrganizationProfile;
+
 export type ProfileInput = {
+  "@type"?: unknown; // "Person" or "Organization"
   name?: unknown;
   alternateName?: unknown; // accept string|string[]
   description?: unknown;
   url?: unknown;
   sameAs?: unknown; // accept string|string[]
+  // Person-specific
+  affiliation?: unknown; // accept string|string[] of UUIDs or resolve URLs
+  // Organization-specific
+  founder?: unknown; // accept string|string[] of UUIDs or resolve URLs
+  foundingDate?: unknown;
 };
 
 export type BuildProfileOptions = {
@@ -318,21 +340,87 @@ function sanitizeSameAsForProfileStorage(urls: string[]): string[] | undefined {
   return out.length ? out : undefined;
 }
 
+/**
+ * Parse and canonicalize entity references (founder/affiliation).
+ * Accepts:
+ * - Array of objects with @id
+ * - Array of UUIDs (converts to resolve URLs)
+ * - Comma/newline separated string of UUIDs
+ * Returns array of EntityRef or undefined if empty.
+ */
+function canonicalizeEntityRefs(value: unknown): EntityRef[] | undefined {
+  if (!value) return undefined;
+
+  let items: unknown[];
+  if (Array.isArray(value)) {
+    items = value;
+  } else if (typeof value === "string") {
+    // Support comma/newline separated UUIDs
+    items = splitMultilineOrComma(value);
+  } else {
+    return undefined;
+  }
+
+  const refs: EntityRef[] = [];
+  const seen = new Set<string>();
+
+  for (const item of items) {
+    let id: string | null = null;
+
+    if (typeof item === "object" && item !== null && "@id" in (item as any)) {
+      // Already an EntityRef
+      id = String((item as any)["@id"]).trim();
+    } else if (typeof item === "string") {
+      const trimmed = item.trim();
+      if (!trimmed) continue;
+      // Check if it's already a full URL
+      if (trimmed.startsWith("https://anchorid.net/resolve/")) {
+        id = trimmed;
+      } else if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(trimmed)) {
+        // It's a UUID, convert to resolve URL
+        id = resolveUrl(trimmed.toLowerCase());
+      }
+    }
+
+    if (id && !seen.has(id)) {
+      seen.add(id);
+      refs.push({ "@id": id });
+    }
+  }
+
+  return refs.length > 0 ? refs : undefined;
+}
+
+/**
+ * Canonicalize founding date.
+ * Accepts ISO 8601 date string (YYYY-MM-DD or full datetime).
+ * Returns just the date portion (YYYY-MM-DD) or undefined.
+ */
+function canonicalizeFoundingDate(value: unknown): string | undefined {
+  if (!isNonEmptyString(value)) return undefined;
+  const trimmed = value.trim();
+  // Accept YYYY-MM-DD or full ISO datetime
+  const match = trimmed.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (match) return match[1];
+  return undefined;
+}
+
 
 
 
 
 /**
- * buildProfile(uuid, stored?, input?, verifiedUrls?, options?) -> canonical Person JSON-LD
+ * buildProfile(uuid, stored?, input?, verifiedUrls?, options?) -> canonical Person/Organization JSON-LD
  *
  * Purpose
- * - Produce a canonical schema.org Person object suitable for KV storage at `profile:<uuid>`
- *   and for public output from `/resolve/<uuid>`.
+ * - Produce a canonical schema.org Person or Organization object suitable for KV storage
+ *   at `profile:<uuid>` and for public output from `/resolve/<uuid>`.
  *
  * Enforces (always)
  * - Required fields present and correct:
  *   @context, @type, @id, identifier, mainEntityOfPage, subjectOf, isPartOf
  * - `dateCreated` is immutable after first write
+ * - `@type` is immutable after first write (Person or Organization)
  * - URL normalization + dedupe for `url` and `sameAs`
  * - `sameAs` merge policy:
  *   - manual sameAs comes from stored (or input on writes)
@@ -348,17 +436,17 @@ function sanitizeSameAsForProfileStorage(urls: string[]): string[] | undefined {
  *   - can be overridden via `preserveStoredTimestampsOnRead=false`
  *
  * Returns
- * - profile: canonical Person JSON-LD (what you may store; `sameAs` depends on persistMergedSameAs)
+ * - profile: canonical Person or Organization JSON-LD (what you may store; `sameAs` depends on persistMergedSameAs)
  * - changed: whether storing `profile` would change KV state (taking bumpOnNoop into account)
  * - effectiveSameAs: the public union (manual ∪ verified) after canonicalization/dedupe
  */
 export function buildProfile(
   uuid: string,
-  stored?: PersonProfile | null,
+  stored?: AnchorProfile | null,
   input?: ProfileInput | null,
   verifiedUrls?: unknown,
   options?: BuildProfileOptions
-): { profile: PersonProfile; changed: boolean; effectiveSameAs: string[] } {
+): { profile: AnchorProfile; changed: boolean; effectiveSameAs: string[] } {
   const opt = { ...DEFAULTS, ...(options ?? {}) };
   const now = opt.nowIso();
 
@@ -366,6 +454,10 @@ export function buildProfile(
 
   const isReadBuild = input == null;
   const preserveOnRead = !!opt.preserveStoredTimestampsOnRead && isReadBuild;
+
+  // Determine entity type: stored type wins (immutable), then input, then default to Person
+  const entityType: EntityType = (stored?.["@type"] as EntityType) ??
+    (input?.["@type"] === "Organization" ? "Organization" : "Person");
 
   // Canonicalize optional inputs (input wins if present)
   const name = canonicalizeString(input?.name) ?? stored?.name;
@@ -391,38 +483,15 @@ export function buildProfile(
   // What do we store in profile.sameAs?
   const sameAsForStorage = opt.persistMergedSameAs ? effectiveSameAs : manualSameAs;
   const sameAs = normalizeOptionalArray(
-        sanitizeSameAsForProfileStorage(sameAsForStorage)
-    );
-
+    sanitizeSameAsForProfileStorage(sameAsForStorage)
+  );
 
   // Baseline timestamps
   const baseDateCreated = stored?.dateCreated ?? now;
   const baseDateModified = stored?.dateModified ?? now;
 
-  const candidate: PersonProfile = {
-    "@context": "https://schema.org",
-    "@type": "Person",
-    "@id": resolveUrl(uuid),
-
-    identifier: buildIdentifier(uuid),
-
-    // timestamps are set after change detection
-    dateCreated: baseDateCreated,
-    dateModified: baseDateModified,
-
-    ...(name ? { name } : {}),
-    ...(alternateName && alternateName.length ? { alternateName } : {}),
-    ...(description ? { description } : {}),
-    ...(url ? { url } : {}),
-    ...(sameAs && sameAs.length ? { sameAs } : {}),
-
-    mainEntityOfPage: refs.mainEntityOfPage,
-    subjectOf: refs.subjectOf,
-    isPartOf: WEBSITE,
-  };
-
-  //strip empty arrays from the storedComparable before the compare
-  function stripEmptyArrays(obj: any) {
+  // Helper to strip empty arrays
+  function stripEmptyArrays<T extends Record<string, unknown>>(obj: T): T {
     if (!obj || typeof obj !== "object") return obj;
     const out: any = Array.isArray(obj) ? [...obj] : { ...obj };
     for (const k of Object.keys(out)) {
@@ -432,7 +501,62 @@ export function buildProfile(
     return out;
   }
 
-  // Strip empty arrays from candidate too (keep canonical output clean)
+  // Build the base profile fields shared by both types
+  const baseFields = {
+    "@context": "https://schema.org" as const,
+    "@id": resolveUrl(uuid),
+    identifier: buildIdentifier(uuid),
+    dateCreated: baseDateCreated,
+    dateModified: baseDateModified,
+    ...(name ? { name } : {}),
+    ...(alternateName && alternateName.length ? { alternateName } : {}),
+    ...(description ? { description } : {}),
+    ...(url ? { url } : {}),
+    ...(sameAs && sameAs.length ? { sameAs } : {}),
+    mainEntityOfPage: refs.mainEntityOfPage,
+    subjectOf: refs.subjectOf,
+    isPartOf: WEBSITE,
+  };
+
+  let candidate: AnchorProfile;
+
+  if (entityType === "Organization") {
+    // Organization-specific fields
+    const storedOrg = stored as OrganizationProfile | undefined;
+
+    const founder = (() => {
+      if (input && "founder" in (input as any)) return canonicalizeEntityRefs(input.founder);
+      return storedOrg?.founder;
+    })();
+
+    const foundingDate = (() => {
+      if (input && "foundingDate" in (input as any)) return canonicalizeFoundingDate(input.foundingDate);
+      return storedOrg?.foundingDate;
+    })();
+
+    candidate = {
+      ...baseFields,
+      "@type": "Organization",
+      ...(founder ? { founder } : {}),
+      ...(foundingDate ? { foundingDate } : {}),
+    } as OrganizationProfile;
+  } else {
+    // Person-specific fields
+    const storedPerson = stored as PersonProfile | undefined;
+
+    const affiliation = (() => {
+      if (input && "affiliation" in (input as any)) return canonicalizeEntityRefs(input.affiliation);
+      return storedPerson?.affiliation;
+    })();
+
+    candidate = {
+      ...baseFields,
+      "@type": "Person",
+      ...(affiliation ? { affiliation } : {}),
+    } as PersonProfile;
+  }
+
+  // Strip empty arrays from candidate (keep canonical output clean)
   const normalizedCandidate = stripEmptyArrays(candidate);
 
   // Detect change compared to stored (ignore dateModified drift by aligning it for comparison)
@@ -459,8 +583,8 @@ export function buildProfile(
   }
 
   const changed = preserveOnRead
-  ? false
-  : (structurallyChanged || (!!stored && opt.bumpOnNoop));
+    ? false
+    : (structurallyChanged || (!!stored && opt.bumpOnNoop));
 
   const cleaned = stripEmptyArrays(candidate);
   return { profile: cleaned, changed, effectiveSameAs };

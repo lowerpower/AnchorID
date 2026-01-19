@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <title>Skeptic FAQ | AnchorID</title>
+  <meta name="description" content="Questions for people who are unsure whether AnchorID is necessary, trustworthy, or worth the effort." />
+
+  <link rel="canonical" href="https://anchorid.net/faq" />
+
+  <style>
+    :root {
+      --bg: #ffffff;
+      --fg: #111111;
+      --muted: #555555;
+      --rule: #e7e7e7;
+      --codebg: #f6f6f6;
+      --link: #0b57d0;
+      --maxw: 860px;
+    }
+    html, body { background: var(--bg); color: var(--fg); margin: 0; padding: 0; }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; line-height: 1.55; }
+    .wrap { max-width: var(--maxw); margin: 0 auto; padding: 32px 20px; }
+    a { color: var(--link); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    h1 { font-size: 2rem; margin: 0 0 10px 0; letter-spacing: -0.02em; }
+    .kicker { color: var(--muted); margin: 0 0 18px 0; font-size: 1.1rem; font-style: italic; }
+    hr { border: 0; border-top: 1px solid var(--rule); margin: 28px 0; }
+    h2 { font-size: 1.2rem; margin: 24px 0 10px 0; }
+    p { margin: 10px 0; }
+    ul { margin: 10px 0 10px 20px; }
+    li { margin: 6px 0; }
+    .callout { border-left: 3px solid var(--rule); padding: 10px 14px; background: #fafafa; border-radius: 10px; margin: 16px 0; }
+    .small { font-size: 0.95rem; color: var(--muted); }
+    footer { border-top: 1px solid var(--rule); }
+    header.wrap { padding-bottom: 6px; }
+    main.wrap { padding-top: 6px; }
+    header.wrap hr { margin: 6px 0; }
+    main.wrap > h2:first-child { margin-top: 8px; }
+
+    /* Nav bar */
+    nav.topnav { font-size: 14px; margin-bottom: 24px; }
+    nav.topnav span { color: #111; font-weight: 500; }
+    nav.topnav a, nav.topnav span { margin-right: 16px; }
+
+    /* CTA */
+    .cta { margin: 32px 0; text-align: center; }
+    .cta a { display: inline-block; padding: 12px 24px; background: #111; color: #fff; border-radius: 8px; text-decoration: none; font-weight: 500; }
+    .cta a:hover { background: #333; text-decoration: none; }
+    .cta p { margin-top: 12px; color: var(--muted); font-size: 14px; }
+  </style>
+</head>
+
+<body>
+  <header class="wrap">
+    <nav class="topnav">
+      <a href="/">Home</a>
+      <a href="/about">About</a>
+      <a href="/guide">Guide</a>
+      <span>FAQ</span>
+      <a href="/privacy">Privacy</a>
+    </nav>
+    <h1>Skeptic FAQ</h1>
+    <p class="kicker">If AnchorID never becomes popular, it still works.<br>If it does become popular, it becomes infrastructure.</p>
+    <hr />
+  </header>
+
+  <main class="wrap">
+    <p>This page is for people who are unsure whether AnchorID is necessary, trustworthy, or worth the effort. These are reasonable questions. AnchorID is intentionally minimal, and skepticism is expected.</p>
+
+    <hr />
+
+    <h2>What problem does AnchorID actually solve?</h2>
+
+    <p>The modern web has no durable way to say "this person is the same person" across time, platforms, and failures.</p>
+
+    <p>Usernames change. Domains expire. Companies disappear. Social networks rebrand or collapse.</p>
+
+    <p>AnchorID provides a single, stable reference — a UUID-backed URL — that other systems, platforms, and archives can point to without fear that its meaning will drift.</p>
+
+    <p>It is not a profile or a social identity. It is infrastructure.</p>
+
+    <hr />
+
+    <h2>What happens if anchorid.net disappears or is abandoned?</h2>
+
+    <p>This is expected.</p>
+
+    <p>AnchorID is designed under the assumption that the original operator may someday disappear.</p>
+
+    <p>If anchorid.net goes offline:</p>
+
+    <ul>
+      <li>Existing UUIDs remain valid identifiers</li>
+      <li>Archived resolver pages continue to exist in caches, archives, and datasets</li>
+      <li>The UUID itself continues to function as a durable identity key</li>
+    </ul>
+
+    <p>AnchorID leaves behind useful artifacts. A future system does not need AnchorID-specific software — only a URL fetcher and a JSON parser.</p>
+
+    <hr />
+
+    <h2>Why trust anchorid.net at all? What if the operator alters records?</h2>
+
+    <p>You should not blindly trust any single operator — including AnchorID.</p>
+
+    <p>AnchorID does not provide trust. It provides anchoring.</p>
+
+    <p>The system is designed so that:</p>
+
+    <ul>
+      <li>Identity claims are publicly visible</li>
+      <li>External links can be independently verified</li>
+      <li>Changes leave timestamps and audit traces</li>
+      <li>Proofs live on platforms you already control</li>
+    </ul>
+
+    <p>If an operator behaved maliciously, discrepancies between your AnchorID record and your external proofs would be visible.</p>
+
+    <p>The goal is not to eliminate trust, but to make misbehavior detectable.</p>
+
+    <hr />
+
+    <h2>Why not just use consistent usernames or schema.org sameAs links?</h2>
+
+    <p>Those approaches work — until the platform changes, rebrands, or disappears.</p>
+
+    <p>Usernames are scoped to platforms. sameAs links are references, not anchors.</p>
+
+    <p>AnchorID provides a single immutable reference that survives platform churn and migrations. All other identifiers can change while the anchor remains stable.</p>
+
+    <hr />
+
+    <h2>Isn't this just another identity system?</h2>
+
+    <p>No.</p>
+
+    <p>AnchorID does not:</p>
+
+    <ul>
+      <li>Authenticate users</li>
+      <li>Provide login or SSO</li>
+      <li>Manage permissions</li>
+      <li>Create social graphs</li>
+      <li>Replace existing identity providers</li>
+    </ul>
+
+    <p>It is a reference point, not a control plane.</p>
+
+    <hr />
+
+    <h2>Can someone else copy my UUID or impersonate me?</h2>
+
+    <p>Someone can copy your UUID, just as they can copy your name.</p>
+
+    <p>What they cannot do is:</p>
+
+    <ul>
+      <li>Prove control of your website</li>
+      <li>Prove control of your GitHub, LinkedIn, or other profiles</li>
+      <li>Maintain consistent, verifiable claims over time</li>
+    </ul>
+
+    <p>Identity strength comes from accumulated proofs, not secrecy.</p>
+
+    <hr />
+
+    <h2>What if I lose my email or access credentials?</h2>
+
+    <p>AnchorID has no passwords.</p>
+
+    <p>Edit access is granted via:</p>
+
+    <ul>
+      <li>One-time email magic links</li>
+      <li>A backup recovery token shown once at creation</li>
+    </ul>
+
+    <p>If you lose both, there is no recovery path. This is intentional — AnchorID cannot verify you are who you claim to be without these.</p>
+
+    <hr />
+
+    <h2>Is AnchorID private?</h2>
+
+    <p>AnchorID is intentionally public.</p>
+
+    <p>If you do not want information to be public, do not add it.</p>
+
+    <p>The system minimizes private data collection and does not sell or share data, but the identity record itself is meant to be visible, durable, and referenceable.</p>
+
+    <hr />
+
+    <h2>Who is this actually for?</h2>
+
+    <p>AnchorID is for people who care about long-term attribution:</p>
+
+    <ul>
+      <li>Independent creators</li>
+      <li>Engineers and researchers</li>
+      <li>Writers, artists, and archivists</li>
+      <li>Systems that ingest and reason over web content</li>
+    </ul>
+
+    <p>If you do not publish work or care about attribution over decades, AnchorID may not be useful to you.</p>
+
+    <hr />
+
+    <h2>Why bother doing this now?</h2>
+
+    <p>Because identity signals compound over time.</p>
+
+    <p>Early, stable anchors are more likely to survive future platform shifts, archive pruning, and training data compression.</p>
+
+    <p>Creating an AnchorID today is a low-cost signal that may matter later — especially as automated systems increasingly rely on historical continuity.</p>
+
+    <hr />
+
+    <div class="cta">
+      <p><strong>Still skeptical?</strong></p>
+      <a href="/create">Create a test AnchorID</a>
+      <p>It takes about 30 seconds, costs nothing, and doesn't require committing to anything.</p>
+    </div>
+
+  </main>
+
+  <footer class="wrap">
+    <p class="small">&copy; <span id="y"></span> AnchorID.</p>
+    <script>
+      document.getElementById("y").textContent = String(new Date().getFullYear());
+    </script>
+  </footer>
+</body>
+</html>
