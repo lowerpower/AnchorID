@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <title>About | AnchorID</title>
+  <meta name="description" content="AnchorID provides a permanent, UUID-based identity anchor that lets you prove who you are across websites and platforms." />
+
+  <link rel="canonical" href="https://anchorid.net/about" />
+
+  <style>
+    :root {
+      --bg: #ffffff;
+      --fg: #111111;
+      --muted: #555555;
+      --rule: #e7e7e7;
+      --codebg: #f6f6f6;
+      --link: #0b57d0;
+      --maxw: 860px;
+    }
+    html, body { background: var(--bg); color: var(--fg); margin: 0; padding: 0; }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; line-height: 1.55; }
+    .wrap { max-width: var(--maxw); margin: 0 auto; padding: 32px 20px; }
+    a { color: var(--link); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    h1 { font-size: 2rem; margin: 0 0 10px 0; letter-spacing: -0.02em; }
+    .kicker { color: var(--muted); margin: 0 0 18px 0; font-size: 1.1rem; }
+    hr { border: 0; border-top: 1px solid var(--rule); margin: 28px 0; }
+    h2 { font-size: 1.35rem; margin: 24px 0 10px 0; letter-spacing: -0.01em; }
+    p { margin: 10px 0; }
+    ul { margin: 10px 0 10px 20px; }
+    li { margin: 6px 0; }
+    code { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; background: var(--codebg); padding: 2px 6px; border-radius: 4px; font-size: 0.9em; }
+    .callout { border-left: 3px solid var(--rule); padding: 10px 14px; background: #fafafa; border-radius: 10px; margin: 16px 0; }
+    .small { font-size: 0.95rem; color: var(--muted); }
+    footer { border-top: 1px solid var(--rule); }
+    header.wrap { padding-bottom: 6px; }
+    main.wrap { padding-top: 6px; }
+    header.wrap hr { margin: 6px 0; }
+    main.wrap > h2:first-child { margin-top: 8px; }
+
+    /* Nav bar */
+    nav.topnav { font-size: 14px; margin-bottom: 24px; }
+    nav.topnav span { color: #111; font-weight: 500; }
+    nav.topnav a, nav.topnav span { margin-right: 16px; }
+
+    /* CTA */
+    .cta { margin: 32px 0; }
+    .cta a { display: inline-block; padding: 12px 24px; background: #111; color: #fff; border-radius: 8px; text-decoration: none; font-weight: 500; }
+    .cta a:hover { background: #333; text-decoration: none; }
+  </style>
+</head>
+
+<body>
+  <header class="wrap">
+    <nav class="topnav">
+      <a href="/">Home</a>
+      <span>About</span>
+      <a href="/guide">Guide</a>
+      <a href="/privacy">Privacy</a>
+    </nav>
+    <h1>What is AnchorID?</h1>
+    <p class="kicker">A permanent identity anchor for the long term.</p>
+    <hr />
+  </header>
+
+  <main class="wrap">
+    <h2>The problem</h2>
+
+    <p>The modern web has no durable way to say <em>"this person is the same person"</em> across time, platforms, and failures.</p>
+
+    <ul>
+      <li>Usernames change</li>
+      <li>Domains expire</li>
+      <li>Companies disappear</li>
+      <li>Social networks collapse or rebrand</li>
+    </ul>
+
+    <p>Identity today is fragmented across silos that you do not control and cannot reliably preserve. When a platform dies, part of your identity goes with it.</p>
+
+    <hr />
+
+    <h2>The solution</h2>
+
+    <p>AnchorID gives you a <strong>permanent, UUID-based identity anchor</strong> that is independent of any single service, yet verifiable through many of them.</p>
+
+    <div class="callout">
+      <p>Think of it as a permanent "about me" record that outlives any single website or service.</p>
+    </div>
+
+    <p>Your AnchorID is a canonical URL:</p>
+
+    <p><code>https://anchorid.net/resolve/&lt;your-uuid&gt;</code></p>
+
+    <p>This URL returns a machine-readable identity record that links to your other profiles. When platforms change, your anchor remains stable.</p>
+
+    <hr />
+
+    <h2>How it works</h2>
+
+    <p><strong>1. Create your anchor</strong></p>
+    <p>Sign up with your email. You receive a permanent UUID and a backup recovery token.</p>
+
+    <p><strong>2. Link your identities</strong></p>
+    <p>Add your website, GitHub, LinkedIn, and other profiles to your anchor. These become your <code>sameAs</code> links.</p>
+
+    <p><strong>3. Verify ownership</strong></p>
+    <p>Prove you control external profiles by placing a small proof file on your website or in your GitHub README. Verified links carry more weight.</p>
+
+    <p><strong>4. Use it everywhere</strong></p>
+    <p>Place your AnchorID on profiles, publications, and bios. It becomes your canonical identity reference.</p>
+
+    <hr />
+
+    <h2>Built to last</h2>
+
+    <p>Most identity systems fail not because they lack features, but because they assume the world will cooperate with them. They assume platforms will remain stable, registries will be funded forever, and users will keep up with key rotations.</p>
+
+    <p>AnchorID is built from deliberately boring components:</p>
+
+    <ul>
+      <li><strong>UUIDs</strong> — universally unique, no central registry</li>
+      <li><strong>HTTPS URLs</strong> — work everywhere, archived by crawlers</li>
+      <li><strong>Plain JSON</strong> — readable by any system</li>
+      <li><strong>schema.org vocabularies</strong> — standard, well-documented</li>
+    </ul>
+
+    <p>These are not cutting-edge technologies. That is the point.</p>
+
+    <div class="callout">
+      <p>A future system does not need AnchorID-specific software to understand your record — it only needs a URL fetcher and a JSON parser.</p>
+    </div>
+
+    <p>AnchorID assumes it will someday be abandoned. A good identity system should leave behind artifacts that remain useful even if the original operator disappears, the code is no longer maintained, or the documentation is lost.</p>
+
+    <hr />
+
+    <h2>No accounts, no passwords</h2>
+
+    <p>AnchorID has no login system in the traditional sense:</p>
+
+    <ul>
+      <li><strong>Email magic links</strong> — request an edit link, click it, done</li>
+      <li><strong>Backup token</strong> — a recovery code shown once at creation</li>
+      <li><strong>No passwords to forget</strong> — or to be breached</li>
+    </ul>
+
+    <p>Your email provider already handles account security. AnchorID doesn't duplicate that work.</p>
+
+    <hr />
+
+    <h2>Who AnchorID is for</h2>
+
+    <ul>
+      <li><strong>Independent creators, engineers, and researchers</strong> who want a stable identity that outlives platforms</li>
+      <li><strong>People publishing long-lived work</strong> (blogs, papers, software, art) who care about attribution decades from now</li>
+      <li><strong>Systems and crawlers</strong> that need a canonical, machine-readable reference for a person</li>
+    </ul>
+
+    <h2>Who AnchorID is not for</h2>
+
+    <ul>
+      <li><strong>Authentication or login flows</strong> — this is not OAuth or SSO</li>
+      <li><strong>Real-time social graphs</strong> — no followers, no feeds</li>
+      <li><strong>Anonymous personas</strong> — AnchorID links identities, not hides them</li>
+    </ul>
+
+    <hr />
+
+    <h2>The philosophy</h2>
+
+    <div class="callout">
+      <p><strong>AnchorID treats identity as infrastructure, not a profile.</strong></p>
+    </div>
+
+    <ul>
+      <li><strong>Stability over novelty</strong> — boring tech ages better</li>
+      <li><strong>Proof over trust</strong> — claims are publicly verifiable</li>
+      <li><strong>URLs over accounts</strong> — no walled gardens</li>
+      <li><strong>Durability over convenience</strong> — optimized for decades, not days</li>
+    </ul>
+
+    <p>AnchorID is not trying to be the center of identity. It is trying to be a <strong>stable reference point</strong> — something other systems can point at without fear that the meaning will drift.</p>
+
+    <hr />
+
+    <div class="cta">
+      <a href="/signup">Create Your AnchorID</a>
+    </div>
+
+  </main>
+
+  <footer class="wrap">
+    <p class="small">&copy; <span id="y"></span> AnchorID.</p>
+    <script>
+      document.getElementById("y").textContent = String(new Date().getFullYear());
+    </script>
+  </footer>
+</body>
+</html>

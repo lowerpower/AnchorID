@@ -218,9 +218,9 @@ export default {
 <body>
   <nav>
     <span>Home</span>
+    <a href="/about">About</a>
     <a href="/guide">Guide</a>
     <a href="/privacy">Privacy</a>
-    <a href="https://github.com/lowerpower/AnchorID">GitHub</a>
   </nav>
 
   <h1>AnchorID</h1>
@@ -266,6 +266,21 @@ export default {
       const html = await env.ANCHOR_KV.get("page:privacy");
       if (!html) {
         return new Response("Privacy policy not found", { status: 404 });
+      }
+      return new Response(html, {
+        headers: {
+          "content-type": "text/html; charset=utf-8",
+          "cache-control":
+            "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400",
+        },
+      });
+    }
+
+    // About page
+    if (path === "/about" || path === "/about/") {
+      const html = await env.ANCHOR_KV.get("page:about");
+      if (!html) {
+        return new Response("About page not found", { status: 404 });
       }
       return new Response(html, {
         headers: {
