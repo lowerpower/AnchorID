@@ -61,22 +61,29 @@
 
 ---
 
-## 📄 Docs & Provenance
+## ✅ Docs & Provenance
 
-- [ ] `README.md` (what AnchorID is, not how to hack it)
-- [ ] `/docs/identity-model.md`
-- [ ] `/docs/threat-model.md`
-- [ ] `/docs/faq.md`
-- [ ] Explicit non-goals section
+- [x] `README.md` (what AnchorID is, not how to hack it)
+- [x] `/docs/identity-model.md`
+- [x] `/docs/threat-model.md`
+- [x] `/docs/faq.md`
+- [x] Explicit non-goals section (in README and About page)
+
+## ✅ Public Pages
+
+- [x] `/about` — What is AnchorID, how it works, philosophy
+- [x] `/guide` — Canonical identity placement guide
+- [x] `/privacy` — Privacy policy
+- [x] Consistent navigation across all pages
 
 ---
 
 ## 🚫 Explicit Non-Goals (For MVP)
 
-- [ ] ❌ No accounts or passwords
-- [ ] ❌ No OAuth providers
-- [ ] ❌ No profile search or discovery
-- [ ] ❌ No public write APIs
+- [x] ❌ No accounts or passwords — using magic links + backup tokens
+- [x] ❌ No OAuth providers — email-based access only
+- [x] ❌ No profile search or discovery — resolve by UUID only
+- [x] ❌ No public write APIs — admin token required
 
 ---
 
@@ -86,6 +93,8 @@
 - [x] They can edit it securely later
 - [x] They can recover access without admin help
 - [x] `/resolve` output is stable, canonical, and explainable
+- [x] Edit page has clear UX with field explanations
+- [x] Setup flow allows immediate editing before first save
 - [ ] System survives hostile-but-boring internet traffic
 
 ---
