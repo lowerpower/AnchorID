@@ -220,6 +220,7 @@ export default {
     <span>Home</span>
     <a href="/about">About</a>
     <a href="/guide">Guide</a>
+    <a href="/proofs">Proofs</a>
     <a href="/faq">FAQ</a>
     <a href="/privacy">Privacy</a>
   </nav>
@@ -268,6 +269,21 @@ export default {
       const html = await env.ANCHOR_KV.get("page:privacy");
       if (!html) {
         return new Response("Privacy policy not found", { status: 404 });
+      }
+      return new Response(html, {
+        headers: {
+          "content-type": "text/html; charset=utf-8",
+          "cache-control":
+            "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400",
+        },
+      });
+    }
+
+    // Proofs page
+    if (path === "/proofs" || path === "/proofs/") {
+      const html = await env.ANCHOR_KV.get("page:proofs");
+      if (!html) {
+        return new Response("Proofs not found", { status: 404 });
       }
       return new Response(html, {
         headers: {

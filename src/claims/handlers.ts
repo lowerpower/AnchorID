@@ -6,8 +6,10 @@ import { nowIso, isUuid, normalizeUrl, normalizeIdentityUrl, loadClaims, saveCla
 import {
   claimIdForWebsite,
   claimIdForGitHub,
+  claimIdForDns,
   buildWellKnownProof,
   buildGitHubReadmeProof,
+  buildDnsProof,
   verifyClaim,
 } from "./verify";
 
@@ -161,7 +163,7 @@ export async function handlePostClaim(request: Request,   env: Env): Promise<Res
   const url = normalizeIdentityUrl(String(payload.url || ""));
 
   if (!isUuid(uuid)) return new Response("Bad UUID", { status: 400 });
-  if (type !== "website" && type !== "github") return new Response("Bad type", { status: 400 });
+  if (type !== "website" && type !== "github" && type !== "dns") return new Response("Bad type", { status: 400 });
 
   const resolverUrl = resolverUrlFor(uuid);
   const now = nowIso();
@@ -181,7 +183,7 @@ export async function handlePostClaim(request: Request,   env: Env): Promise<Res
       createdAt: now,
       updatedAt: now,
     };
-  } else {
+  } else if (type === "github") {
     const id = claimIdForGitHub(url);
     const proof = buildGitHubReadmeProof(url, resolverUrl);
     claim = {
@@ -193,6 +195,45 @@ export async function handlePostClaim(request: Request,   env: Env): Promise<Res
       createdAt: now,
       updatedAt: now,
     };
+  } else if (type === "dns") {
+    // Parse domain input to determine qname
+    // Accept: "example.com" (defaults to _anchorid.example.com)
+    // Accept: "_anchorid.example.com" (explicit subdomain)
+    let domain = url.toLowerCase().trim();
+
+    // Remove protocol if present
+    domain = domain.replace(/^https?:\/\//, "");
+    // Remove trailing slash
+    domain = domain.replace(/\/$/, "");
+    // Remove path
+    domain = domain.split("/")[0];
+
+    let qname: string;
+    if (domain.startsWith("_anchorid.")) {
+      // User specified subdomain explicitly
+      qname = domain;
+    } else {
+      // Default to subdomain method
+      qname = `_anchorid.${domain}`;
+    }
+
+    const id = claimIdForDns(qname);
+    const proof = buildDnsProof(qname, uuid);
+
+    // Use the base domain as the url for display
+    const displayUrl = domain.startsWith("_anchorid.") ? domain.slice(10) : domain;
+
+    claim = {
+      id,
+      type: "dns",
+      url: displayUrl,
+      status: "self_asserted",
+      proof,
+      createdAt: now,
+      updatedAt: now,
+    };
+  } else {
+    return new Response("Invalid claim type", { status: 400 });
   }
 
   const list = await loadClaims(env, uuid);

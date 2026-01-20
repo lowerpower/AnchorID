@@ -1,0 +1,354 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <title>Identity Proofs | AnchorID</title>
+  <meta name="description" content="Prove ownership of websites, domains, and accounts to strengthen your AnchorID canonical identity." />
+
+  <link rel="canonical" href="https://anchorid.net/proofs" />
+
+  <meta property="og:type" content="article" />
+  <meta property="og:site_name" content="AnchorID" />
+  <meta property="og:title" content="Identity Proofs" />
+  <meta property="og:description" content="Prove ownership of websites, domains, and accounts to strengthen your AnchorID canonical identity." />
+  <meta property="og:url" content="https://anchorid.net/proofs" />
+  <meta name="twitter:card" content="summary" />
+
+  <style>
+    :root {
+      --bg: #ffffff;
+      --fg: #111111;
+      --muted: #555555;
+      --rule: #e7e7e7;
+      --codebg: #f6f6f6;
+      --link: #0b57d0;
+      --maxw: 860px;
+    }
+    html, body { background: var(--bg); color: var(--fg); margin: 0; padding: 0; }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; line-height: 1.55; }
+    header, main, footer { display: block; }
+    .wrap { max-width: var(--maxw); margin: 0 auto; padding: 32px 20px; }
+    a { color: var(--link); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    h1 { font-size: 2rem; margin: 0 0 10px 0; letter-spacing: -0.02em; }
+    .kicker { color: var(--muted); margin: 0 0 18px 0; }
+    .meta { color: var(--muted); font-size: 0.95rem; }
+    hr { border: 0; border-top: 1px solid var(--rule); margin: 24px 0; }
+    h2 { font-size: 1.35rem; margin: 28px 0 10px 0; letter-spacing: -0.01em; }
+    h3 { font-size: 1.1rem; margin: 18px 0 8px 0; }
+    p { margin: 10px 0; }
+    ul, ol { margin: 10px 0 10px 20px; }
+    li { margin: 6px 0; }
+    code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+    pre { background: var(--codebg); padding: 14px; border: 1px solid var(--rule); border-radius: 10px; overflow: auto; }
+    .callout { border-left: 3px solid var(--rule); padding: 10px 14px; background: #fafafa; border-radius: 10px; }
+    .small { font-size: 0.95rem; color: var(--muted); }
+    footer { border-top: 1px solid var(--rule); }
+    header.wrap { padding-bottom: 6px; }
+    main.wrap { padding-top: 6px; }
+    header.wrap hr { margin: 6px 0; }
+    main.wrap > h2:first-child { margin-top: 8px; }
+    h2 { font-size: 1.35rem; margin: 20px 0 10px 0; letter-spacing: -0.01em; }
+    nav.topnav { font-size: 14px; margin-bottom: 24px; }
+    nav.topnav span { color: #111; font-weight: 500; }
+    nav.topnav a, nav.topnav span { margin-right: 16px; }
+
+    .proof-card {
+      border: 1px solid var(--rule);
+      border-radius: 12px;
+      padding: 16px;
+      margin: 16px 0;
+      background: #fafafa;
+    }
+    .proof-card h3 { margin-top: 0; }
+    .proof-card .status {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 0.85rem;
+      font-weight: 500;
+      margin-left: 8px;
+    }
+    .status.strong { background: #e7f7ee; color: #0d652d; border: 1px solid #bfe8cf; }
+    .status.good { background: #e6f3ff; color: #0b57d0; border: 1px solid #b3d9ff; }
+    .proof-card ul { margin-top: 8px; }
+  </style>
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "Organization",
+        "@id": "https://anchorid.net/#org",
+        "name": "AnchorID",
+        "url": "https://anchorid.net/"
+      },
+      {
+        "@type": "WebSite",
+        "@id": "https://anchorid.net/#website",
+        "url": "https://anchorid.net/",
+        "name": "AnchorID",
+        "publisher": { "@id": "https://anchorid.net/#org" }
+      },
+      {
+        "@type": "WebPage",
+        "@id": "https://anchorid.net/proofs#webpage",
+        "url": "https://anchorid.net/proofs",
+        "name": "Identity Proofs",
+        "description": "Prove ownership of websites, domains, and accounts to strengthen your AnchorID canonical identity.",
+        "isPartOf": { "@id": "https://anchorid.net/#website" },
+        "dateModified": "2026-01-20T01:15:00Z",
+        "inLanguage": "en"
+      }
+    ]
+  }
+  </script>
+</head>
+
+<body>
+  <header class="wrap">
+    <nav class="topnav">
+      <a href="/">Home</a>
+      <a href="/about">About</a>
+      <a href="/guide">Guide</a>
+      <span>Proofs</span>
+      <a href="/faq">FAQ</a>
+      <a href="/privacy">Privacy</a>
+    </nav>
+    <h1>Identity Proofs</h1>
+    <p class="kicker">Prove ownership of websites, domains, and accounts to strengthen your canonical identity.</p>
+    <p class="small"><strong>Last modified:</strong> January 20, 2026</p>
+    <hr />
+  </header>
+
+  <main class="wrap">
+    <h2>What are identity proofs?</h2>
+
+    <p>
+      Identity proofs let you <strong>cryptographically verify</strong> that you control specific resources—websites, domains, or accounts—and bind them to your AnchorID.
+    </p>
+
+    <p>
+      Once verified, these proofs are added to your <strong>canonical identity record</strong> and published in your resolver's <code>sameAs</code> field, creating a web of verified connections.
+    </p>
+
+    <div class="callout">
+      <p><strong>Why use proofs?</strong></p>
+      <ul>
+        <li>Reduce impersonation risk</li>
+        <li>Strengthen search and AI attribution</li>
+        <li>Provide machine-readable ownership signals</li>
+        <li>Build a verifiable web of identity across platforms</li>
+      </ul>
+    </div>
+
+    <hr />
+
+    <h2>How proofs work</h2>
+
+    <ol>
+      <li><strong>Claim</strong> a resource (website, domain, GitHub profile)</li>
+      <li><strong>Publish proof</strong> at a specific location (TXT record, .well-known file, README)</li>
+      <li><strong>Verify</strong> the claim through AnchorID</li>
+      <li><strong>Verified resources</strong> appear in your canonical identity resolver</li>
+    </ol>
+
+    <p>
+      All verified proofs are publicly viewable at:
+    </p>
+
+    <pre><code>https://anchorid.net/claims/&lt;UUID&gt;</code></pre>
+
+    <hr />
+
+    <h2>Available proof types</h2>
+
+    <div class="proof-card">
+      <h3>Website Proof <span class="status strong">Strong Signal</span></h3>
+
+      <p>Prove you control a website by publishing a proof file at <code>/.well-known/anchorid.txt</code></p>
+
+      <p><strong>Good for:</strong></p>
+      <ul>
+        <li>Personal websites and blogs</li>
+        <li>Company websites</li>
+        <li>Project homepages</li>
+      </ul>
+
+      <p><strong>Proof location:</strong></p>
+      <pre><code>https://example.com/.well-known/anchorid.txt</code></pre>
+
+      <p><strong>File contents:</strong></p>
+      <pre><code>https://anchorid.net/resolve/&lt;your-uuid&gt;</code></pre>
+
+      <p class="small">
+        <a href="https://github.com/lowerpower/anchorid/blob/main/docs/proofs/website.md">View detailed guide →</a>
+      </p>
+    </div>
+
+    <div class="proof-card">
+      <h3>DNS Proof (Domain Control) <span class="status strong">Strong Signal</span></h3>
+
+      <p>Prove you control a domain by publishing a DNS TXT record.</p>
+
+      <p><strong>Good for:</strong></p>
+      <ul>
+        <li>Organizations with domain control</li>
+        <li>Software projects tied to domains</li>
+        <li>Personal domains</li>
+        <li>Strongest signal when paired with website proof</li>
+      </ul>
+
+      <p><strong>DNS record:</strong></p>
+      <pre><code>Name:  _anchorid
+Type:  TXT
+Value: anchorid=urn:uuid:&lt;your-uuid&gt;</code></pre>
+
+      <p><strong>Example:</strong></p>
+      <pre><code>_anchorid.example.com  TXT  "anchorid=urn:uuid:4ff7ed97-..."</code></pre>
+
+      <p class="small">
+        <a href="https://github.com/lowerpower/anchorid/blob/main/docs/proofs/dns.md">View detailed guide →</a>
+      </p>
+    </div>
+
+    <div class="proof-card">
+      <h3>GitHub Proof <span class="status good">Good Signal</span></h3>
+
+      <p>Prove you control a GitHub account by adding your AnchorID to your profile README.</p>
+
+      <p><strong>Good for:</strong></p>
+      <ul>
+        <li>Developers and open source contributors</li>
+        <li>Code attribution</li>
+        <li>Technical identity verification</li>
+      </ul>
+
+      <p><strong>Proof location:</strong></p>
+      <pre><code>https://github.com/username/username/README.md</code></pre>
+
+      <p><strong>Add to README:</strong></p>
+      <pre><code>Canonical identity: https://anchorid.net/resolve/&lt;your-uuid&gt;</code></pre>
+
+      <p class="small">
+        <a href="https://github.com/lowerpower/anchorid/blob/main/docs/proofs/github.md">View detailed guide →</a>
+      </p>
+    </div>
+
+    <hr />
+
+    <h2>Proof strength comparison</h2>
+
+    <table style="width: 100%; border-collapse: collapse; margin: 16px 0;">
+      <thead>
+        <tr style="border-bottom: 2px solid var(--rule);">
+          <th style="text-align: left; padding: 8px;">Proof Type</th>
+          <th style="text-align: left; padding: 8px;">Signal Strength</th>
+          <th style="text-align: left; padding: 8px;">Best For</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr style="border-bottom: 1px solid var(--rule);">
+          <td style="padding: 8px;">DNS + Website</td>
+          <td style="padding: 8px;"><strong>Strongest</strong></td>
+          <td style="padding: 8px;">Organizations, official projects</td>
+        </tr>
+        <tr style="border-bottom: 1px solid var(--rule);">
+          <td style="padding: 8px;">DNS only</td>
+          <td style="padding: 8px;"><strong>Strong</strong></td>
+          <td style="padding: 8px;">Domain owners</td>
+        </tr>
+        <tr style="border-bottom: 1px solid var(--rule);">
+          <td style="padding: 8px;">Website only</td>
+          <td style="padding: 8px;"><strong>Strong</strong></td>
+          <td style="padding: 8px;">Personal sites, blogs</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px;">GitHub</td>
+          <td style="padding: 8px;">Good</td>
+          <td style="padding: 8px;">Developers, technical work</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <hr />
+
+    <h2>Creating and verifying proofs</h2>
+
+    <h3>Via Admin UI</h3>
+    <ol>
+      <li>Log in to your AnchorID account</li>
+      <li>Navigate to the Claims section</li>
+      <li>Add a new claim</li>
+      <li>Publish the proof at the required location</li>
+      <li>Click "Verify" to check the proof</li>
+    </ol>
+
+    <h3>Via API</h3>
+    <p>Developers can manage proofs programmatically:</p>
+
+    <pre><code># Create a claim
+POST https://anchorid.net/claim
+{
+  "uuid": "&lt;your-uuid&gt;",
+  "type": "dns",
+  "url": "example.com"
+}
+
+# Verify a claim
+POST https://anchorid.net/claim/verify
+{
+  "uuid": "&lt;your-uuid&gt;",
+  "id": "dns:_anchorid.example.com"
+}</code></pre>
+
+    <p class="small">
+      API endpoints require authentication with <code>Authorization: Bearer &lt;token&gt;</code>
+    </p>
+
+    <hr />
+
+    <h2>Viewing your verified proofs</h2>
+
+    <p>All verified proofs are publicly visible at your claims page:</p>
+
+    <pre><code>https://anchorid.net/claims/&lt;UUID&gt;</code></pre>
+
+    <p>Verified resources also appear in your resolver's <code>sameAs</code> field:</p>
+
+    <pre><code>https://anchorid.net/resolve/&lt;UUID&gt;</code></pre>
+
+    <hr />
+
+    <h2>Security and verification</h2>
+
+    <div class="callout">
+      <p><strong>Important:</strong></p>
+      <ul>
+        <li>Proofs demonstrate <strong>control</strong>, not legal identity</li>
+        <li>DNS and website proofs are stronger than social account proofs</li>
+        <li>Combine multiple proof types for strongest signal</li>
+        <li>Proofs can be re-verified at any time</li>
+      </ul>
+    </div>
+
+    <hr />
+
+    <h2>Questions?</h2>
+
+    <p>
+      See the <a href="/faq">FAQ</a> for common questions or consult the detailed proof guides linked above.
+    </p>
+  </main>
+
+  <footer class="wrap">
+    <p class="small">&copy; <span id="y"></span> AnchorID. <a href="/">Home</a> · <a href="/guide">Guide</a> · <a href="/faq">FAQ</a> · <a href="/privacy">Privacy</a></p>
+    <script>
+      document.getElementById("y").textContent = String(new Date().getFullYear());
+    </script>
+  </footer>
+</body>
+</html>
