@@ -961,6 +961,202 @@ ${isOrg ? `
   </div>
 </form>
 
+<h2 style="margin-top:32px">Identity Claims</h2>
+<p class="hint">Prove ownership of websites, domains, and accounts. Verified claims automatically appear in your sameAs.</p>
+
+${claims.length === 0 ? `<div class="card" style="margin:14px 0">
+  <p style="margin:0;color:#666">No claims yet. Add your first claim below.</p>
+</div>` : `
+<div class="grid" style="margin-top:14px">
+  ${claims.map((c) => {
+    const statusBadgeStyle = c.status === "verified"
+      ? "background:#d4edda;color:#155724"
+      : c.status === "failed"
+      ? "background:#f8d7da;color:#721c24"
+      : "background:#fff3cd;color:#856404";
+
+    let proofDetails = "";
+    if (c.type === "dns" && c.proof.kind === "dns_txt") {
+      const qname = escapeHtml((c.proof as any).qname || "");
+      const token = escapeHtml((c.proof as any).expectedToken || "");
+      proofDetails = `
+        <div style="margin-top:8px;font-size:12px;color:#555">
+          <strong>Query name:</strong> <code>${qname}</code><br>
+          <strong>Expected:</strong> <code style="font-size:11px">${token}</code>
+        </div>`;
+    } else if (c.proof.kind === "well_known") {
+      proofDetails = `
+        <div style="margin-top:8px;font-size:12px;color:#555">
+          <strong>Proof location:</strong> <code style="font-size:11px">${escapeHtml((c.proof as any).url || "")}</code>
+        </div>`;
+    } else if (c.proof.kind === "github_readme") {
+      proofDetails = `
+        <div style="margin-top:8px;font-size:12px;color:#555">
+          <strong>Proof location:</strong> <code style="font-size:11px">${escapeHtml((c.proof as any).url || "")}</code>
+        </div>`;
+    }
+
+    return `
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:start">
+        <div style="flex:1">
+          <label style="margin-bottom:4px">
+            ${escapeHtml(c.type).toUpperCase()}
+            <span class="badge" style="${statusBadgeStyle}">${escapeHtml(c.status)}</span>
+          </label>
+          <code style="font-size:13px;word-break:break-all">${escapeHtml(c.url)}</code>
+          ${proofDetails}
+          ${c.failReason ? `<div style="margin-top:8px;color:#721c24;font-size:12px"><strong>Error:</strong> ${escapeHtml(c.failReason)}</div>` : ""}
+          ${c.lastCheckedAt ? `<div style="margin-top:6px;font-size:11px;color:#777">Last checked: ${escapeHtml(c.lastCheckedAt)}</div>` : ""}
+        </div>
+        <button type="button" class="verify-btn" data-uuid="${escapeHtml(uuid)}" data-claim-id="${escapeHtml(c.id)}"
+          style="padding:6px 12px;font-size:12px;margin-left:10px;white-space:nowrap">
+          Verify
+        </button>
+      </div>
+    </div>`;
+  }).join("")}
+</div>
+`}
+
+<details style="margin-top:20px;border:1px solid #ddd;border-radius:10px;padding:14px;background:#f9f9f9">
+  <summary style="cursor:pointer;font-weight:600;font-size:14px">Add New Claim</summary>
+
+  <div style="margin-top:14px">
+    <form id="addClaimForm">
+      <input type="hidden" name="uuid" value="${escapeHtml(uuid)}">
+
+      <label style="display:block;margin-bottom:8px">
+        <strong>Claim Type</strong>
+      </label>
+      <select name="type" id="claimType" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;margin-bottom:12px">
+        <option value="website">Website (.well-known/anchorid.txt)</option>
+        <option value="github">GitHub (profile README)</option>
+        <option value="dns">DNS (TXT record)</option>
+      </select>
+
+      <label style="display:block;margin-bottom:8px">
+        <strong id="urlLabel">URL or Domain</strong>
+      </label>
+      <input type="text" name="url" id="claimUrl" placeholder="https://example.com or example.com"
+        style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;margin-bottom:12px">
+
+      <div id="dnsHint" style="display:none;font-size:12px;color:#555;margin-bottom:12px;padding:10px;background:#fff;border:1px solid #e0e0e0;border-radius:6px">
+        <strong>DNS Setup Instructions:</strong><br>
+        Add a TXT record at <code>_anchorid.yourdomain.com</code> with value:<br>
+        <code style="font-size:11px">anchorid=urn:uuid:${escapeHtml(uuid)}</code>
+      </div>
+
+      <button type="submit" style="padding:8px 16px;background:#111;color:#fff;border:1px solid #111;border-radius:6px;cursor:pointer">
+        Add Claim
+      </button>
+      <span id="claimStatus" style="margin-left:10px;font-size:13px"></span>
+    </form>
+  </div>
+</details>
+
+<script>
+(function() {
+  const adminToken = "${escapeHtml(getAdminSecret(env) || "")}";
+
+  // Update form hints based on claim type
+  document.getElementById("claimType").addEventListener("change", function() {
+    const type = this.value;
+    const urlLabel = document.getElementById("urlLabel");
+    const urlInput = document.getElementById("claimUrl");
+    const dnsHint = document.getElementById("dnsHint");
+
+    if (type === "website") {
+      urlLabel.textContent = "Website URL";
+      urlInput.placeholder = "https://example.com";
+      dnsHint.style.display = "none";
+    } else if (type === "github") {
+      urlLabel.textContent = "GitHub Profile URL";
+      urlInput.placeholder = "https://github.com/username";
+      dnsHint.style.display = "none";
+    } else if (type === "dns") {
+      urlLabel.textContent = "Domain";
+      urlInput.placeholder = "example.com or _anchorid.example.com";
+      dnsHint.style.display = "block";
+    }
+  });
+
+  // Add claim form submission
+  document.getElementById("addClaimForm").addEventListener("submit", async function(e) {
+    e.preventDefault();
+    const statusEl = document.getElementById("claimStatus");
+    statusEl.textContent = "Adding...";
+    statusEl.style.color = "#666";
+
+    const formData = new FormData(e.target);
+    const payload = {
+      uuid: formData.get("uuid"),
+      type: formData.get("type"),
+      url: formData.get("url")
+    };
+
+    try {
+      const res = await fetch("/claim", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer " + adminToken
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (res.ok) {
+        statusEl.textContent = "✓ Added! Reloading...";
+        statusEl.style.color = "#155724";
+        setTimeout(() => location.reload(), 1000);
+      } else {
+        const text = await res.text();
+        statusEl.textContent = "✗ Error: " + text;
+        statusEl.style.color = "#721c24";
+      }
+    } catch (err) {
+      statusEl.textContent = "✗ Network error";
+      statusEl.style.color = "#721c24";
+    }
+  });
+
+  // Verify button handlers
+  document.querySelectorAll(".verify-btn").forEach(btn => {
+    btn.addEventListener("click", async function() {
+      const uuid = this.dataset.uuid;
+      const claimId = this.dataset.claimId;
+
+      this.textContent = "Verifying...";
+      this.disabled = true;
+
+      try {
+        const res = await fetch("/claim/verify", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": "Bearer " + adminToken
+          },
+          body: JSON.stringify({ uuid, id: claimId })
+        });
+
+        if (res.ok) {
+          location.reload();
+        } else {
+          const text = await res.text();
+          alert("Verification failed: " + text);
+          this.textContent = "Verify";
+          this.disabled = false;
+        }
+      } catch (err) {
+        alert("Network error: " + err.message);
+        this.textContent = "Verify";
+        this.disabled = false;
+      }
+    });
+  });
+})();
+</script>
+
 <form method="post" action="/admin/logout" style="margin-top:18px">
   ${csrf}
   <button type="submit">Logout</button>
