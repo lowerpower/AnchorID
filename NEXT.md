@@ -44,10 +44,10 @@ Items to tackle in future sessions, organized by priority and category.
   - [x] User-friendly error descriptions - Non-technical language for all errors
   - [x] Troubleshooting hints in error responses - Actionable guidance with doc links
 
-- [ ] **Add health check endpoint**
-  - [ ] `/health` or `/_health` endpoint
-  - [ ] Check KV connectivity
-  - [ ] Return service status
+- [x] **Add health check endpoint** ✅ (Completed Jan 20, 2026)
+  - [x] `/health` and `/_health` endpoints - Both routes supported
+  - [x] Check KV connectivity - Tests KV read with latency measurement
+  - [x] Return service status - JSON with overall status and component checks
 
 ### Low Priority
 
@@ -338,4 +338,4 @@ From the list above, these are quick to implement:
 ---
 
 _Last updated: January 20, 2026_
-_After: Error message improvements_
+_After: Health check endpoint implementation_

@@ -191,6 +191,48 @@ async function checkRequestSize(request: Request, maxSize: number = MAX_JSON_SIZ
   return null;
 }
 
+// Health check endpoint
+async function handleHealthCheck(env: Env): Promise<Response> {
+  const checks: Record<string, { status: string; message?: string; latencyMs?: number }> = {};
+  let overallHealthy = true;
+
+  // Check KV connectivity
+  try {
+    const startKv = Date.now();
+    // Try a simple read operation - use a known key or test key
+    const testResult = await env.ANCHOR_KV.get("health:check");
+    const kvLatency = Date.now() - startKv;
+
+    checks.kv = {
+      status: "healthy",
+      message: "KV storage is accessible",
+      latencyMs: kvLatency,
+    };
+  } catch (e: any) {
+    checks.kv = {
+      status: "unhealthy",
+      message: `KV error: ${e.message || "unknown"}`,
+    };
+    overallHealthy = false;
+  }
+
+  const response = {
+    status: overallHealthy ? "healthy" : "unhealthy",
+    timestamp: new Date().toISOString(),
+    checks,
+    version: "1.0",
+  };
+
+  return new Response(JSON.stringify(response, null, 2), {
+    status: overallHealthy ? 200 : 503,
+    headers: {
+      "content-type": "application/json; charset=utf-8",
+      "cache-control": "no-cache, no-store, must-revalidate",
+      ...securityHeaders(),
+    },
+  });
+}
+
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -210,6 +252,11 @@ export default {
         const sizeError = await checkRequestSize(request);
         if (sizeError) return sizeError;
       }
+    }
+
+    // Health check endpoint (public, no auth required)
+    if ((path === "/_health" || path === "/health") && request.method === "GET") {
+      return handleHealthCheck(env);
     }
 
     // Admin routes
