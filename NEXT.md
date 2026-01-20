@@ -8,12 +8,12 @@ Items to tackle in future sessions, organized by priority and category.
 
 ### High Priority
 
-- [ ] **Add security headers** to all responses
-  - [ ] `Content-Security-Policy` - Prevent XSS and injection attacks
-  - [ ] `X-Frame-Options: DENY` - Prevent clickjacking
-  - [ ] `X-Content-Type-Options: nosniff` - Prevent MIME sniffing
-  - [ ] `Referrer-Policy: strict-origin-when-cross-origin`
-  - [ ] `Permissions-Policy` - Restrict browser features
+- [x] **Add security headers** to all responses ✅ (Completed Jan 20, 2026)
+  - [x] `Content-Security-Policy` - Prevent XSS and injection attacks
+  - [x] `X-Frame-Options: DENY` - Prevent clickjacking
+  - [x] `X-Content-Type-Options: nosniff` - Prevent MIME sniffing
+  - [x] `Referrer-Policy: strict-origin-when-cross-origin`
+  - [x] `Permissions-Policy` - Restrict browser features
 
 - [ ] **Add request size limits**
   - [ ] Limit JSON payload size (prevent memory exhaustion)
@@ -327,8 +327,8 @@ From `todo.md`:
 
 From the list above, these are quick to implement:
 
-1. ✅ Commit CHANGELOG (1 min)
-2. ⚡ Add security headers (15-30 min)
+1. ✅ Commit CHANGELOG (1 min) - DONE
+2. ✅ Add security headers (15-30 min) - DONE
 3. ⚡ Add DNS query timeouts (15-30 min)
 4. ⚡ Update README with DNS proof (10 min)
 5. ⚡ Fix test snapshots (5 min)

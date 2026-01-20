@@ -18,6 +18,17 @@ function resolverUrlFor(uuid: string): string {
   return `https://anchorid.net/resolve/${uuid}`;
 }
 
+// Security headers for all responses
+function securityHeaders(): Record<string, string> {
+  return {
+    "x-content-type-options": "nosniff",
+    "x-frame-options": "DENY",
+    "referrer-policy": "strict-origin-when-cross-origin",
+    "permissions-policy": "interest-cohort=()",
+    "content-security-policy": "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; base-uri 'self'; form-action 'self'",
+  };
+}
+
 
 export async function handleGetClaims(
   request: Request,
@@ -33,6 +44,7 @@ export async function handleGetClaims(
     headers: {
       "content-type": "application/json; charset=utf-8",
       "cache-control": "public, max-age=60, s-maxage=300, stale-while-revalidate=86400",
+      ...securityHeaders(),
     },
   });
 }
@@ -147,6 +159,7 @@ export async function handleGetClaimsHtml(
     headers: {
       "content-type": "text/html; charset=utf-8",
       "cache-control": "public, max-age=60, s-maxage=300, stale-while-revalidate=86400",
+      ...securityHeaders(),
     },
   });
 }
@@ -241,7 +254,10 @@ export async function handlePostClaim(request: Request,   env: Env): Promise<Res
   await saveClaims(env, uuid, updated);
 
   return new Response(JSON.stringify({ ok: true, claim }, null, 2), {
-    headers: { "content-type": "application/json; charset=utf-8" },
+    headers: {
+      "content-type": "application/json; charset=utf-8",
+      ...securityHeaders(),
+    },
   });
 }
 
@@ -287,7 +303,10 @@ export async function handlePostClaimVerify(
   await saveClaims(env, uuid, updated);
 
   return new Response(JSON.stringify({ ok: true, claim }, null, 2), {
-    headers: { "content-type": "application/json; charset=utf-8" },
+    headers: {
+      "content-type": "application/json; charset=utf-8",
+      ...securityHeaders(),
+    },
   });
 }
 

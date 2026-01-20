@@ -242,8 +242,7 @@ export default {
         {
           headers: {
             "content-type": "text/html; charset=utf-8",
-            "x-content-type-options": "nosniff",
-            "referrer-policy": "no-referrer",
+            ...securityHeaders(),
           },
         }
       );
@@ -260,6 +259,7 @@ export default {
           "content-type": "text/html; charset=utf-8",
           "cache-control":
             "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400",
+          ...securityHeaders(),
         },
       });
     }
@@ -275,6 +275,7 @@ export default {
           "content-type": "text/html; charset=utf-8",
           "cache-control":
             "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400",
+          ...securityHeaders(),
         },
       });
     }
@@ -290,6 +291,7 @@ export default {
           "content-type": "text/html; charset=utf-8",
           "cache-control":
             "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400",
+          ...securityHeaders(),
         },
       });
     }
@@ -305,6 +307,7 @@ export default {
           "content-type": "text/html; charset=utf-8",
           "cache-control":
             "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400",
+          ...securityHeaders(),
         },
       });
     }
@@ -320,6 +323,7 @@ export default {
           "content-type": "text/html; charset=utf-8",
           "cache-control":
             "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400",
+          ...securityHeaders(),
         },
       });
     }
@@ -824,7 +828,11 @@ function htmlError(title: string, message: string, backLink: string): Response {
 </body></html>`;
   return new Response(html, {
     status: 400,
-    headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" },
+    headers: {
+      "content-type": "text/html; charset=utf-8",
+      "cache-control": "no-store",
+      ...securityHeaders(),
+    },
   });
 }
 
@@ -839,7 +847,11 @@ function htmlSuccess(title: string, message: string, email: string): Response {
 <p><a href="/">Return home</a></p>
 </body></html>`;
   return new Response(html, {
-    headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" },
+    headers: {
+      "content-type": "text/html; charset=utf-8",
+      "cache-control": "no-store",
+      ...securityHeaders(),
+    },
   });
 }
 
@@ -1412,12 +1424,23 @@ function isUuid(s: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(s);
 }
 
+// Security headers applied to all responses
+function securityHeaders(): Record<string, string> {
+  return {
+    "x-content-type-options": "nosniff",
+    "x-frame-options": "DENY",
+    "referrer-policy": "strict-origin-when-cross-origin",
+    "permissions-policy": "interest-cohort=()",
+    "content-security-policy": "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; base-uri 'self'; form-action 'self'",
+  };
+}
+
 function json(obj: unknown, status = 200, extraHeaders: Record<string, string> = {}) {
   return new Response(JSON.stringify(obj, null, 2), {
     status,
     headers: {
       "content-type": "application/json; charset=utf-8",
-      "x-content-type-options": "nosniff",
+      ...securityHeaders(),
       ...extraHeaders,
     },
   });
@@ -1428,7 +1451,7 @@ function ldjson(obj: unknown, status = 200, extraHeaders: Record<string, string>
     status,
     headers: {
       "content-type": "application/ld+json; charset=utf-8",
-      "x-content-type-options": "nosniff",
+      ...securityHeaders(),
       ...extraHeaders,
     },
   });
