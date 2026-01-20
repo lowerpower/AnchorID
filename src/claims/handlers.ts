@@ -167,7 +167,7 @@ export async function handleGetClaimsHtml(
 
 // Token-gated in router (reuse your existing auth guard there)
 export async function handlePostClaim(request: Request,   env: Env): Promise<Response> {
-  const payload = await request.json().catch(() => null);
+  const payload: any = await request.json().catch(() => null);
   if (!payload) return new Response("Bad JSON", { status: 400 });
 
   const uuid = String(payload.uuid || "").trim();
@@ -265,11 +265,12 @@ export async function handlePostClaimVerify(
   request: Request,
   env: Env
 ): Promise<Response> {
-  const payload = await request.json().catch(() => null);
+  const payload: any = await request.json().catch(() => null);
   if (!payload) return new Response("Bad JSON", { status: 400 });
 
   const uuid = String(payload.uuid || "").trim();
   const id = String(payload.id || "").trim();
+  const bypassCache = Boolean(payload.bypassCache || payload.recheckNow);
 
   if (!isUuid(uuid)) return new Response("Bad UUID", { status: 400 });
   if (!id) return new Response("Bad claim id", { status: 400 });
@@ -283,7 +284,7 @@ export async function handlePostClaimVerify(
 
   let result: { status: Claim["status"]; failReason?: string };
   try {
-    result = await verifyClaim(claim);
+    result = await verifyClaim(claim, env.ANCHOR_KV, bypassCache);
   } catch (e: any) {
     result = { status: "failed", failReason: `verify_error:${String(e?.message || e)}` };
   }

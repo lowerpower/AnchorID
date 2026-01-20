@@ -25,11 +25,11 @@ Items to tackle in future sessions, organized by priority and category.
   - [x] Overall verification timeout: 5s (via 2 attempts × 2.5s)
   - [x] Add retry logic on transient failures (1 retry)
 
-- [ ] **Add DNS query result caching**
-  - [ ] Success cache: 15 minutes (per spec)
-  - [ ] Failure cache: 2 minutes
-  - [ ] TTL-bounded caching if available from DNS response
-  - [ ] "Recheck now" bypass option
+- [x] **Add DNS query result caching** ✅ (Completed Jan 20, 2026)
+  - [x] Success cache: 15 minutes (per spec), capped at DNS TTL if lower
+  - [x] Failure cache: 2 minutes
+  - [x] TTL-bounded caching from DNS response (uses minimum TTL from TXT records)
+  - [x] "Recheck now" bypass option (via `bypassCache` or `recheckNow` parameter)
 
 ### Medium Priority
 
@@ -338,4 +338,4 @@ From the list above, these are quick to implement:
 ---
 
 _Last updated: January 20, 2026_
-_After: DNS proof implementation_
+_After: DNS query result caching implementation_

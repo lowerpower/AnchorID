@@ -142,8 +142,16 @@ async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, timeoutErr
   return Promise.race([promise, timeout]);
 }
 
+// DNS query result with TTL information
+interface DnsQueryResult {
+  ok: boolean;
+  txtValues: string[];
+  error?: string;
+  ttl?: number; // TTL from DNS response (seconds)
+}
+
 // Query DNS TXT records via Cloudflare DoH JSON API (single attempt)
-async function queryDnsTxtOnce(qname: string, timeoutMs: number = 2500): Promise<{ ok: boolean; txtValues: string[]; error?: string }> {
+async function queryDnsTxtOnce(qname: string, timeoutMs: number = 2500): Promise<DnsQueryResult> {
   const dohUrl = `https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(qname)}&type=TXT`;
 
   try {
@@ -160,7 +168,7 @@ async function queryDnsTxtOnce(qname: string, timeoutMs: number = 2500): Promise
       return { ok: false, txtValues: [], error: `doh_status:${r.status}` };
     }
 
-    const data = await r.json();
+    const data: any = await r.json();
 
     // Check for NXDOMAIN or no answers
     if (data.Status !== 0) {
@@ -171,14 +179,21 @@ async function queryDnsTxtOnce(qname: string, timeoutMs: number = 2500): Promise
       return { ok: false, txtValues: [], error: "no_txt_records" };
     }
 
-    // Extract TXT records
+    // Extract TXT records and minimum TTL
     const txtValues: string[] = [];
+    let minTtl: number | undefined;
+
     for (const answer of data.Answer) {
       if (answer.type === 16) { // TXT record type
         if (answer.data) {
           // TXT data may be a single string or array of strings
           // DoH JSON returns the full concatenated string typically
           txtValues.push(String(answer.data));
+        }
+
+        // Track minimum TTL from all TXT records
+        if (typeof answer.TTL === "number" && answer.TTL > 0) {
+          minTtl = minTtl === undefined ? answer.TTL : Math.min(minTtl, answer.TTL);
         }
       }
     }
@@ -187,7 +202,7 @@ async function queryDnsTxtOnce(qname: string, timeoutMs: number = 2500): Promise
       return { ok: false, txtValues: [], error: "no_txt_records" };
     }
 
-    return { ok: true, txtValues };
+    return { ok: true, txtValues, ttl: minTtl };
   } catch (e: any) {
     // Check if it's a timeout or network error
     const errorMsg = e.message || String(e);
@@ -199,7 +214,7 @@ async function queryDnsTxtOnce(qname: string, timeoutMs: number = 2500): Promise
 }
 
 // Query DNS TXT records with timeout and retry on transient failures
-async function queryDnsTxt(qname: string): Promise<{ ok: boolean; txtValues: string[]; error?: string }> {
+async function queryDnsTxt(qname: string): Promise<DnsQueryResult> {
   const perRequestTimeout = 2500; // 2.5s per spec
   const maxRetries = 1; // 1 retry on transient failures
 
@@ -232,7 +247,91 @@ async function queryDnsTxt(qname: string): Promise<{ ok: boolean; txtValues: str
   return { ok: false, txtValues: [], error: lastError };
 }
 
-async function verifyDnsClaim(claim: Claim): Promise<{ status: ClaimStatus; failReason?: string }> {
+// Cached DNS query result
+interface CachedDnsResult {
+  ok: boolean;
+  txtValues: string[];
+  error?: string;
+  cachedAt: number; // Unix timestamp (ms)
+  expiresAt: number; // Unix timestamp (ms)
+}
+
+// Query DNS TXT records with caching
+async function queryDnsTxtCached(
+  qname: string,
+  kv: KVNamespace,
+  bypassCache: boolean = false
+): Promise<DnsQueryResult> {
+  const cacheKey = `dnscache:${qname.toLowerCase()}`;
+  const now = Date.now();
+
+  // Check cache first (unless bypassed)
+  if (!bypassCache) {
+    const cachedJson = await kv.get(cacheKey);
+    if (cachedJson) {
+      try {
+        const cached: CachedDnsResult = JSON.parse(cachedJson);
+
+        // Check if still valid
+        if (cached.expiresAt > now) {
+          return {
+            ok: cached.ok,
+            txtValues: cached.txtValues,
+            error: cached.error,
+          };
+        }
+      } catch {
+        // Invalid cache entry, continue to fresh query
+      }
+    }
+  }
+
+  // Perform fresh query
+  const result = await queryDnsTxt(qname);
+
+  // Determine cache TTL
+  let cacheTtlSeconds: number;
+
+  if (result.ok) {
+    // Success: Use DNS TTL if available, capped at 15 minutes
+    const defaultSuccessTtl = 15 * 60; // 15 minutes
+    if (result.ttl && result.ttl > 0) {
+      // Use DNS TTL, but cap at 15 minutes
+      cacheTtlSeconds = Math.min(result.ttl, defaultSuccessTtl);
+    } else {
+      cacheTtlSeconds = defaultSuccessTtl;
+    }
+  } else {
+    // Failure: 2 minutes
+    cacheTtlSeconds = 2 * 60;
+  }
+
+  // Store in cache
+  const expiresAt = now + (cacheTtlSeconds * 1000);
+  const cached: CachedDnsResult = {
+    ok: result.ok,
+    txtValues: result.txtValues,
+    error: result.error,
+    cachedAt: now,
+    expiresAt,
+  };
+
+  try {
+    await kv.put(cacheKey, JSON.stringify(cached), {
+      expirationTtl: cacheTtlSeconds,
+    });
+  } catch {
+    // Cache write failure is non-fatal
+  }
+
+  return result;
+}
+
+async function verifyDnsClaim(
+  claim: Claim,
+  kv: KVNamespace,
+  bypassCache: boolean = false
+): Promise<{ status: ClaimStatus; failReason?: string }> {
   if (claim.proof.kind !== "dns_txt") {
     return { status: "failed", failReason: "invalid_proof_kind" };
   }
@@ -248,8 +347,8 @@ async function verifyDnsClaim(claim: Claim): Promise<{ status: ClaimStatus; fail
   // Build set of acceptable tokens
   const expectedTokens = buildExpectedDnsTokens(expectedUuid);
 
-  // Query DNS
-  const result = await queryDnsTxt(qname);
+  // Query DNS (with caching)
+  const result = await queryDnsTxtCached(qname, kv, bypassCache);
   if (!result.ok) {
     return { status: "failed", failReason: result.error || "dns_query_failed" };
   }
@@ -276,11 +375,16 @@ async function verifyDnsClaim(claim: Claim): Promise<{ status: ClaimStatus; fail
 }
 
 export async function verifyClaim(
-  claim: Claim
+  claim: Claim,
+  kv?: KVNamespace,
+  bypassCache: boolean = false
 ): Promise<{ status: ClaimStatus; failReason?: string }> {
   // Handle DNS claims
   if (claim.type === "dns") {
-    return verifyDnsClaim(claim);
+    if (!kv) {
+      return { status: "failed", failReason: "kv_not_available" };
+    }
+    return verifyDnsClaim(claim, kv, bypassCache);
   }
 
   // Handle website and github claims
