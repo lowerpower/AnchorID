@@ -20,10 +20,10 @@ Items to tackle in future sessions, organized by priority and category.
   - [ ] Limit URL length
   - [ ] Reject oversized requests early
 
-- [ ] **Add timeouts to DNS queries**
-  - [ ] Per-request timeout: 2.5s (per spec)
-  - [ ] Overall verification timeout: 5s
-  - [ ] Add retry logic on transient failures (1 retry)
+- [x] **Add timeouts to DNS queries** ✅ (Completed Jan 20, 2026)
+  - [x] Per-request timeout: 2.5s (per spec)
+  - [x] Overall verification timeout: 5s (via 2 attempts × 2.5s)
+  - [x] Add retry logic on transient failures (1 retry)
 
 - [ ] **Add DNS query result caching**
   - [ ] Success cache: 15 minutes (per spec)
@@ -329,7 +329,7 @@ From the list above, these are quick to implement:
 
 1. ✅ Commit CHANGELOG (1 min) - DONE
 2. ✅ Add security headers (15-30 min) - DONE
-3. ⚡ Add DNS query timeouts (15-30 min)
+3. ✅ Add DNS query timeouts (15-30 min) - DONE
 4. ⚡ Update README with DNS proof (10 min)
 5. ⚡ Fix test snapshots (5 min)
 

@@ -134,17 +134,27 @@ function buildExpectedDnsTokens(uuid: string): string[] {
   ];
 }
 
-// Query DNS TXT records via Cloudflare DoH JSON API
-async function queryDnsTxt(qname: string): Promise<{ ok: boolean; txtValues: string[]; error?: string }> {
+// Timeout wrapper for promises
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, timeoutError: string): Promise<T> {
+  const timeout = new Promise<T>((_, reject) =>
+    setTimeout(() => reject(new Error(timeoutError)), timeoutMs)
+  );
+  return Promise.race([promise, timeout]);
+}
+
+// Query DNS TXT records via Cloudflare DoH JSON API (single attempt)
+async function queryDnsTxtOnce(qname: string, timeoutMs: number = 2500): Promise<{ ok: boolean; txtValues: string[]; error?: string }> {
   const dohUrl = `https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(qname)}&type=TXT`;
 
   try {
-    const r = await fetch(dohUrl, {
+    const fetchPromise = fetch(dohUrl, {
       method: "GET",
       headers: {
         "accept": "application/dns-json",
       },
     });
+
+    const r = await withTimeout(fetchPromise, timeoutMs, "dns_query_timeout");
 
     if (!r.ok) {
       return { ok: false, txtValues: [], error: `doh_status:${r.status}` };
@@ -179,8 +189,47 @@ async function queryDnsTxt(qname: string): Promise<{ ok: boolean; txtValues: str
 
     return { ok: true, txtValues };
   } catch (e: any) {
-    return { ok: false, txtValues: [], error: `fetch_error:${e.message || e}` };
+    // Check if it's a timeout or network error
+    const errorMsg = e.message || String(e);
+    if (errorMsg.includes("timeout")) {
+      return { ok: false, txtValues: [], error: "timeout" };
+    }
+    return { ok: false, txtValues: [], error: `fetch_error:${errorMsg}` };
   }
+}
+
+// Query DNS TXT records with timeout and retry on transient failures
+async function queryDnsTxt(qname: string): Promise<{ ok: boolean; txtValues: string[]; error?: string }> {
+  const perRequestTimeout = 2500; // 2.5s per spec
+  const maxRetries = 1; // 1 retry on transient failures
+
+  let lastError = "";
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    const result = await queryDnsTxtOnce(qname, perRequestTimeout);
+
+    // Success - return immediately
+    if (result.ok) {
+      return result;
+    }
+
+    // Non-transient errors - don't retry
+    if (result.error === "no_txt_records" || result.error?.startsWith("dns_status:")) {
+      return result;
+    }
+
+    // Transient errors - retry once
+    lastError = result.error || "unknown_error";
+
+    // Don't retry on last attempt
+    if (attempt < maxRetries) {
+      // Small delay before retry (100ms)
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+  }
+
+  // All retries exhausted
+  return { ok: false, txtValues: [], error: lastError };
 }
 
 async function verifyDnsClaim(claim: Claim): Promise<{ status: ClaimStatus; failReason?: string }> {
