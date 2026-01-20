@@ -106,10 +106,10 @@ Items to tackle in future sessions, organized by priority and category.
 
 ### High Priority
 
-- [ ] **Commit CHANGELOG-dns-proof.md**
-  - [ ] Review and finalize
-  - [ ] Commit to repository
-  - [ ] Consider moving to `/docs/changelogs/` directory
+- [x] **Commit CHANGELOG-dns-proof.md** ✅ (Completed Jan 20, 2026)
+  - [x] Review and finalize
+  - [x] Commit to repository
+  - [x] Organized into `/docs/changelogs/` directory with index
 
 - [x] **Update main README.md** ✅ (Completed Jan 20, 2026)
   - [x] Add DNS proof to feature list
@@ -308,9 +308,11 @@ From `todo.md`:
 
 ## 🗂️ Housekeeping
 
-- [ ] Commit `CHANGELOG-dns-proof.md`
+- [x] Commit `CHANGELOG-dns-proof.md` ✅
+- [x] Create `/docs/changelogs/` directory ✅
+- [x] Create `CHANGELOG-production-hardening.md` ✅
+- [x] Add changelog index in `/docs/changelogs/README.md` ✅
 - [ ] Update `todo.md` with DNS proof completion
-- [ ] Create `/docs/changelogs/` directory for future changelogs
 - [ ] Consider organizing specs into `/docs/specs/v1/`
 
 ---
