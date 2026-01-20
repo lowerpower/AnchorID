@@ -16,6 +16,7 @@ AnchorID is designed for **longevity, decentralization, and crawlability**, not 
 - **[Threat Model](docs/threat-model.md)** — Security model, known threats, and mitigations
 - **[FAQ](docs/faq.md)** — Frequently asked questions
 - **[Placement Guide](https://anchorid.net/guide)** — How to place your AnchorID across profiles and platforms
+- **[Identity Proofs](https://anchorid.net/proofs)** — How to prove ownership of websites, domains, and accounts
 - **[Why AnchorID Is Deliberately Boring](docs/why-anchorid-is-deliberately-boring.md)** — Design philosophy
 
 ---
@@ -97,6 +98,14 @@ AnchorID supports **self-asserted claims** that can be **verified automatically*
   ```
   https://example.com/.well-known/anchorid.txt
   ```
+
+* **DNS/Domain control**
+  Proof via DNS TXT record:
+
+  ```
+  _anchorid.example.com  TXT  "anchorid=urn:uuid:<uuid>"
+  ```
+
 * **GitHub identity**
   Proof via GitHub profile README (`username/username` repo)
 

@@ -111,10 +111,10 @@ Items to tackle in future sessions, organized by priority and category.
   - [ ] Commit to repository
   - [ ] Consider moving to `/docs/changelogs/` directory
 
-- [ ] **Update main README.md**
-  - [ ] Add DNS proof to feature list
-  - [ ] Link to /proofs page
-  - [ ] Update "What can you prove" section
+- [x] **Update main README.md** ✅ (Completed Jan 20, 2026)
+  - [x] Add DNS proof to feature list
+  - [x] Link to /proofs page
+  - [x] Update "What can you prove" section
 
 ### Medium Priority
 
@@ -330,8 +330,10 @@ From the list above, these are quick to implement:
 1. ✅ Commit CHANGELOG (1 min) - DONE
 2. ✅ Add security headers (15-30 min) - DONE
 3. ✅ Add DNS query timeouts (15-30 min) - DONE
-4. ⚡ Update README with DNS proof (10 min)
-5. ⚡ Fix test snapshots (5 min)
+4. ✅ Update README with DNS proof (10 min) - DONE
+5. ✅ Fix test snapshots (5 min) - DONE
+
+🎉 **All quick wins completed!**
 
 ---
 
