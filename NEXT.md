@@ -39,10 +39,10 @@ Items to tackle in future sessions, organized by priority and category.
   - [ ] Monitor rate limit hits
   - [ ] Alert on unusual patterns
 
-- [ ] **Improve error messages**
-  - [ ] More specific DNS failure reasons
-  - [ ] User-friendly error descriptions
-  - [ ] Troubleshooting hints in error responses
+- [x] **Improve error messages** ✅ (Completed Jan 20, 2026)
+  - [x] More specific DNS failure reasons - Maps all DNS status codes to explanations
+  - [x] User-friendly error descriptions - Non-technical language for all errors
+  - [x] Troubleshooting hints in error responses - Actionable guidance with doc links
 
 - [ ] **Add health check endpoint**
   - [ ] `/health` or `/_health` endpoint
@@ -338,4 +338,4 @@ From the list above, these are quick to implement:
 ---
 
 _Last updated: January 20, 2026_
-_After: DNS claims admin UI implementation_
+_After: Error message improvements_
