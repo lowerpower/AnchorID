@@ -12,6 +12,7 @@ import {
   buildDnsProof,
   verifyClaim,
 } from "./verify";
+import { getErrorInfo } from "./errors";
 
 // Optional: pass base resolver host in if you want staging/prod support later
 function resolverUrlFor(uuid: string): string {
@@ -74,6 +75,16 @@ export async function handleGetClaimsHtml(
   }
 
   function renderClaim(c: any): string {
+    let failReasonHtml = "";
+    if (c.failReason) {
+      const errorInfo = getErrorInfo(c.failReason);
+      failReasonHtml = `<div class="fail" style="margin-top:8px">
+        <strong>Error:</strong> ${esc(errorInfo.message)}
+        ${errorInfo.hint ? `<br><span style="font-size:12px">${esc(errorInfo.hint)}</span>` : ""}
+        ${errorInfo.docLink ? `<br><a href="${esc(errorInfo.docLink)}" style="font-size:11px">View documentation →</a>` : ""}
+      </div>`;
+    }
+
     return `
       <div class="claim">
         <div class="row">
@@ -85,8 +96,8 @@ export async function handleGetClaimsHtml(
           <span>${esc(c.type)}</span>
           ${c.verifiedAt ? `<span>Verified: <code>${esc(c.verifiedAt)}</code></span>` : ""}
           ${c.lastCheckedAt ? `<span>Checked: <code>${esc(c.lastCheckedAt)}</code></span>` : ""}
-          ${c.failReason ? `<span class="fail">Fail: <code>${esc(c.failReason)}</code></span>` : ""}
         </div>
+        ${failReasonHtml}
         <details>
           <summary>Proof</summary>
           <div class="proof">

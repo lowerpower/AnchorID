@@ -3,6 +3,7 @@
 import type { Env } from "../env";
 import { buildProfile, mergeSameAs } from "../domain/profile";
 import { loadClaims } from "../claims/store";
+import { formatErrorHtml } from "../claims/errors";
 
 // ------------------ Cookie auth ------------------
 
@@ -1006,7 +1007,7 @@ ${claims.length === 0 ? `<div class="card" style="margin:14px 0">
           </label>
           <code style="font-size:13px;word-break:break-all">${escapeHtml(c.url)}</code>
           ${proofDetails}
-          ${c.failReason ? `<div style="margin-top:8px;color:#721c24;font-size:12px"><strong>Error:</strong> ${escapeHtml(c.failReason)}</div>` : ""}
+          ${c.failReason ? `<div style="margin-top:8px;color:#721c24;font-size:12px">${formatErrorHtml(c.failReason)}</div>` : ""}
           ${c.lastCheckedAt ? `<div style="margin-top:6px;font-size:11px;color:#777">Last checked: ${escapeHtml(c.lastCheckedAt)}</div>` : ""}
         </div>
         <button type="button" class="verify-btn" data-uuid="${escapeHtml(uuid)}" data-claim-id="${escapeHtml(c.id)}"
