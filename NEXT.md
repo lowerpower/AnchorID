@@ -68,22 +68,22 @@ Items to tackle in future sessions, organized by priority and category.
 
 ### High Priority
 
-- [ ] **Add DNS claims to admin UI**
-  - [ ] Create DNS claim form in admin
-  - [ ] Show DNS claims in profile list
-  - [ ] Add "Verify" button for DNS claims
-  - [ ] Display DNS proof details (qname, expected token)
+- [x] **Add DNS claims to admin UI** ✅ (Completed Jan 20, 2026)
+  - [x] Create DNS claim form in admin - Type selector + dynamic hints
+  - [x] Show DNS claims in profile list - All claim types displayed with proof details
+  - [x] Add "Verify" button for DNS claims - One-click verification for all claim types
+  - [x] Display DNS proof details (qname, expected token) - Shown inline with each claim
 
-- [ ] **Add claims management page**
-  - [ ] List all claims for a profile
-  - [ ] Show verification status
-  - [ ] Allow re-verification
-  - [ ] Show last checked timestamps
+- [x] **Add claims management page** ✅ (Completed Jan 20, 2026)
+  - [x] List all claims for a profile - Integrated into admin edit page
+  - [x] Show verification status - Color-coded badges (verified/failed/self_asserted)
+  - [x] Allow re-verification - Verify button on each claim
+  - [x] Show last checked timestamps - Displayed below each claim
 
 ### Medium Priority
 
-- [ ] **Improve claim creation UX**
-  - [ ] Single "Add Proof" workflow with type selector
+- [x] **Improve claim creation UX** ✅ (Completed Jan 20, 2026)
+  - [x] Single "Add Proof" workflow with type selector - Collapsible form with dropdown
   - [ ] Inline validation (check domain format, GitHub username)
   - [ ] Preview of what needs to be published
   - [ ] Copy-to-clipboard for proof values
@@ -338,4 +338,4 @@ From the list above, these are quick to implement:
 ---
 
 _Last updated: January 20, 2026_
-_After: DNS query result caching implementation_
+_After: DNS claims admin UI implementation_
