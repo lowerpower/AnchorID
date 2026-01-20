@@ -151,10 +151,10 @@ Items to tackle in future sessions, organized by priority and category.
 
 ### High Priority
 
-- [ ] **Public signup flow improvements**
-  - [ ] Better error messages on signup
-  - [ ] Email verification step
-  - [ ] Clearer setup page instructions
+- [x] **Public signup flow improvements** ✅ (Completed Jan 20, 2026)
+  - [x] Better error messages on signup - Inline validation, clear error states, improved messaging
+  - [x] Email verification step - Setup link via email confirms email ownership
+  - [x] Clearer setup page instructions - Step-by-step guide, prominent backup token warnings
 
 - [ ] **Claim verification notifications**
   - [ ] Email when claim verified
@@ -338,4 +338,4 @@ From the list above, these are quick to implement:
 ---
 
 _Last updated: January 20, 2026_
-_After: Health check endpoint implementation_
+_After: Public signup flow improvements_

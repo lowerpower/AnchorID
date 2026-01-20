@@ -613,19 +613,38 @@ async function handleSignupPage(request: Request, env: Env): Promise<Response> {
   body { font-family:system-ui; max-width:720px; margin:40px auto; padding:0 16px; line-height:1.45; }
   .card { background:#f6f6f6; padding:14px; border-radius:10px; margin-bottom:14px; }
   .card.required { border: 1px solid #1a73e8; }
+  .card.info { background:#e8f4fd; border:1px solid #b8daff; }
   label { font-weight:600; display:block; margin-bottom:6px; }
   input { width:100%; box-sizing:border-box; padding:10px; border:1px solid #ddd; border-radius:8px; font:inherit; }
-  button { padding:10px 14px; border-radius:10px; border:1px solid #111; background:#111; color:#fff; cursor:pointer; font:inherit; }
-  .hint { color:#555; font-size:13px; margin-top:6px; }
+  input:focus { outline:2px solid #1a73e8; border-color:#1a73e8; }
+  input.error { border-color:#dc3545; }
+  button { padding:12px 20px; border-radius:10px; border:1px solid #111; background:#111; color:#fff; cursor:pointer; font:inherit; font-weight:500; }
+  button:hover { background:#333; }
+  button:disabled { background:#ccc; border-color:#ccc; cursor:not-allowed; }
+  .hint { color:#555; font-size:13px; margin-top:6px; line-height:1.4; }
   .badge { display:inline-block; font-size:11px; padding:2px 6px; border-radius:999px; background:#1a73e8; color:#fff; margin-left:6px; vertical-align:middle; }
+  .error-msg { color:#dc3545; font-size:13px; margin-top:6px; display:none; }
+  .error-msg.show { display:block; }
   a { color:#1a73e8; }
+  ol { padding-left:20px; margin:8px 0; }
+  ol li { margin-bottom:6px; }
 </style>
 </head>
 <body>
 <h1>Create Your AnchorID</h1>
-<p>AnchorID is a permanent, decentralized identity anchor. Once created, you control it via email magic links.</p>
+<p>AnchorID is a permanent, UUID-based identity anchor. Once created, only you can modify it via email magic links or backup token.</p>
 
-<form method="post" action="/signup">
+<div class="card info">
+  <strong>What happens next:</strong>
+  <ol style="margin:8px 0;padding-left:20px;font-size:14px">
+    <li>We'll send a setup link to your email (expires in 15 minutes)</li>
+    <li>Click the link to verify your email and see your backup recovery token</li>
+    <li>Save the backup token somewhere safe (password manager, secure note)</li>
+    <li>Edit your profile and add verifiable identity claims</li>
+  </ol>
+</div>
+
+<form method="post" action="/signup" id="signupForm">
   <input type="hidden" name="_csrf" value="${escapeHtml(csrfToken)}">
 
   <div class="card required">
@@ -638,29 +657,92 @@ async function handleSignupPage(request: Request, env: Env): Promise<Response> {
         <input type="radio" name="type" value="Organization"> Organization
       </label>
     </div>
-    <div class="hint">Cannot be changed after creation. Choose Organization for companies, nonprofits, or projects.</div>
+    <div class="hint"><strong>Person:</strong> Individual identity (yourself, a pseudonym, etc.)<br>
+    <strong>Organization:</strong> Company, nonprofit, project, or collective<br>
+    ⚠️ This cannot be changed after creation.</div>
   </div>
 
   <div class="card required">
     <label>Email <span class="badge">Required</span></label>
-    <input name="email" type="email" placeholder="you@example.com" required>
-    <div class="hint">We'll send you a link to complete setup. Never shared, stored as hash only.</div>
+    <input name="email" id="emailInput" type="email" placeholder="you@example.com" required>
+    <div class="error-msg" id="emailError"></div>
+    <div class="hint">
+      • You'll receive a setup link at this address<br>
+      • Used for magic link authentication (no passwords!)<br>
+      • Never shared publicly, stored as one-way hash only<br>
+      • Cannot be changed after creation (you can add recovery options)
+    </div>
   </div>
 
   <div class="card">
-    <label>Name (optional)</label>
-    <input name="name" placeholder="e.g., Jane Doe or Acme Corp">
-    <div class="hint">You can change this later.</div>
+    <label>Name (optional but recommended)</label>
+    <input name="name" id="nameInput" placeholder="e.g., Jane Doe or Acme Corp">
+    <div class="hint">Your display name. You can change this anytime later.</div>
   </div>
 
   <div style="margin-top:14px">
-    <button type="submit">Create Identity</button>
+    <button type="submit" id="submitBtn">Create Identity</button>
+    <span id="submitStatus" style="margin-left:10px;font-size:13px;color:#555"></span>
   </div>
 </form>
 
 <p style="margin-top:24px;font-size:13px;color:#555">
   Already have an AnchorID? <a href="/login">Request edit link</a>
 </p>
+
+<script>
+(function() {
+  const form = document.getElementById('signupForm');
+  const emailInput = document.getElementById('emailInput');
+  const emailError = document.getElementById('emailError');
+  const submitBtn = document.getElementById('submitBtn');
+  const submitStatus = document.getElementById('submitStatus');
+
+  // Email validation
+  emailInput.addEventListener('blur', function() {
+    const email = this.value.trim();
+    if (!email) return;
+
+    if (!isValidEmail(email)) {
+      emailInput.classList.add('error');
+      emailError.textContent = 'Please enter a valid email address';
+      emailError.classList.add('show');
+    } else {
+      emailInput.classList.remove('error');
+      emailError.classList.remove('show');
+    }
+  });
+
+  emailInput.addEventListener('input', function() {
+    if (emailError.classList.contains('show')) {
+      emailInput.classList.remove('error');
+      emailError.classList.remove('show');
+    }
+  });
+
+  function isValidEmail(email) {
+    const re = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;
+    return re.test(email);
+  }
+
+  // Form submission
+  form.addEventListener('submit', function(e) {
+    const email = emailInput.value.trim();
+
+    if (!isValidEmail(email)) {
+      e.preventDefault();
+      emailInput.focus();
+      emailInput.classList.add('error');
+      emailError.textContent = 'Please enter a valid email address';
+      emailError.classList.add('show');
+      return;
+    }
+
+    submitBtn.disabled = true;
+    submitStatus.textContent = 'Creating identity...';
+  });
+})();
+</script>
 </body></html>`;
 
   const headers: Record<string, string> = {
@@ -815,87 +897,162 @@ async function handleSetupPage(request: Request, env: Env): Promise<Response> {
 
   const html = `<!doctype html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>AnchorID Created</title>
+<title>AnchorID Created Successfully</title>
 <style>
   body { font-family:system-ui; max-width:720px; margin:40px auto; padding:0 16px; line-height:1.45; }
-  .card { background:#f6f6f6; padding:14px; border-radius:10px; margin-bottom:14px; }
-  .success { background:#e6f4ea; border:1px solid #a8dab5; }
-  .warning { background:#fff8e6; border:1px solid #ffe58f; }
-  .token-box { background:#111; color:#0f0; padding:16px; border-radius:8px; font-family:monospace; font-size:14px; word-break:break-all; margin:12px 0; }
-  button { padding:10px 14px; border-radius:10px; border:1px solid #111; background:#111; color:#fff; cursor:pointer; font:inherit; margin-right:8px; }
+  .card { background:#f6f6f6; padding:16px; border-radius:10px; margin-bottom:16px; }
+  .success { background:#e6f4ea; border:2px solid #34a853; }
+  .warning { background:#fff3cd; border:2px solid #ffc107; }
+  .critical { background:#fff5f5; border:2px solid #dc3545; }
+  .step { background:#fff; border:1px solid #e0e0e0; padding:16px; border-radius:8px; margin-bottom:12px; }
+  .step-number { display:inline-block; background:#1a73e8; color:#fff; width:28px; height:28px; border-radius:50%; text-align:center; line-height:28px; font-weight:600; margin-right:10px; }
+  .token-box { background:#111; color:#0f0; padding:16px; border-radius:8px; font-family:monospace; font-size:14px; word-break:break-all; margin:12px 0; user-select:all; }
+  button { padding:10px 16px; border-radius:8px; border:1px solid #111; background:#111; color:#fff; cursor:pointer; font:inherit; margin-right:8px; font-weight:500; }
+  button:hover { background:#333; }
   button.secondary { background:#fff; color:#111; border:1px solid #ddd; }
-  .hint { color:#555; font-size:13px; margin-top:6px; }
-  code { background:#eee; padding:2px 6px; border-radius:4px; font-size:13px; }
-  .type-badge { display:inline-block; background:#1a73e8; color:#fff; font-size:11px; padding:2px 8px; border-radius:999px; margin-left:8px; vertical-align:middle; }
-  a { color:#1a73e8; }
-  a.btn { display:inline-block; padding:12px 20px; border-radius:10px; background:#1a73e8; color:#fff; text-decoration:none; font-weight:500; }
-  a.btn:hover { background:#1557b0; }
+  button.secondary:hover { background:#f0f0f0; }
+  .hint { color:#555; font-size:13px; margin-top:8px; line-height:1.4; }
+  code { background:#eee; padding:2px 6px; border-radius:4px; font-size:13px; font-family:monospace; }
+  .type-badge { display:inline-block; background:#1a73e8; color:#fff; font-size:12px; padding:3px 8px; border-radius:999px; margin-left:8px; vertical-align:middle; }
+  a { color:#1a73e8; text-decoration:none; }
+  a:hover { text-decoration:underline; }
+  a.btn { display:inline-block; padding:14px 24px; border-radius:10px; background:#1a73e8; color:#fff; text-decoration:none; font-weight:600; text-align:center; }
+  a.btn:hover { background:#1557b0; text-decoration:none; }
   .action-box { text-align:center; padding:20px 0; }
+  ul { padding-left:20px; margin:8px 0; }
+  ul li { margin-bottom:8px; }
+  .icon { font-size:20px; margin-right:8px; vertical-align:middle; }
+  h2 { margin-top:0; margin-bottom:12px; font-size:20px; }
+  .saved-indicator { display:inline-block; background:#34a853; color:#fff; padding:4px 10px; border-radius:4px; font-size:12px; margin-left:10px; }
 </style>
 </head>
 <body>
-<h1>Your AnchorID is Ready</h1>
-
 <div class="card success">
-  <strong>Success!</strong> Your ${entityType === "Organization" ? "organization" : "identity"} anchor has been created.
-  <div class="hint" style="margin-top:8px">
-    UUID: <code>${escapeHtml(uuid)}</code><br>
-    Type: <span class="type-badge">${escapeHtml(entityType)}</span><br>
-    Name: <strong>${escapeHtml(name)}</strong>
+  <h1 style="margin:0 0 8px 0"><span class="icon">✓</span>Your AnchorID is Ready!</h1>
+  <div style="font-size:14px;color:#155724">
+    <strong>UUID:</strong> <code>${escapeHtml(uuid)}</code><br>
+    <strong>Type:</strong> <span class="type-badge">${escapeHtml(entityType)}</span>
+    <strong>Name:</strong> ${escapeHtml(name)}
   </div>
 </div>
 
 ${backupToken ? `
-<div class="card warning">
-  <strong>Save Your Backup Token</strong>
-  <p style="margin:8px 0">This token lets you recover access if you lose your email.
-  <strong>It will only be shown once.</strong></p>
+<div class="card critical">
+  <h2><span class="icon">⚠️</span>CRITICAL: Save Your Backup Recovery Token</h2>
+  <p style="margin:8px 0;font-size:15px"><strong>This token will only be shown once.</strong> If you lose access to your email, this is the ONLY way to recover your AnchorID.</p>
 
   <div class="token-box" id="token">${escapeHtml(backupToken)}</div>
 
-  <button type="button" onclick="copyToken()">Copy Token</button>
-  <button type="button" class="secondary" onclick="downloadToken()">Download as File</button>
+  <div style="margin:12px 0">
+    <button type="button" onclick="copyToken()"><span class="icon">📋</span>Copy Token</button>
+    <button type="button" class="secondary" onclick="downloadToken()"><span class="icon">💾</span>Download as File</button>
+    <span id="saveStatus" class="saved-indicator" style="display:none">Copied!</span>
+  </div>
 
-  <p class="hint" style="margin-top:12px">
-    Store this somewhere safe (password manager, secure note, printed copy).
-  </p>
+  <div class="hint" style="background:#fff;padding:10px;border-radius:6px;border:1px solid #ffc107">
+    <strong>Where to save it:</strong><br>
+    ✓ Password manager (1Password, Bitwarden, etc.)<br>
+    ✓ Secure note app (encrypted)<br>
+    ✓ Printed and stored in a safe location<br>
+    ✗ Do NOT store in plain text files or unencrypted notes
+  </div>
 </div>
 
 <script>
+let tokenSaved = false;
+
 function copyToken() {
-  navigator.clipboard.writeText(document.getElementById('token').textContent);
-  alert('Token copied to clipboard');
+  const tokenText = document.getElementById('token').textContent;
+  navigator.clipboard.writeText(tokenText).then(function() {
+    const status = document.getElementById('saveStatus');
+    status.style.display = 'inline-block';
+    tokenSaved = true;
+    setTimeout(() => { status.style.display = 'none'; }, 3000);
+  });
 }
+
 function downloadToken() {
   const token = document.getElementById('token').textContent;
-  const blob = new Blob(['AnchorID Backup Token\\n\\nUUID: ${escapeHtml(uuid)}\\nToken: ' + token + '\\n\\nKeep this file safe.'], {type: 'text/plain'});
+  const blob = new Blob([
+    'AnchorID Backup Recovery Token\\n' +
+    '================================\\n\\n' +
+    'UUID: ${escapeHtml(uuid)}\\n' +
+    'Type: ${escapeHtml(entityType)}\\n' +
+    'Name: ${escapeHtml(name)}\\n\\n' +
+    'Backup Token:\\n' + token + '\\n\\n' +
+    'IMPORTANT: Keep this file secure and private.\\n' +
+    'This token grants full access to your AnchorID.\\n'
+  ], {type: 'text/plain'});
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = 'anchorid-backup-${escapeHtml(uuid.slice(0, 8))}.txt';
   a.click();
+  tokenSaved = true;
 }
+
+window.addEventListener('beforeunload', function(e) {
+  if (!tokenSaved) {
+    e.preventDefault();
+    e.returnValue = 'Have you saved your backup token? It will not be shown again.';
+    return e.returnValue;
+  }
+});
 </script>
 ` : `
 <div class="card warning">
-  <strong>Backup token already viewed</strong>
-  <p class="hint">The backup token was shown when you first completed setup.</p>
+  <h2><span class="icon">ℹ️</span>Backup Token Already Viewed</h2>
+  <p class="hint">The backup token was displayed when you first completed setup. If you didn't save it, you won't be able to recover access without your email.</p>
 </div>
 `}
 
-<div class="card action-box">
-  <a href="/edit?token=${escapeHtml(token)}" class="btn">Edit this AnchorID</a>
-  <p class="hint" style="margin-top:12px">
-    This link can be used once to finish setup.<br>
-    After saving, you'll need to request a new edit link by email.
-  </p>
+<div class="card">
+  <h2>Next Steps</h2>
+
+  <div class="step">
+    <span class="step-number">1</span>
+    <strong>Complete Your Profile</strong>
+    <p style="margin:8px 0 8px 38px;color:#555;font-size:14px">Add your name, URL, description, and other details to make your identity more useful.</p>
+    <div style="margin-left:38px">
+      <a href="/edit?token=${escapeHtml(token)}" class="btn">Edit Profile Now</a>
+    </div>
+    <p class="hint" style="margin-left:38px">This setup link expires after first save. To edit later, request a new link at <a href="/login">/login</a></p>
+  </div>
+
+  <div class="step">
+    <span class="step-number">2</span>
+    <strong>View Your Public Identity</strong>
+    <p style="margin:8px 0 8px 38px;color:#555;font-size:14px">See how your identity appears to others and search engines.</p>
+    <div style="margin-left:38px">
+      <a href="/resolve/${escapeHtml(uuid)}" target="_blank" rel="noopener">View /resolve/${escapeHtml(uuid.slice(0,8))}...</a>
+    </div>
+  </div>
+
+  <div class="step">
+    <span class="step-number">3</span>
+    <strong>Add Identity Proofs</strong>
+    <p style="margin:8px 0 8px 38px;color:#555;font-size:14px">Prove ownership of websites, domains, and accounts. Verified claims strengthen your identity and appear in your sameAs links.</p>
+    <div style="margin-left:38px">
+      <a href="/proofs" target="_blank">Learn about identity proofs →</a>
+    </div>
+  </div>
+
+  <div class="step">
+    <span class="step-number">4</span>
+    <strong>Place Your AnchorID</strong>
+    <p style="margin:8px 0 8px 38px;color:#555;font-size:14px">Link to your AnchorID from your website, social profiles, and projects.</p>
+    <div style="margin-left:38px">
+      <a href="/guide" target="_blank">Read the placement guide →</a>
+    </div>
+  </div>
 </div>
 
-<div class="card">
-  <strong>What's Next?</strong>
-  <ul style="margin:8px 0;padding-left:20px">
-    <li>View your public identity: <a href="/resolve/${escapeHtml(uuid)}" target="_blank">/resolve/${escapeHtml(uuid.slice(0, 8))}...</a></li>
-    <li>To edit later, request a magic link at <a href="/login">/login</a></li>
-    <li>Add verifiable claims to link your websites and profiles</li>
+<div class="card" style="background:#f9f9f9;border:1px solid #ddd">
+  <h2 style="font-size:16px">Remember:</h2>
+  <ul style="font-size:14px">
+    <li><strong>Email access:</strong> Request magic links at <a href="/login">/login</a></li>
+    <li><strong>Backup token:</strong> Use it at <a href="/login">/login</a> if you lose email access</li>
+    <li><strong>Identity is permanent:</strong> Your UUID and email cannot be changed</li>
+    <li><strong>Everything else is editable:</strong> Name, description, claims, sameAs links</li>
   </ul>
 </div>
 
