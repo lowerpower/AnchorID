@@ -156,10 +156,10 @@ Items to tackle in future sessions, organized by priority and category.
   - [x] Email verification step - Setup link via email confirms email ownership
   - [x] Clearer setup page instructions - Step-by-step guide, prominent backup token warnings
 
-- [ ] **Claim verification notifications**
-  - [ ] Email when claim verified
-  - [ ] Email when claim fails
-  - [ ] Optional webhook for API users
+- [x] **Claim verification notifications** ✅ (Completed Jan 20, 2026)
+  - [x] Email when claim verified - Sends success notification with claim details
+  - [x] Email when claim fails - Sends failure notification with troubleshooting hints
+  - [ ] Optional webhook for API users - Not implemented (future enhancement)
 
 ### Medium Priority
 
@@ -338,4 +338,4 @@ From the list above, these are quick to implement:
 ---
 
 _Last updated: January 20, 2026_
-_After: Public signup flow improvements_
+_After: Claim verification notifications_

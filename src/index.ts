@@ -55,6 +55,10 @@ export interface Env {
   IP_LOGIN_RL_PER_HOUR?: string;   // default 10 (per IP for login attempts)
   IP_EDIT_RL_PER_HOUR?: string;    // default 30 (per IP for edit page loads)
   IP_UPDATE_RL_PER_HOUR?: string;  // default 60 (per IP for update submissions)
+
+  // Optional: Enable claim verification notifications
+  // If enabled, stores email in plaintext (as _email in profile) for notifications
+  ENABLE_CLAIM_NOTIFICATIONS?: string; // "true" to enable
 }
 
 const FOUNDER_UUID = "4ff7ed97-b78f-4ae6-9011-5af714ee241c";
@@ -820,11 +824,16 @@ async function handleSignup(request: Request, env: Env): Promise<Response> {
   );
 
   // Add private fields (not part of public schema)
-  const profile = {
+  const profile: any = {
     ...canonicalProfile,
     _emailHash: emailHash,
     _backupTokenHash: backupTokenHash,
   };
+
+  // Optionally store email for claim verification notifications
+  if (env.ENABLE_CLAIM_NOTIFICATIONS === "true") {
+    profile._email = email;
+  }
 
   // Generate edit token for email
   const editToken = randomTokenUrlSafe(32);

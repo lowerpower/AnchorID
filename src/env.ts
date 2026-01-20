@@ -20,5 +20,9 @@ export interface Env {
   LOGIN_TTL_SECONDS?: string; // default 900
   LOGIN_RL_PER_HOUR?: string; // default 3
   UPDATE_RL_PER_HOUR?: string; // default 20
+
+  // Optional: Enable claim verification notifications
+  // If enabled, stores email in plaintext (as _email in profile) for notifications
+  ENABLE_CLAIM_NOTIFICATIONS?: string; // "true" to enable
 }
 

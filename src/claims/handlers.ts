@@ -13,6 +13,7 @@ import {
   verifyClaim,
 } from "./verify";
 import { getErrorInfo } from "./errors";
+import { sendClaimVerifiedEmail, sendClaimFailedEmail, shouldSendNotification } from "./notifications";
 
 // Optional: pass base resolver host in if you want staging/prod support later
 function resolverUrlFor(uuid: string): string {
@@ -291,6 +292,7 @@ export async function handlePostClaimVerify(
   if (idx < 0) return new Response("Claim not found", { status: 404 });
 
   const claim = { ...list[idx] };
+  const previousStatus = claim.status; // Track previous status for notifications
   const now = nowIso();
 
   let result: { status: Claim["status"]; failReason?: string };
@@ -313,6 +315,26 @@ export async function handlePostClaimVerify(
   const updated = [...list];
   updated[idx] = claim;
   await saveClaims(env, uuid, updated);
+
+  // Send notification if status changed (success or failure)
+  if (previousStatus !== result.status) {
+    // Get profile to retrieve email (if notifications enabled)
+    const profile = await env.ANCHOR_KV.get(`profile:${uuid}`, { type: "json" }) as any | null;
+    const email = profile?._email;
+
+    if (shouldSendNotification(env, email)) {
+      // Send in background (don't wait for email to send)
+      if (result.status === "verified") {
+        sendClaimVerifiedEmail(env, email, uuid, claim).catch(e => {
+          console.error("Failed to send verification success notification:", e);
+        });
+      } else if (result.status === "failed") {
+        sendClaimFailedEmail(env, email, uuid, claim).catch(e => {
+          console.error("Failed to send verification failure notification:", e);
+        });
+      }
+    }
+  }
 
   return new Response(JSON.stringify({ ok: true, claim }, null, 2), {
     headers: {
