@@ -160,12 +160,57 @@ function uuidV4(): string {
   return crypto.randomUUID();
 }
 
+// Request size validation
+const MAX_JSON_SIZE = 50 * 1024; // 50KB - generous for profile data
+const MAX_URL_LENGTH = 2048; // Standard max URL length
+
+function checkUrlLength(url: URL): Response | null {
+  if (url.href.length > MAX_URL_LENGTH) {
+    return new Response("URL too long", {
+      status: 414,
+      headers: { "content-type": "text/plain", ...securityHeaders() }
+    });
+  }
+  return null;
+}
+
+async function checkRequestSize(request: Request, maxSize: number = MAX_JSON_SIZE): Promise<Response | null> {
+  const contentLength = request.headers.get("content-length");
+
+  // If content-length header is present and exceeds limit, reject immediately
+  if (contentLength) {
+    const size = parseInt(contentLength, 10);
+    if (!isNaN(size) && size > maxSize) {
+      return new Response("Request body too large", {
+        status: 413,
+        headers: { "content-type": "text/plain", ...securityHeaders() }
+      });
+    }
+  }
+
+  return null;
+}
+
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
     const path = url.pathname;
 
+    // Check URL length early
+    const urlLengthError = checkUrlLength(url);
+    if (urlLengthError) return urlLengthError;
+
+    // Check request size for POST/PUT requests with body
+    if (request.method === "POST" || request.method === "PUT") {
+      const contentType = request.headers.get("content-type") || "";
+      if (contentType.includes("application/json") ||
+          contentType.includes("application/x-www-form-urlencoded") ||
+          contentType.includes("multipart/form-data")) {
+        const sizeError = await checkRequestSize(request);
+        if (sizeError) return sizeError;
+      }
+    }
 
     // Admin routes
     if (path === "/admin/login" && request.method === "GET") return handleAdminLoginPage(request, env);

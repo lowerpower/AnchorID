@@ -15,10 +15,10 @@ Items to tackle in future sessions, organized by priority and category.
   - [x] `Referrer-Policy: strict-origin-when-cross-origin`
   - [x] `Permissions-Policy` - Restrict browser features
 
-- [ ] **Add request size limits**
-  - [ ] Limit JSON payload size (prevent memory exhaustion)
-  - [ ] Limit URL length
-  - [ ] Reject oversized requests early
+- [x] **Add request size limits** ✅ (Completed Jan 20, 2026)
+  - [x] Limit JSON payload size (prevent memory exhaustion) - 50KB
+  - [x] Limit URL length - 2048 characters
+  - [x] Reject oversized requests early
 
 - [x] **Add timeouts to DNS queries** ✅ (Completed Jan 20, 2026)
   - [x] Per-request timeout: 2.5s (per spec)
