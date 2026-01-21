@@ -4,6 +4,15 @@ This directory contains detailed changelogs for major feature implementations an
 
 ## Changelogs
 
+### [Admin Panel Email Addition - January 21, 2026](./CHANGELOG-admin-email-addition.md)
+Admin UI enhancement for adding email addresses to legacy profiles:
+- Inline email addition form on admin edit page
+- Email validation and duplicate checking
+- Automatic KV mappings and audit logging
+- Enables magic link login for legacy accounts
+
+**Focus:** Admin tooling, legacy account migration
+
 ### [Production Hardening - January 20, 2026](./CHANGELOG-production-hardening.md)
 Production readiness update with 6 high-priority features:
 - DNS query result caching with TTL support
@@ -61,6 +70,7 @@ When adding new changelogs:
 
 | Date | Changelog | Focus |
 |------|-----------|-------|
+| 2026-01-21 | Admin Panel Email Addition | Admin tooling, legacy migration |
 | 2026-01-20 | Production Hardening | Security, monitoring, UX |
 | 2026-01-19 | DNS Proof Implementation | New proof type, docs |
 
