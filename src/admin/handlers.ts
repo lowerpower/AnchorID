@@ -737,11 +737,14 @@ export async function handleAdminEditGet(req: Request, env: Env, uuid: string): 
   const successMessages: Record<string, string> = {
     saved: "Profile saved successfully.",
     no_changes: "No changes detected.",
+    email_added: "Email address added successfully. Magic link login is now enabled.",
   };
 
   const errorMessages: Record<string, string> = {
     save_failed: "Failed to save profile. Please try again.",
     invalid_url: "One or more URLs are invalid.",
+    invalid_email: "Please enter a valid email address.",
+    email_exists: "This email is already associated with another profile.",
   };
 
   const html = `<!doctype html>
@@ -813,8 +816,16 @@ ${error ? `<div class="alert alert-error">${escapeHtml(errorMessages[error] || e
   <div class="card danger">
     <label>Email Access <span class="badge" style="background:#ffd6d6">Not configured</span></label>
     <div class="hint" style="margin-top:0">
-      Created before email-based access was added.
+      Created before email-based access was added. Add an email below to enable magic link login.
     </div>
+    <form method="post" action="/admin/save/${escapeHtml(uuid)}" style="margin-top:10px">
+      ${csrf}
+      <input type="hidden" name="is_email_update" value="1">
+      <label style="font-size:13px;font-weight:600;display:block;margin-bottom:4px">Add Email Address</label>
+      <input type="email" name="email" placeholder="user@example.com" required
+        style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font:inherit;margin-bottom:8px">
+      <button type="submit" style="padding:6px 12px;font-size:13px">Add Email</button>
+    </form>
   </div>
   `}
 
@@ -1202,6 +1213,59 @@ export async function handleAdminSavePost(
     return csrfError();
   }
 
+  // Check if this is an email update request
+  const isEmailUpdate = fd.get("is_email_update") === "1";
+
+  if (isEmailUpdate) {
+    // Handle email addition/update
+    const rawEmail = String(fd.get("email") || "").trim();
+    const email = normalizeEmail(rawEmail);
+
+    if (!email || !isValidEmail(email)) {
+      return new Response(null, {
+        status: 303,
+        headers: { Location: `/admin/edit/${uuid}?error=invalid_email`, "cache-control": "no-store" },
+      });
+    }
+
+    const emailHash = await sha256Hex(email);
+
+    // Check if this email is already associated with a different profile
+    const existingUuid = await env.ANCHOR_KV.get(`email:${emailHash}`);
+    if (existingUuid && existingUuid !== uuid) {
+      return new Response(null, {
+        status: 303,
+        headers: { Location: `/admin/edit/${uuid}?error=email_exists`, "cache-control": "no-store" },
+      });
+    }
+
+    // Update the profile with the email hash
+    const updatedProfile = {
+      ...stored,
+      _emailHash: emailHash,
+    };
+
+    // Optionally store email for claim verification notifications
+    if (env.ENABLE_CLAIM_NOTIFICATIONS === "true") {
+      updatedProfile._email = email;
+    }
+
+    // Save profile and email mapping
+    await Promise.all([
+      env.ANCHOR_KV.put(`profile:${uuid}`, JSON.stringify(updatedProfile)),
+      env.ANCHOR_KV.put(`email:${emailHash}`, uuid),
+    ]);
+
+    // Audit log
+    await appendAuditLog(env, uuid, req, "update", "admin", ["_emailHash"], "Email added");
+
+    return new Response(null, {
+      status: 303,
+      headers: { Location: `/admin/edit/${uuid}?success=email_added`, "cache-control": "no-store" },
+    });
+  }
+
+  // Regular profile update
   const input: Record<string, unknown> = {
     name: fd.get("name"),
     alternateName: fd.get("alternateName"), // string with newlines is OK
