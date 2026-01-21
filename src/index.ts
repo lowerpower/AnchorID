@@ -1113,7 +1113,7 @@ function htmlSuccess(title: string, message: string, email: string): Response {
   });
 }
 
-// GET /login - Public login form (request magic link)
+// GET /login - Public login form (request magic link or use backup token)
 async function handleLoginPage(request: Request, env: Env): Promise<Response> {
   const { token: csrfToken, needsSet } = ensureCsrfToken(request);
 
@@ -1127,30 +1127,117 @@ async function handleLoginPage(request: Request, env: Env): Promise<Response> {
   input { width:100%; box-sizing:border-box; padding:10px; border:1px solid #ddd; border-radius:8px; font:inherit; }
   button { padding:10px 14px; border-radius:10px; border:1px solid #111; background:#111; color:#fff; cursor:pointer; font:inherit; }
   .hint { color:#555; font-size:13px; margin-top:6px; }
-  a { color:#1a73e8; }
+  a { color:#1a73e8; text-decoration:none; }
+  a:hover { text-decoration:underline; }
+  .tabs { display:flex; gap:8px; margin-bottom:20px; border-bottom:2px solid #e0e0e0; }
+  .tab { padding:10px 16px; cursor:pointer; border:none; background:none; font:inherit; font-weight:500; color:#666; border-bottom:2px solid transparent; margin-bottom:-2px; }
+  .tab.active { color:#111; border-bottom-color:#111; }
+  .tab-content { display:none; }
+  .tab-content.active { display:block; }
+  code { background:#eee; padding:2px 6px; border-radius:4px; font-family:monospace; font-size:13px; }
 </style>
 </head>
 <body>
-<h1>Request Edit Link</h1>
-<p>Enter your email to receive a magic link for editing your AnchorID.</p>
+<h1>Login to AnchorID</h1>
+<p>Choose your login method below.</p>
 
-<form method="post" action="/login">
-  <input type="hidden" name="_csrf" value="${escapeHtml(csrfToken)}">
+<div class="tabs">
+  <button class="tab active" onclick="switchTab('email')">Email Magic Link</button>
+  <button class="tab" onclick="switchTab('backup')">Backup Token</button>
+</div>
 
-  <div class="card">
-    <label>Email</label>
-    <input name="email" type="email" placeholder="you@example.com" required>
-    <div class="hint">We'll send a secure edit link if this email has an AnchorID.</div>
+<!-- Email Magic Link Tab -->
+<div id="email-tab" class="tab-content active">
+  <h2 style="margin-top:0;font-size:18px">Request Edit Link via Email</h2>
+  <p style="margin-bottom:14px;color:#555">We'll send a secure edit link to your email.</p>
+
+  <form method="post" action="/login">
+    <input type="hidden" name="_csrf" value="${escapeHtml(csrfToken)}">
+
+    <div class="card">
+      <label>Email</label>
+      <input name="email" type="email" placeholder="you@example.com" required>
+      <div class="hint">We'll send a secure edit link if this email has an AnchorID.</div>
+    </div>
+
+    <div style="margin-top:14px">
+      <button type="submit">Send Edit Link</button>
+    </div>
+  </form>
+</div>
+
+<!-- Backup Token Tab -->
+<div id="backup-tab" class="tab-content">
+  <h2 style="margin-top:0;font-size:18px">Login with Backup Token</h2>
+  <p style="margin-bottom:14px;color:#555">Use your backup recovery token to access your profile.</p>
+
+  <form id="backupForm" onsubmit="return handleBackupLogin(event)">
+    <div class="card">
+      <label>AnchorID (UUID)</label>
+      <input id="uuidInput" type="text" placeholder="4ff7ed97-b78f-4ae6-9011-5af714ee241c" required pattern="[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}">
+      <div class="hint">Your 36-character UUID identifier.</div>
+    </div>
+
+    <div class="card">
+      <label>Backup Token</label>
+      <input id="tokenInput" type="text" placeholder="Enter your backup recovery token" required>
+      <div class="hint">The token you saved when creating your AnchorID. This is case-sensitive.</div>
+    </div>
+
+    <div style="margin-top:14px">
+      <button type="submit">Login with Backup Token</button>
+    </div>
+  </form>
+
+  <div class="card" style="background:#fff8e6;border:1px solid #ffe58f;margin-top:14px">
+    <strong>What is a backup token?</strong>
+    <p style="margin:6px 0 0 0;font-size:13px;color:#555">
+      Your backup token is a recovery code shown once during account creation.
+      It allows you to access your AnchorID if you lose access to your email.
+      If you don't have it, you'll need to use email login instead.
+    </p>
   </div>
-
-  <div style="margin-top:14px">
-    <button type="submit">Send Edit Link</button>
-  </div>
-</form>
+</div>
 
 <p style="margin-top:24px;font-size:13px;color:#555">
   Don't have an AnchorID? <a href="/signup">Create one</a>
 </p>
+
+<script>
+function switchTab(tab) {
+  // Update tab buttons
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  event.target.classList.add('active');
+
+  // Update tab content
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+  document.getElementById(tab + '-tab').classList.add('active');
+}
+
+function handleBackupLogin(e) {
+  e.preventDefault();
+
+  const uuid = document.getElementById('uuidInput').value.trim().toLowerCase();
+  const token = document.getElementById('tokenInput').value.trim();
+
+  if (!uuid || !token) {
+    alert('Please enter both UUID and backup token.');
+    return false;
+  }
+
+  // Validate UUID format
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!uuidRegex.test(uuid)) {
+    alert('Invalid UUID format. Please check and try again.');
+    return false;
+  }
+
+  // Redirect to edit page with backup token parameters
+  window.location.href = '/edit?backup_token=' + encodeURIComponent(token) + '&uuid=' + encodeURIComponent(uuid);
+  return false;
+}
+</script>
+
 </body></html>`;
 
   const headers: Record<string, string> = {
