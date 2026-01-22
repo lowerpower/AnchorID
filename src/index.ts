@@ -13,6 +13,7 @@ import {
   handleAdminSavePost,
   handleAdminRotateToken,
   handleAdminDebugKv,
+  handleAdminDelete,
 } from "./admin/handlers";
 
 
@@ -288,6 +289,9 @@ export default {
 
     const mRotate = path.match(/^\/admin\/rotate-token\/([0-9a-f-]{36})$/i);
     if (mRotate && request.method === "POST") return handleAdminRotateToken(request, env, mRotate[1].toLowerCase());
+
+    const mDelete = path.match(/^\/admin\/delete\/([0-9a-f-]{36})$/i);
+    if (mDelete && request.method === "POST") return handleAdminDelete(request, env, mDelete[1].toLowerCase());
 
 
     // Homepage
