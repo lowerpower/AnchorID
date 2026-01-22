@@ -457,22 +457,78 @@ export default {
 
 
 
-	// Token-gated: add/update claim
+	// Token-gated: add/update claim (admin or user for own profile)
 	if (path === "/claim" && request.method === "POST") {
-  		// your existing auth guard here
-  		const denied = requireAdmin(request, env);
-  		if (denied) return denied;
-	    
-        return handlePostClaim(request, env as any);
+		// Parse body to get UUID
+		const bodyText = await request.text();
+		const payload: any = JSON.parse(bodyText);
+		const targetUuid = String(payload.uuid || "").trim().toLowerCase();
+
+		// Check admin auth first
+		const adminDenied = requireAdmin(request, env);
+		if (!adminDenied) {
+			// Admin has access to all profiles
+			return handlePostClaim(new Request(request.url, {
+				method: request.method,
+				headers: request.headers,
+				body: bodyText,
+			}), env as any);
+		}
+
+		// Not admin - check if user session for own profile
+		const authHeader = request.headers.get("authorization") || "";
+		const sessionToken = authHeader.replace(/^Bearer\s+/i, "").trim();
+
+		if (sessionToken) {
+			const session = (await env.ANCHOR_KV.get(`login:${sessionToken}`, { type: "json" })) as any | null;
+			if (session?.uuid && String(session.uuid).toLowerCase() === targetUuid) {
+				// User authenticated for their own profile
+				return handlePostClaim(new Request(request.url, {
+					method: request.method,
+					headers: request.headers,
+					body: bodyText,
+				}), env as any);
+			}
+		}
+
+		return new Response("Unauthorized", { status: 401 });
 	}
 
-	// Token-gated: verify claim
+	// Token-gated: verify claim (admin or user for own profile)
 	if (path === "/claim/verify" && request.method === "POST") {
-  		// your existing auth guard here
-  		const denied = requireAdmin(request, env);
-		if (denied) return denied;
+		// Parse body to get UUID
+		const bodyText = await request.text();
+		const payload: any = JSON.parse(bodyText);
+		const targetUuid = String(payload.uuid || "").trim().toLowerCase();
 
-		return handlePostClaimVerify(request, env as any);
+		// Check admin auth first
+		const adminDenied = requireAdmin(request, env);
+		if (!adminDenied) {
+			// Admin has access to all profiles
+			return handlePostClaimVerify(new Request(request.url, {
+				method: request.method,
+				headers: request.headers,
+				body: bodyText,
+			}), env as any);
+		}
+
+		// Not admin - check if user session for own profile
+		const authHeader = request.headers.get("authorization") || "";
+		const sessionToken = authHeader.replace(/^Bearer\s+/i, "").trim();
+
+		if (sessionToken) {
+			const session = (await env.ANCHOR_KV.get(`login:${sessionToken}`, { type: "json" })) as any | null;
+			if (session?.uuid && String(session.uuid).toLowerCase() === targetUuid) {
+				// User authenticated for their own profile
+				return handlePostClaimVerify(new Request(request.url, {
+					method: request.method,
+					headers: request.headers,
+					body: bodyText,
+				}), env as any);
+			}
+		}
+
+		return new Response("Unauthorized", { status: 401 });
 	}
 
     // Resolver (v1): /resolve/<uuid>
@@ -1582,12 +1638,200 @@ ${isOrg ? `
   </div>
 </form>
 
+<div class="section" style="margin-top:40px">
+  <h2>Identity Claims</h2>
+  <p class="hint">Prove ownership of websites, domains, and accounts. Verified claims automatically appear in your sameAs.</p>
+
+${claims.length === 0 ? `<div style="background:#f6f6f6;padding:14px;border-radius:8px;margin:14px 0">
+  <p style="margin:0;color:#666">No claims yet. Add your first claim below.</p>
+</div>` : `
+<div style="margin-top:14px;display:grid;gap:14px">
+  ${claims.map((c) => {
+    const statusStyle = c.status === "verified"
+      ? "background:#d4edda;color:#155724;padding:3px 8px;border-radius:4px;font-size:12px"
+      : c.status === "failed"
+      ? "background:#f8d7da;color:#721c24;padding:3px 8px;border-radius:4px;font-size:12px"
+      : "background:#fff3cd;color:#856404;padding:3px 8px;border-radius:4px;font-size:12px";
+
+    let proofDetails = "";
+    if (c.type === "dns" && c.proof.kind === "dns_txt") {
+      const qname = escapeHtml((c.proof as any).qname || "");
+      const token = escapeHtml((c.proof as any).expectedToken || "");
+      proofDetails = `
+        <div style="margin-top:8px;font-size:12px;color:#555">
+          <strong>Query name:</strong> <code>${qname}</code><br>
+          <strong>Expected:</strong> <code style="font-size:11px">${token}</code>
+        </div>`;
+    } else if (c.proof.kind === "well_known") {
+      proofDetails = `
+        <div style="margin-top:8px;font-size:12px;color:#555">
+          <strong>Proof location:</strong> <code style="font-size:11px">${escapeHtml((c.proof as any).url || "")}</code>
+        </div>`;
+    } else if (c.proof.kind === "github_readme") {
+      proofDetails = `
+        <div style="margin-top:8px;font-size:12px;color:#555">
+          <strong>Proof location:</strong> <code style="font-size:11px">${escapeHtml((c.proof as any).url || "")}</code>
+        </div>`;
+    }
+
+    return `
+    <div style="background:#f6f6f6;padding:14px;border-radius:8px">
+      <div style="display:flex;justify-content:space-between;align-items:start">
+        <div style="flex:1">
+          <div style="font-weight:500;margin-bottom:4px">
+            ${escapeHtml(c.type).toUpperCase()}
+            <span style="${statusStyle}">${escapeHtml(c.status)}</span>
+          </div>
+          <code style="font-size:13px;word-break:break-all">${escapeHtml(c.url)}</code>
+          ${proofDetails}
+          ${c.failReason ? `<div style="margin-top:8px;color:#721c24;font-size:12px">Error: ${escapeHtml(c.failReason)}</div>` : ""}
+          ${c.lastCheckedAt ? `<div style="margin-top:6px;font-size:11px;color:#777">Last checked: ${escapeHtml(c.lastCheckedAt)}</div>` : ""}
+        </div>
+        <button type="button" class="verify-claim-btn" data-claim-id="${escapeHtml(c.id)}"
+          style="padding:6px 12px;font-size:12px;margin-left:10px;white-space:nowrap;cursor:pointer;background:#111;color:#fff;border:1px solid #111;border-radius:6px">
+          Verify
+        </button>
+      </div>
+    </div>`;
+  }).join("")}
+</div>
+`}
+
+<details style="margin-top:20px;border:1px solid #ddd;border-radius:8px;padding:14px;background:#f9f9f9">
+  <summary style="cursor:pointer;font-weight:600;font-size:14px">Add New Claim</summary>
+
+  <div style="margin-top:14px">
+    <form id="addClaimForm">
+      <label style="display:block;margin-bottom:8px;font-weight:500">Claim Type</label>
+      <select id="claimType" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;margin-bottom:12px;font:inherit">
+        <option value="website">Website (.well-known/anchorid.txt)</option>
+        <option value="github">GitHub (profile README)</option>
+        <option value="dns">DNS (TXT record)</option>
+      </select>
+
+      <label style="display:block;margin-bottom:8px;font-weight:500" id="urlLabel">URL or Domain</label>
+      <input type="text" id="claimUrl" placeholder="https://example.com or example.com"
+        style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;margin-bottom:12px;font:inherit;box-sizing:border-box">
+
+      <div id="dnsHint" style="display:none;font-size:12px;color:#555;margin-bottom:12px;padding:10px;background:#fff;border:1px solid #e0e0e0;border-radius:6px">
+        <strong>DNS Setup Instructions:</strong><br>
+        Add a TXT record at <code>_anchorid.yourdomain.com</code> with value:<br>
+        <code style="font-size:11px">anchorid=urn:uuid:${escapeHtml(uuid)}</code>
+      </div>
+
+      <button type="submit" style="padding:8px 16px;background:#111;color:#fff;border:1px solid #111;border-radius:6px;cursor:pointer;font:inherit">
+        Add Claim
+      </button>
+      <span id="claimStatus" style="margin-left:10px;font-size:13px"></span>
+    </form>
+  </div>
+</details>
+</div>
+
 <pre id="out"></pre>
 
 <div class="footer">
   AnchorID favors durability over convenience.<br>
   Most changes are reversible. The identifier is not.
 </div>
+<script>
+// Claim form handling
+(function() {
+  const sessionToken = "${escapeHtml(sessionToken)}";
+  const profileUuid = "${escapeHtml(uuid)}";
+
+  // Update form hints based on claim type
+  document.getElementById("claimType").addEventListener("change", function() {
+    const type = this.value;
+    const urlLabel = document.getElementById("urlLabel");
+    const urlInput = document.getElementById("claimUrl");
+    const dnsHint = document.getElementById("dnsHint");
+
+    if (type === "website") {
+      urlLabel.textContent = "Website URL";
+      urlInput.placeholder = "https://example.com";
+      dnsHint.style.display = "none";
+    } else if (type === "github") {
+      urlLabel.textContent = "GitHub Profile URL";
+      urlInput.placeholder = "https://github.com/username";
+      dnsHint.style.display = "none";
+    } else if (type === "dns") {
+      urlLabel.textContent = "Domain";
+      urlInput.placeholder = "example.com or _anchorid.example.com";
+      dnsHint.style.display = "block";
+    }
+  });
+
+  // Add claim form submission
+  document.getElementById("addClaimForm").addEventListener("submit", async function(e) {
+    e.preventDefault();
+    const statusEl = document.getElementById("claimStatus");
+    statusEl.textContent = "Adding...";
+    statusEl.style.color = "#666";
+
+    const type = document.getElementById("claimType").value;
+    const url = document.getElementById("claimUrl").value.trim();
+
+    try {
+      const res = await fetch("/claim", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer " + sessionToken
+        },
+        body: JSON.stringify({ uuid: profileUuid, type, url })
+      });
+
+      if (res.ok) {
+        statusEl.textContent = "✓ Added! Reloading...";
+        statusEl.style.color = "#155724";
+        setTimeout(() => location.reload(), 1000);
+      } else {
+        const text = await res.text();
+        statusEl.textContent = "✗ Failed: " + text;
+        statusEl.style.color = "#721c24";
+      }
+    } catch (err) {
+      statusEl.textContent = "✗ Network error";
+      statusEl.style.color = "#721c24";
+    }
+  });
+
+  // Verify claim buttons
+  document.querySelectorAll(".verify-claim-btn").forEach(btn => {
+    btn.addEventListener("click", async function() {
+      const claimId = this.getAttribute("data-claim-id");
+      this.textContent = "Verifying...";
+      this.disabled = true;
+
+      try {
+        const res = await fetch("/claim/verify", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": "Bearer " + sessionToken
+          },
+          body: JSON.stringify({ uuid: profileUuid, claimId })
+        });
+
+        if (res.ok) {
+          this.textContent = "✓ Done";
+          setTimeout(() => location.reload(), 1000);
+        } else {
+          const text = await res.text();
+          alert("Verification failed: " + text);
+          this.textContent = "Verify";
+          this.disabled = false;
+        }
+      } catch (err) {
+        alert("Network error: " + err.message);
+        this.textContent = "Verify";
+        this.disabled = false;
+      }
+    });
+  });
+})();
+</script>
 <script>
 async function submitForm(e){
   e.preventDefault();
