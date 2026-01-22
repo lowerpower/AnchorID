@@ -4,6 +4,15 @@ This directory contains detailed changelogs for major feature implementations an
 
 ## Changelogs
 
+### [Documentation Updates & Security Hardening - January 22, 2026](./CHANGELOG-documentation-and-security.md)
+Documentation updates + rate limiting for claim endpoints:
+- **Documentation**: Updated FAQ, proofs page, and CLAUDE.md for self-service claims
+- **Rate Limiting**: Added IP and UUID rate limits to /claim and /claim/verify endpoints
+- **Security**: Prevent spam claims, excessive verifications, and DoS attacks
+- Comprehensive documentation of new user self-service workflow
+
+**Focus:** Documentation accuracy, security hardening, abuse prevention
+
 ### [Admin Panel Enhancements & Critical Bug Fix - January 21, 2026](./CHANGELOG-admin-enhancements.md)
 🚨 **CRITICAL BUG FIX** + two admin UI enhancements:
 - **🚨 Bug Fix**: Metadata preservation - prevents account lockouts during profile edits
@@ -70,6 +79,7 @@ When adding new changelogs:
 
 | Date | Changelog | Focus |
 |------|-----------|-------|
+| 2026-01-22 | Documentation & Security Hardening | Docs, rate limiting, abuse prevention |
 | 2026-01-21 | Admin Enhancements + Critical Bug Fix | 🚨 Account lockout fix, admin tools |
 | 2026-01-20 | Production Hardening | Security, monitoring, UX |
 | 2026-01-19 | DNS Proof Implementation | New proof type, docs |
