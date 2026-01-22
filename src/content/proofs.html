@@ -100,7 +100,7 @@
         "name": "Identity Proofs",
         "description": "Prove ownership of websites, domains, and accounts to strengthen your AnchorID canonical identity.",
         "isPartOf": { "@id": "https://anchorid.net/#website" },
-        "dateModified": "2026-01-20T01:15:00Z",
+        "dateModified": "2026-01-22T07:15:00Z",
         "inLanguage": "en"
       }
     ]
@@ -120,7 +120,7 @@
     </nav>
     <h1>Identity Proofs</h1>
     <p class="kicker">Prove ownership of websites, domains, and accounts to strengthen your canonical identity.</p>
-    <p class="small"><strong>Last modified:</strong> January 20, 2026</p>
+    <p class="small"><strong>Last modified:</strong> January 22, 2026</p>
     <hr />
   </header>
 
@@ -278,20 +278,28 @@ Value: anchorid=urn:uuid:&lt;your-uuid&gt;</code></pre>
 
     <h2>Creating and verifying proofs</h2>
 
-    <h3>Via Admin UI</h3>
+    <h3>Via Web Interface (Recommended)</h3>
     <ol>
-      <li>Log in to your AnchorID account</li>
-      <li>Navigate to the Claims section</li>
-      <li>Add a new claim</li>
-      <li>Publish the proof at the required location</li>
-      <li>Click "Verify" to check the proof</li>
+      <li>Go to <code>/login</code> and authenticate with your email or backup token</li>
+      <li>Scroll to the "Identity Claims" section on your edit page</li>
+      <li>Click "Add New Claim" and select the proof type (Website, GitHub, or DNS)</li>
+      <li>Enter the URL or domain name</li>
+      <li>Publish the proof at the required location (TXT record, .well-known file, or README)</li>
+      <li>Click "Verify" next to your claim to trigger verification</li>
     </ol>
 
+    <p class="small">
+      The web interface provides real-time feedback and displays the current status of all your claims.
+    </p>
+
     <h3>Via API</h3>
-    <p>Developers can manage proofs programmatically:</p>
+    <p>Developers can manage proofs programmatically using your session token:</p>
 
     <pre><code># Create a claim
 POST https://anchorid.net/claim
+Authorization: Bearer &lt;your-session-token&gt;
+Content-Type: application/json
+
 {
   "uuid": "&lt;your-uuid&gt;",
   "type": "dns",
@@ -300,13 +308,16 @@ POST https://anchorid.net/claim
 
 # Verify a claim
 POST https://anchorid.net/claim/verify
+Authorization: Bearer &lt;your-session-token&gt;
+Content-Type: application/json
+
 {
   "uuid": "&lt;your-uuid&gt;",
-  "id": "dns:_anchorid.example.com"
+  "claimId": "dns:_anchorid.example.com"
 }</code></pre>
 
     <p class="small">
-      API endpoints require authentication with <code>Authorization: Bearer &lt;token&gt;</code>
+      Your session token is the same token from your magic link. It's valid for the duration of your editing session.
     </p>
 
     <hr />
