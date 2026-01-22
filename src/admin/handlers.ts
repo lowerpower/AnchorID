@@ -355,6 +355,10 @@ export async function handleAdminHome(req: Request, env: Env): Promise<Response>
 
   const csrf = csrfInput(req);
 
+  // Check for deleted profile success message
+  const url = new URL(req.url);
+  const deletedName = url.searchParams.get("deleted") || "";
+
   const list = await env.ANCHOR_KV.list({ prefix: "profile:", limit: 200 });
   const uuids = list.keys
     .map((k) => k.name.slice("profile:".length))
@@ -367,9 +371,16 @@ export async function handleAdminHome(req: Request, env: Env): Promise<Response>
 
   const html = `<!doctype html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>AnchorID Admin</title></head>
+<title>AnchorID Admin</title>
+<style>
+  .alert { padding:12px 14px; border-radius:10px; margin-bottom:14px; }
+  .alert-success { background:#d4edda; border:1px solid #c3e6cb; color:#155724; }
+</style>
+</head>
 <body style="font-family:system-ui;max-width:720px;margin:40px auto;padding:0 16px;line-height:1.45">
 <h1>AnchorID Admin</h1>
+
+${deletedName ? `<div class="alert alert-success">✓ Profile deleted: <strong>${escapeHtml(deletedName)}</strong></div>` : ""}
 
 <p><a href="/admin/new">Create new profile</a></p>
 
@@ -733,6 +744,12 @@ export async function handleAdminEditGet(req: Request, env: Env, uuid: string): 
   const founder = isOrg ? extractUuids((canonical as any).founder) : [];
   const foundingDate = isOrg ? ((canonical as any).foundingDate || "") : "";
   const affiliation = !isOrg ? extractUuids((canonical as any).affiliation) : [];
+
+  // Check if profile is deletable (less than 7 days old)
+  const createdDate = canonical.dateCreated ? new Date(canonical.dateCreated) : null;
+  const now = new Date();
+  const ageInDays = createdDate ? (now.getTime() - createdDate.getTime()) / (1000 * 60 * 60 * 24) : 999;
+  const isDeletable = ageInDays < 7;
 
   const successMessages: Record<string, string> = {
     saved: "Profile saved successfully.",
@@ -1169,6 +1186,42 @@ ${claims.length === 0 ? `<div class="card" style="margin:14px 0">
 })();
 </script>
 
+${isDeletable ? `
+<div style="margin-top:32px;padding:20px;border:2px solid #dc3545;border-radius:10px;background:#fff5f5">
+  <h2 style="margin:0 0 8px 0;font-size:18px;color:#dc3545">⚠️ Danger Zone</h2>
+  <p style="margin:0 0 12px 0;color:#721c24;font-size:14px">
+    This profile is <strong>${Math.floor(ageInDays)} days old</strong> and can be deleted.
+    Profiles older than 7 days cannot be deleted to prevent accidental loss of established identities.
+  </p>
+
+  <details style="margin-bottom:12px">
+    <summary style="cursor:pointer;font-weight:600;color:#721c24;font-size:14px">What gets deleted?</summary>
+    <ul style="margin:8px 0;padding-left:20px;font-size:13px;color:#555">
+      <li>Profile data (<code>profile:${escapeHtml(uuid)}</code>)</li>
+      <li>Email mapping (<code>email:&lt;hash&gt;</code>)</li>
+      <li>Claims ledger (<code>claims:${escapeHtml(uuid)}</code>)</li>
+      <li>Audit log (<code>audit:${escapeHtml(uuid)}</code>)</li>
+    </ul>
+  </details>
+
+  <form method="post" action="/admin/delete/${escapeHtml(uuid)}"
+    onsubmit="return confirm('⚠️ DELETE PROFILE?\\n\\nThis will permanently delete:\\n- Profile: ${escapeHtml(name || uuid)}\\n- Email access\\n- All claims\\n- Audit log\\n\\nThis action CANNOT be undone.\\n\\nType DELETE in the box below to confirm.');">
+    ${csrf}
+    <button type="submit" style="background:#dc3545;color:#fff;border-color:#dc3545;font-weight:600">
+      Delete Profile Permanently
+    </button>
+  </form>
+</div>
+` : `
+<div style="margin-top:32px;padding:16px;border:1px solid #d0d7de;border-radius:10px;background:#f6f8fa">
+  <h3 style="margin:0 0 6px 0;font-size:14px;color:#555">🔒 Profile Protection</h3>
+  <p style="margin:0;font-size:13px;color:#666">
+    This profile is <strong>${Math.floor(ageInDays)} days old</strong> and cannot be deleted.
+    Only profiles less than 7 days old can be deleted to prevent accidental loss of established identities.
+  </p>
+</div>
+`}
+
 <form method="post" action="/admin/logout" style="margin-top:18px">
   ${csrf}
   <button type="submit">Logout</button>
@@ -1403,4 +1456,69 @@ function downloadToken() {
 </body></html>`;
 
   return htmlResponse(html);
+}
+
+
+// POST /admin/delete/<uuid> - Delete profile and all associated records (only if less than 7 days old)
+export async function handleAdminDelete(
+  req: Request,
+  env: Env,
+  uuid: string
+): Promise<Response> {
+  const denied = requireAdminCookie(req, env);
+  if (denied) return denied;
+
+  if (!isUuid(uuid)) return new Response("Invalid UUID", { status: 400 });
+
+  // Validate CSRF token
+  const fd = await req.formData();
+  if (!await validateCsrf(req, fd)) {
+    return csrfError();
+  }
+
+  const stored = (await env.ANCHOR_KV.get(`profile:${uuid}`, { type: "json" })) as any | null;
+  if (!stored) return new Response("Not found", { status: 404 });
+
+  // Check if profile is less than 7 days old
+  const createdDate = stored.dateCreated ? new Date(stored.dateCreated) : null;
+  if (!createdDate) {
+    return new Response("Profile has no creation date, cannot determine age", { status: 400 });
+  }
+
+  const now = new Date();
+  const ageInDays = (now.getTime() - createdDate.getTime()) / (1000 * 60 * 60 * 24);
+
+  if (ageInDays >= 7) {
+    return new Response("Profile is too old to delete (>= 7 days). Only profiles less than 7 days old can be deleted.", {
+      status: 403,
+      headers: { "content-type": "text/plain" }
+    });
+  }
+
+  // Delete all associated records
+  const keysToDelete: string[] = [
+    `profile:${uuid}`,
+    `claims:${uuid}`,
+    `audit:${uuid}`,
+    `signup:${uuid}`,
+    `created:${uuid}`,
+  ];
+
+  // Delete email mapping if it exists
+  if (stored._emailHash) {
+    keysToDelete.push(`email:${stored._emailHash}`);
+  }
+
+  // Delete all keys in parallel
+  await Promise.all(keysToDelete.map(key => env.ANCHOR_KV.delete(key)));
+
+  // Redirect to admin home with success message
+  const name = stored.name || uuid.slice(0, 8);
+  return new Response(null, {
+    status: 303,
+    headers: {
+      Location: `/admin?deleted=${encodeURIComponent(name)}`,
+      "cache-control": "no-store"
+    },
+  });
 }
