@@ -402,6 +402,52 @@ export default {
       });
     }
 
+    // Proofs detail pages
+    if (path === "/proofs/website" || path === "/proofs/website/") {
+      const html = await env.ANCHOR_KV.get("page:proofs-website");
+      if (!html) {
+        return new Response("Website proof guide not found", { status: 404 });
+      }
+      return new Response(html, {
+        headers: {
+          "content-type": "text/html; charset=utf-8",
+          "cache-control":
+            "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400",
+          ...securityHeaders(),
+        },
+      });
+    }
+
+    if (path === "/proofs/dns" || path === "/proofs/dns/") {
+      const html = await env.ANCHOR_KV.get("page:proofs-dns");
+      if (!html) {
+        return new Response("DNS proof guide not found", { status: 404 });
+      }
+      return new Response(html, {
+        headers: {
+          "content-type": "text/html; charset=utf-8",
+          "cache-control":
+            "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400",
+          ...securityHeaders(),
+        },
+      });
+    }
+
+    if (path === "/proofs/github" || path === "/proofs/github/") {
+      const html = await env.ANCHOR_KV.get("page:proofs-github");
+      if (!html) {
+        return new Response("GitHub proof guide not found", { status: 404 });
+      }
+      return new Response(html, {
+        headers: {
+          "content-type": "text/html; charset=utf-8",
+          "cache-control":
+            "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400",
+          ...securityHeaders(),
+        },
+      });
+    }
+
     // About page
     if (path === "/about" || path === "/about/") {
       const html = await env.ANCHOR_KV.get("page:about");

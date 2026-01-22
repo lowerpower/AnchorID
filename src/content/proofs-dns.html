@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <title>DNS Proof Guide | AnchorID</title>
+  <meta name="description" content="Prove you control a domain by publishing a DNS TXT record. Step-by-step guide for DNS proof verification." />
+
+  <link rel="canonical" href="https://anchorid.net/proofs/dns" />
+
+  <style>
+    :root {
+      --bg: #ffffff;
+      --fg: #111111;
+      --muted: #555555;
+      --rule: #e7e7e7;
+      --codebg: #f6f6f6;
+      --link: #0b57d0;
+      --maxw: 860px;
+    }
+    html, body { background: var(--bg); color: var(--fg); margin: 0; padding: 0; }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; line-height: 1.55; }
+    .wrap { max-width: var(--maxw); margin: 0 auto; padding: 32px 20px; }
+    a { color: var(--link); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    h1 { font-size: 2rem; margin: 0 0 10px 0; letter-spacing: -0.02em; }
+    h2 { font-size: 1.35rem; margin: 20px 0 10px 0; letter-spacing: -0.01em; }
+    h3 { font-size: 1.1rem; margin: 18px 0 8px 0; }
+    .kicker { color: var(--muted); margin: 0 0 18px 0; }
+    .small { font-size: 0.95rem; color: var(--muted); }
+    hr { border: 0; border-top: 1px solid var(--rule); margin: 24px 0; }
+    p { margin: 10px 0; }
+    ul, ol { margin: 10px 0 10px 20px; }
+    li { margin: 6px 0; }
+    code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+    code { background: var(--codebg); padding: 2px 6px; border-radius: 4px; }
+    pre { background: var(--codebg); padding: 14px; border: 1px solid var(--rule); border-radius: 10px; overflow: auto; }
+    pre code { background: none; padding: 0; }
+    .callout { border-left: 3px solid var(--rule); padding: 10px 14px; background: #fafafa; border-radius: 10px; margin: 16px 0; }
+    footer { border-top: 1px solid var(--rule); }
+    header.wrap { padding-bottom: 6px; }
+    main.wrap { padding-top: 6px; }
+    header.wrap hr { margin: 6px 0; }
+    nav.topnav { font-size: 14px; margin-bottom: 24px; }
+    nav.topnav span { color: #111; font-weight: 500; }
+    nav.topnav a, nav.topnav span { margin-right: 16px; }
+  </style>
+</head>
+
+<body>
+  <header class="wrap">
+    <nav class="topnav">
+      <a href="/">Home</a>
+      <a href="/about">About</a>
+      <a href="/guide">Guide</a>
+      <a href="/proofs">Proofs</a>
+      <a href="/faq">FAQ</a>
+      <a href="/privacy">Privacy</a>
+    </nav>
+    <h1>DNS Proof Guide</h1>
+    <p class="kicker">Prove you control a domain by publishing a DNS TXT record.</p>
+    <hr />
+  </header>
+
+  <main class="wrap">
+    <div class="callout">
+      <p><strong>What is this?</strong> DNS proof lets you prove you control a domain by publishing a DNS TXT record that contains your AnchorID UUID.</p>
+      <p><strong>Important:</strong> This is a <strong>domain-control</strong> proof. It does not prove legal identity.</p>
+    </div>
+
+    <hr />
+
+    <h2>Recommended setup (most common)</h2>
+
+    <h3>1. Add a TXT record</h3>
+
+    <p><strong>Name / Host</strong></p>
+    <pre><code>_anchorid</code></pre>
+
+    <p><strong>Type</strong></p>
+    <pre><code>TXT</code></pre>
+
+    <p><strong>Value</strong></p>
+    <pre><code>anchorid=urn:uuid:&lt;your-uuid&gt;</code></pre>
+
+    <p><strong>Example:</strong></p>
+    <pre><code>anchorid=urn:uuid:4ff7ed97-b78f-4ae6-9011-5af714ee241c</code></pre>
+
+    <p>This creates a TXT record at: <code>_anchorid.example.com</code></p>
+
+    <h3>2. Wait for DNS to propagate</h3>
+    <p>Depending on your DNS provider, this can take from a minute to an hour.</p>
+
+    <h3>3. Verify in AnchorID</h3>
+    <p>In AnchorID:</p>
+    <ol>
+      <li>Go to <a href="/login">/login</a> and authenticate</li>
+      <li>Scroll to "Identity Claims" section</li>
+      <li>Click "Add New Claim"</li>
+      <li>Choose <strong>DNS</strong> proof type</li>
+      <li>Enter your domain (example.com)</li>
+      <li>Click "Verify"</li>
+    </ol>
+
+    <hr />
+
+    <h2>Optional: Apex TXT method</h2>
+
+    <p>If your DNS provider cannot create <code>_anchorid</code> records, you may place the TXT record at the domain apex instead:</p>
+
+    <p><strong>Name / Host</strong></p>
+    <pre><code>@</code></pre>
+    <p>(or blank, depending on provider)</p>
+
+    <p><strong>Type</strong></p>
+    <pre><code>TXT</code></pre>
+
+    <p><strong>Value</strong></p>
+    <pre><code>anchorid=urn:uuid:&lt;your-uuid&gt;</code></pre>
+
+    <div class="callout">
+      <p><strong>Note:</strong> Apex TXT often already contains SPF/DKIM/DMARC-related records. The <code>_anchorid</code> method is preferred.</p>
+    </div>
+
+    <hr />
+
+    <h2>Troubleshooting</h2>
+
+    <h3>"No TXT records found"</h3>
+    <ul>
+      <li>Confirm the record exists at <code>_anchorid.&lt;domain&gt;</code> (recommended) or at apex (if you chose apex)</li>
+      <li>Confirm you saved/published the DNS changes in your provider</li>
+      <li>Try again after a few minutes (propagation delay)</li>
+    </ul>
+
+    <h3>"TXT record found but doesn't match"</h3>
+    <p>AnchorID looks for a value that includes your UUID. The recommended value is:</p>
+    <pre><code>anchorid=urn:uuid:&lt;your-uuid&gt;</code></pre>
+
+    <p>Make sure:</p>
+    <ul>
+      <li>UUID is correct</li>
+      <li>No extra characters were added</li>
+      <li>You did not paste smart quotes</li>
+    </ul>
+
+    <h3>Long TXT records</h3>
+    <p>Some DNS tools split long TXT values into multiple quoted strings. AnchorID supports this. For DNS proof, keep the record short and simple.</p>
+
+    <hr />
+
+    <h2>What DNS proof is good for</h2>
+
+    <ul>
+      <li>Organizations (strong signal)</li>
+      <li>Software projects tied to a domain (strong signal)</li>
+      <li>Personal domains (good signal)</li>
+    </ul>
+
+    <p>DNS proof is most valuable when paired with a website proof:</p>
+    <ul>
+      <li>DNS TXT record at <code>_anchorid.example.com</code></li>
+      <li>Website proof at <code>/.well-known/anchorid.txt</code></li>
+    </ul>
+
+    <p>This combination provides the strongest verification signal.</p>
+
+    <hr />
+
+    <p><a href="/proofs">← Back to Proofs</a></p>
+  </main>
+
+  <footer class="wrap">
+    <p class="small">&copy; <span id="y"></span> AnchorID. <a href="/">Home</a> · <a href="/about">About</a> · <a href="/guide">Guide</a> · <a href="/proofs">Proofs</a> · <a href="/faq">FAQ</a> · <a href="/privacy">Privacy</a></p>
+    <script>
+      document.getElementById("y").textContent = String(new Date().getFullYear());
+    </script>
+  </footer>
+</body>
+</html>

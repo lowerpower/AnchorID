@@ -1,0 +1,308 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <title>Website Proof Guide | AnchorID</title>
+  <meta name="description" content="Prove you control a website by publishing a text file at a well-known location. Step-by-step guide for website proof verification." />
+
+  <link rel="canonical" href="https://anchorid.net/proofs/website" />
+
+  <style>
+    :root {
+      --bg: #ffffff;
+      --fg: #111111;
+      --muted: #555555;
+      --rule: #e7e7e7;
+      --codebg: #f6f6f6;
+      --link: #0b57d0;
+      --maxw: 860px;
+    }
+    html, body { background: var(--bg); color: var(--fg); margin: 0; padding: 0; }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; line-height: 1.55; }
+    .wrap { max-width: var(--maxw); margin: 0 auto; padding: 32px 20px; }
+    a { color: var(--link); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    h1 { font-size: 2rem; margin: 0 0 10px 0; letter-spacing: -0.02em; }
+    h2 { font-size: 1.35rem; margin: 20px 0 10px 0; letter-spacing: -0.01em; }
+    h3 { font-size: 1.1rem; margin: 18px 0 8px 0; }
+    .kicker { color: var(--muted); margin: 0 0 18px 0; }
+    .small { font-size: 0.95rem; color: var(--muted); }
+    hr { border: 0; border-top: 1px solid var(--rule); margin: 24px 0; }
+    p { margin: 10px 0; }
+    ul, ol { margin: 10px 0 10px 20px; }
+    li { margin: 6px 0; }
+    code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+    code { background: var(--codebg); padding: 2px 6px; border-radius: 4px; }
+    pre { background: var(--codebg); padding: 14px; border: 1px solid var(--rule); border-radius: 10px; overflow: auto; }
+    pre code { background: none; padding: 0; }
+    .callout { border-left: 3px solid var(--rule); padding: 10px 14px; background: #fafafa; border-radius: 10px; margin: 16px 0; }
+    footer { border-top: 1px solid var(--rule); }
+    header.wrap { padding-bottom: 6px; }
+    main.wrap { padding-top: 6px; }
+    header.wrap hr { margin: 6px 0; }
+    nav.topnav { font-size: 14px; margin-bottom: 24px; }
+    nav.topnav span { color: #111; font-weight: 500; }
+    nav.topnav a, nav.topnav span { margin-right: 16px; }
+    table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+    th, td { text-align: left; padding: 8px; border-bottom: 1px solid var(--rule); }
+    th { font-weight: 500; }
+  </style>
+</head>
+
+<body>
+  <header class="wrap">
+    <nav class="topnav">
+      <a href="/">Home</a>
+      <a href="/about">About</a>
+      <a href="/guide">Guide</a>
+      <a href="/proofs">Proofs</a>
+      <a href="/faq">FAQ</a>
+      <a href="/privacy">Privacy</a>
+    </nav>
+    <h1>Website Proof Guide</h1>
+    <p class="kicker">Prove you control a website by publishing a text file at a well-known location.</p>
+    <hr />
+  </header>
+
+  <main class="wrap">
+    <div class="callout">
+      <p><strong>What is this?</strong> Website proof lets you prove you control a website by publishing a text file that contains your AnchorID UUID.</p>
+      <p><strong>Important:</strong> This is a <strong>website-control</strong> proof. It does not prove legal identity.</p>
+    </div>
+
+    <hr />
+
+    <h2>Setup</h2>
+
+    <h3>1. Create the proof file</h3>
+
+    <p>Create a file named <code>anchorid.txt</code> in the <code>.well-known</code> directory of your website.</p>
+
+    <p><strong>File path:</strong></p>
+    <pre><code>/.well-known/anchorid.txt</code></pre>
+
+    <p><strong>File contents:</strong></p>
+    <pre><code>https://anchorid.net/resolve/&lt;your-uuid&gt;</code></pre>
+
+    <p><strong>Example:</strong></p>
+    <pre><code>https://anchorid.net/resolve/4ff7ed97-b78f-4ae6-9011-5af714ee241c</code></pre>
+
+    <h3>2. Make it publicly accessible</h3>
+
+    <p>The file must be accessible at:</p>
+    <pre><code>https://example.com/.well-known/anchorid.txt</code></pre>
+
+    <p><strong>Important requirements:</strong></p>
+    <ul>
+      <li>Must be served over HTTPS</li>
+      <li>Must be publicly accessible (no authentication required)</li>
+      <li>Must return <code>200 OK</code> status</li>
+      <li>Content-Type can be <code>text/plain</code> or any text type</li>
+    </ul>
+
+    <h3>3. Verify in AnchorID</h3>
+
+    <p>In AnchorID:</p>
+    <ol>
+      <li>Go to <a href="/login">/login</a> and authenticate</li>
+      <li>Scroll to "Identity Claims" section</li>
+      <li>Click "Add New Claim"</li>
+      <li>Choose <strong>Website</strong> proof type</li>
+      <li>Enter your domain (example.com)</li>
+      <li>Click "Verify"</li>
+    </ol>
+
+    <hr />
+
+    <h2>What the verification checks</h2>
+
+    <p>When you verify a website claim, AnchorID will:</p>
+
+    <ol>
+      <li>Fetch <code>https://example.com/.well-known/anchorid.txt</code></li>
+      <li>Check that the file contains your resolver URL: <code>https://anchorid.net/resolve/&lt;uuid&gt;</code></li>
+      <li>Mark the claim as verified if the URL is found</li>
+    </ol>
+
+    <p>The URL match is case-sensitive and must be exact.</p>
+
+    <hr />
+
+    <h2>Accepted domains</h2>
+
+    <p>You can claim:</p>
+    <ul>
+      <li>Root domains: <code>example.com</code></li>
+      <li>Subdomains: <code>blog.example.com</code></li>
+      <li>Any domain you control</li>
+    </ul>
+
+    <p>Each domain requires its own proof file.</p>
+
+    <hr />
+
+    <h2>Multiple proofs on one domain</h2>
+
+    <p>You can verify multiple AnchorID profiles from the same domain by including multiple resolver URLs in the file, one per line:</p>
+
+    <pre><code>https://anchorid.net/resolve/4ff7ed97-b78f-4ae6-9011-5af714ee241c
+https://anchorid.net/resolve/a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d</code></pre>
+
+    <p>Each user can then verify their respective claim.</p>
+
+    <hr />
+
+    <h2>Troubleshooting</h2>
+
+    <h3>"File not found" or 404</h3>
+    <ul>
+      <li>Confirm the file exists at <code>https://example.com/.well-known/anchorid.txt</code></li>
+      <li>Check that your web server serves the <code>.well-known</code> directory</li>
+      <li>Some frameworks require special configuration to serve dotfiles</li>
+    </ul>
+
+    <h3>"Proof not found"</h3>
+    <ul>
+      <li>Verify the file contains exactly: <code>https://anchorid.net/resolve/&lt;your-uuid&gt;</code></li>
+      <li>Check for typos in the UUID</li>
+      <li>Ensure there are no extra characters or formatting</li>
+      <li>Try viewing the file in your browser to confirm it's accessible</li>
+    </ul>
+
+    <h3>HTTPS issues</h3>
+    <ul>
+      <li>The file must be served over HTTPS, not HTTP</li>
+      <li>Mixed content or certificate issues will cause verification to fail</li>
+      <li>Ensure your SSL certificate is valid</li>
+    </ul>
+
+    <h3>Web server configuration</h3>
+
+    <p><strong>Apache (.htaccess):</strong></p>
+    <pre><code># Enable .well-known directory
+&lt;IfModule mod_rewrite.c&gt;
+  RewriteEngine On
+  RewriteCond %{REQUEST_URI} ^/.well-known/
+  RewriteRule ^ - [L]
+&lt;/IfModule&gt;</code></pre>
+
+    <p><strong>Nginx:</strong></p>
+    <pre><code>location /.well-known/ {
+    allow all;
+}</code></pre>
+
+    <p><strong>Next.js / React / SPA:</strong><br>
+    Place the file in your <code>public/.well-known/anchorid.txt</code> directory.</p>
+
+    <hr />
+
+    <h2>What website proof is good for</h2>
+
+    <ul>
+      <li>Personal websites and blogs (strong signal)</li>
+      <li>Company websites (strong signal)</li>
+      <li>Project homepages (strong signal)</li>
+      <li>Portfolio sites (good signal)</li>
+    </ul>
+
+    <p>Website proof is most valuable when paired with a DNS proof:</p>
+    <ul>
+      <li>DNS TXT record at <code>_anchorid.example.com</code></li>
+      <li>Website proof at <code>https://example.com/.well-known/anchorid.txt</code></li>
+    </ul>
+
+    <p>This combination provides the strongest ownership signal.</p>
+
+    <hr />
+
+    <h2>Security considerations</h2>
+
+    <ul>
+      <li>Anyone with access to your web server can add or modify the proof file</li>
+      <li>Keep your web server secure</li>
+      <li>Regularly verify your proofs to ensure they haven't been tampered with</li>
+      <li>Consider using file permissions to restrict write access</li>
+    </ul>
+
+    <hr />
+
+    <h2>Comparison with other proofs</h2>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Proof Type</th>
+          <th>Requirement</th>
+          <th>Signal Strength</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Website</td>
+          <td>File upload access</td>
+          <td>Strong</td>
+        </tr>
+        <tr>
+          <td>DNS</td>
+          <td>DNS control</td>
+          <td>Strong</td>
+        </tr>
+        <tr>
+          <td>Website + DNS</td>
+          <td>Both</td>
+          <td>Strongest</td>
+        </tr>
+        <tr>
+          <td>GitHub</td>
+          <td>Profile README edit</td>
+          <td>Good</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <hr />
+
+    <h2>API usage</h2>
+
+    <p><strong>Create a website claim:</strong></p>
+    <pre><code>curl -X POST https://anchorid.net/claim \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "uuid": "YOUR-UUID",
+    "type": "website",
+    "url": "https://example.com"
+  }'</code></pre>
+
+    <p><strong>Verify the claim:</strong></p>
+    <pre><code>curl -X POST https://anchorid.net/claim/verify \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "uuid": "YOUR-UUID",
+    "id": "website:example.com"
+  }'</code></pre>
+
+    <hr />
+
+    <h2>Standards and conventions</h2>
+
+    <p>The <code>.well-known</code> directory is defined in <a href="https://www.rfc-editor.org/rfc/rfc8615.html" target="_blank">RFC 8615</a> as a standard location for site-wide metadata.</p>
+
+    <p>AnchorID follows this convention for discoverability and compatibility with existing web infrastructure.</p>
+
+    <hr />
+
+    <p><a href="/proofs">← Back to Proofs</a></p>
+  </main>
+
+  <footer class="wrap">
+    <p class="small">&copy; <span id="y"></span> AnchorID. <a href="/">Home</a> · <a href="/about">About</a> · <a href="/guide">Guide</a> · <a href="/proofs">Proofs</a> · <a href="/faq">FAQ</a> · <a href="/privacy">Privacy</a></p>
+    <script>
+      document.getElementById("y").textContent = String(new Date().getFullYear());
+    </script>
+  </footer>
+</body>
+</html>

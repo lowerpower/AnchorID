@@ -8,6 +8,9 @@ Publish pages:
   npx wrangler kv key put --remote --binding ANCHOR_KV "page:faq" --path ./src/content/faq.html
   npx wrangler kv key put --remote --binding ANCHOR_KV "page:guide" --path ./src/content/guide.html
   npx wrangler kv key put --remote --binding ANCHOR_KV "page:proofs" --path ./src/content/proofs.html
+  npx wrangler kv key put --remote --binding ANCHOR_KV "page:proofs-website" --path ./src/content/proofs-website.html
+  npx wrangler kv key put --remote --binding ANCHOR_KV "page:proofs-dns" --path ./src/content/proofs-dns.html
+  npx wrangler kv key put --remote --binding ANCHOR_KV "page:proofs-github" --path ./src/content/proofs-github.html
   npx wrangler kv key put --remote --binding ANCHOR_KV "page:privacy" --path ./src/content/privacy.html
 
 
