@@ -1,7 +1,7 @@
 // src/claims/handlers.ts
 
 import type { Env } from "../env";
-import type { Claim, ClaimsEnv } from "./types";
+import type { Claim } from "./types";
 import { nowIso, isUuid, normalizeUrl, normalizeIdentityUrl, loadClaims, saveClaims, upsertClaim } from "./store";
 import {
   claimIdForWebsite,

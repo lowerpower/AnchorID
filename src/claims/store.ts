@@ -2,7 +2,7 @@
 // src/claims/store.ts
 
 import type { Env } from "../env";
-import type { Claim, ClaimsEnv } from "./types";
+import type { Claim } from "./types";
 
 export function nowIso(): string {
   return new Date().toISOString();
