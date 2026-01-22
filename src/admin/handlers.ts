@@ -1347,7 +1347,15 @@ export async function handleAdminSavePost(
   }
 
   if (changed) {
-    await env.ANCHOR_KV.put(`profile:${uuid}`, JSON.stringify(next));
+    // Preserve metadata fields (email, backup token, etc.) when saving
+    const profileWithMeta = {
+      ...next,
+      ...(stored._emailHash ? { _emailHash: stored._emailHash } : {}),
+      ...(stored._backupTokenHash ? { _backupTokenHash: stored._backupTokenHash } : {}),
+      ...(stored._email ? { _email: stored._email } : {}),
+    };
+
+    await env.ANCHOR_KV.put(`profile:${uuid}`, JSON.stringify(profileWithMeta));
 
     // Audit log
     const changedFields = computeChangedFields(stored, next);

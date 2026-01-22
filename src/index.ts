@@ -1707,7 +1707,15 @@ async function handleUpdate(request: Request, env: Env): Promise<Response> {
   });
 
   if (changed) {
-    await env.ANCHOR_KV.put(key, JSON.stringify(next));
+    // Preserve metadata fields (email, backup token, etc.) when saving
+    const profileWithMeta = {
+      ...next,
+      ...(current._emailHash ? { _emailHash: current._emailHash } : {}),
+      ...(current._backupTokenHash ? { _backupTokenHash: current._backupTokenHash } : {}),
+      ...(current._email ? { _email: current._email } : {}),
+    };
+
+    await env.ANCHOR_KV.put(key, JSON.stringify(profileWithMeta));
 
     // Audit log
     const method = session.backupAccess ? "backup_token" : "magic_link";
