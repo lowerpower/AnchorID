@@ -198,6 +198,8 @@ Yes. To prevent abuse:
 - Login requests: 10/hour per IP, 3/hour per email
 - Edit page: 30/hour per IP
 - Updates: 60/hour per IP, 20/hour per UUID
+- Claim creation: 30/hour per IP, 10/hour per UUID
+- Claim verification: 20/hour per IP, 20/hour per UUID
 
 If you hit a limit, wait an hour.
 

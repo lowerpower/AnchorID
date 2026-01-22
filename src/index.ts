@@ -56,6 +56,12 @@ export interface Env {
   IP_LOGIN_RL_PER_HOUR?: string;   // default 10 (per IP for login attempts)
   IP_EDIT_RL_PER_HOUR?: string;    // default 30 (per IP for edit page loads)
   IP_UPDATE_RL_PER_HOUR?: string;  // default 60 (per IP for update submissions)
+  IP_CLAIM_RL_PER_HOUR?: string;   // default 30 (per IP for claim creation)
+  IP_VERIFY_RL_PER_HOUR?: string;  // default 20 (per IP for claim verification)
+
+  // Per-UUID rate limits for claims
+  CLAIM_RL_PER_HOUR?: string;      // default 10 (per UUID for claim creation)
+  VERIFY_RL_PER_HOUR?: string;     // default 20 (per UUID for claim verification)
 
   // Optional: Enable claim verification notifications
   // If enabled, stores email in plaintext (as _email in profile) for notifications
@@ -459,6 +465,11 @@ export default {
 
 	// Token-gated: add/update claim (admin or user for own profile)
 	if (path === "/claim" && request.method === "POST") {
+		// Per-IP rate limit (checked first to prevent abuse)
+		const ipLimit = parseInt(env.IP_CLAIM_RL_PER_HOUR || "30", 10);
+		const ipRateLimited = await checkIpRateLimit(request, env, "ip:claim", ipLimit);
+		if (ipRateLimited) return ipRateLimited;
+
 		// Parse body to get UUID
 		const bodyText = await request.text();
 		const payload: any = JSON.parse(bodyText);
@@ -467,7 +478,7 @@ export default {
 		// Check admin auth first
 		const adminDenied = requireAdmin(request, env);
 		if (!adminDenied) {
-			// Admin has access to all profiles
+			// Admin has access to all profiles (skip per-UUID rate limit for admins)
 			return handlePostClaim(new Request(request.url, {
 				method: request.method,
 				headers: request.headers,
@@ -482,7 +493,13 @@ export default {
 		if (sessionToken) {
 			const session = (await env.ANCHOR_KV.get(`login:${sessionToken}`, { type: "json" })) as any | null;
 			if (session?.uuid && String(session.uuid).toLowerCase() === targetUuid) {
-				// User authenticated for their own profile
+				// User authenticated for their own profile - check per-UUID rate limit
+				const maxPerHour = parseInt(env.CLAIM_RL_PER_HOUR || "10", 10);
+				const rl = await incrWithTtl(env.ANCHOR_KV, `rl:claim:${targetUuid}`, 3600);
+				if (rl > maxPerHour) {
+					return json({ error: "rate_limited", message: "Too many claim operations" }, 429, { "cache-control": "no-store", "retry-after": "3600" });
+				}
+
 				return handlePostClaim(new Request(request.url, {
 					method: request.method,
 					headers: request.headers,
@@ -496,6 +513,11 @@ export default {
 
 	// Token-gated: verify claim (admin or user for own profile)
 	if (path === "/claim/verify" && request.method === "POST") {
+		// Per-IP rate limit (checked first to prevent abuse)
+		const ipLimit = parseInt(env.IP_VERIFY_RL_PER_HOUR || "20", 10);
+		const ipRateLimited = await checkIpRateLimit(request, env, "ip:verify", ipLimit);
+		if (ipRateLimited) return ipRateLimited;
+
 		// Parse body to get UUID
 		const bodyText = await request.text();
 		const payload: any = JSON.parse(bodyText);
@@ -504,7 +526,7 @@ export default {
 		// Check admin auth first
 		const adminDenied = requireAdmin(request, env);
 		if (!adminDenied) {
-			// Admin has access to all profiles
+			// Admin has access to all profiles (skip per-UUID rate limit for admins)
 			return handlePostClaimVerify(new Request(request.url, {
 				method: request.method,
 				headers: request.headers,
@@ -519,7 +541,13 @@ export default {
 		if (sessionToken) {
 			const session = (await env.ANCHOR_KV.get(`login:${sessionToken}`, { type: "json" })) as any | null;
 			if (session?.uuid && String(session.uuid).toLowerCase() === targetUuid) {
-				// User authenticated for their own profile
+				// User authenticated for their own profile - check per-UUID rate limit
+				const maxPerHour = parseInt(env.VERIFY_RL_PER_HOUR || "20", 10);
+				const rl = await incrWithTtl(env.ANCHOR_KV, `rl:verify:${targetUuid}`, 3600);
+				if (rl > maxPerHour) {
+					return json({ error: "rate_limited", message: "Too many verification attempts" }, 429, { "cache-control": "no-store", "retry-after": "3600" });
+				}
+
 				return handlePostClaimVerify(new Request(request.url, {
 					method: request.method,
 					headers: request.headers,

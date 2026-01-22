@@ -142,13 +142,17 @@ npx wrangler kv key put --remote --binding ANCHOR_KV "page:privacy" --path ./src
 | `signup:<uuid>` | Backup token (plaintext, one-time display) | 5 min |
 | `created:<uuid>` | Backup token for admin flow | 60 sec |
 | `audit:<uuid>` | Audit log entries (max 100) | Permanent |
-| `page:<name>` | Static HTML pages (guide, privacy) | Permanent |
-| `rl:login:<hash>` | Rate limit counter | 1 hour |
-| `rl:update:<uuid>` | Rate limit counter | 1 hour |
-| `ip:signup` | IP rate limit | 1 hour |
-| `ip:login` | IP rate limit | 1 hour |
-| `ip:edit` | IP rate limit | 1 hour |
-| `ip:update` | IP rate limit | 1 hour |
+| `page:<name>` | Static HTML pages (guide, privacy, proofs) | Permanent |
+| `rl:login:<hash>` | Rate limit counter (login by email) | 1 hour |
+| `rl:update:<uuid>` | Rate limit counter (profile updates) | 1 hour |
+| `rl:claim:<uuid>` | Rate limit counter (claim creation) | 1 hour |
+| `rl:verify:<uuid>` | Rate limit counter (claim verification) | 1 hour |
+| `rl:ip:signup:<iphash>` | IP rate limit (signup) | 1 hour |
+| `rl:ip:login:<iphash>` | IP rate limit (login) | 1 hour |
+| `rl:ip:edit:<iphash>` | IP rate limit (edit page) | 1 hour |
+| `rl:ip:update:<iphash>` | IP rate limit (updates) | 1 hour |
+| `rl:ip:claim:<iphash>` | IP rate limit (claim creation) | 1 hour |
+| `rl:ip:verify:<iphash>` | IP rate limit (verification) | 1 hour |
 
 ---
 
@@ -165,6 +169,10 @@ npx wrangler kv key put --remote --binding ANCHOR_KV "page:privacy" --path ./src
 | `IP_LOGIN_RL_PER_HOUR` | 10 | Max login attempts per IP/hour |
 | `IP_EDIT_RL_PER_HOUR` | 30 | Max edit page loads per IP/hour |
 | `IP_UPDATE_RL_PER_HOUR` | 60 | Max update submissions per IP/hour |
+| `IP_CLAIM_RL_PER_HOUR` | 30 | Max claim operations per IP/hour |
+| `IP_VERIFY_RL_PER_HOUR` | 20 | Max verification attempts per IP/hour |
+| `CLAIM_RL_PER_HOUR` | 10 | Max claim operations per UUID/hour |
+| `VERIFY_RL_PER_HOUR` | 20 | Max verification attempts per UUID/hour |
 
 ---
 
