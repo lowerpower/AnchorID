@@ -49,15 +49,21 @@ No. There are no usernames or passwords. Access is controlled through:
 
 ### How do I edit my profile?
 
-1. Go to `/login` and enter your email
-2. Click the link in the email you receive
+1. Go to `/login` and enter your email (or use your backup token)
+2. Click the link in the email you receive (or enter your UUID + backup token)
 3. Make your changes and save
 
 The link expires after 15 minutes and can only be used once.
 
 ### What if I lose access to my email?
 
-Use your backup token. When you created your AnchorID, you were shown a recovery token. Enter it at `/edit` along with your UUID to regain access.
+Use your backup token. When you created your AnchorID, you were shown a recovery token. You can use it to log in:
+
+1. Go to `/login` and click the "Backup Token" tab
+2. Enter your UUID and backup token
+3. You'll be taken directly to your edit page
+
+Alternatively, you can go directly to `/edit?backup_token=YOUR_TOKEN&uuid=YOUR_UUID`.
 
 If you've lost both your email access and backup token, there is no recovery path. This is intentional—AnchorID cannot verify you are who you claim to be without these.
 
@@ -67,9 +73,11 @@ Currently, the email associated with an AnchorID cannot be changed through the p
 
 ### Can I delete my AnchorID?
 
-No. The identifier is permanent by design. You can clear all optional fields (name, description, URLs), but the UUID itself persists forever.
+Profiles less than 7 days old can be deleted by administrators upon request. After 7 days, the identifier becomes permanent by design.
 
-This is a feature, not a limitation. Stable identifiers are useless if they can disappear.
+You can clear all optional fields (name, description, URLs) at any time, but the UUID itself persists after the 7-day window.
+
+This is a feature, not a limitation. Stable identifiers are useless if they can disappear. The 7-day grace period allows for cleanup of test accounts and mistakes while preserving long-term stability.
 
 ---
 
@@ -111,21 +119,40 @@ Nothing. The `dateModified` timestamp only updates when something actually chang
 
 ### What is a claim?
 
-A claim is an assertion that you control an external identity (a website or GitHub profile). Claims must be verified before they appear in your public profile.
+A claim is an assertion that you control an external identity (a website, GitHub profile, or domain). Claims must be verified before they appear in your public profile.
+
+### How do I add and manage claims?
+
+You can manage claims directly from your profile edit page:
+
+1. Log in to your profile at `/login`
+2. Scroll to the "Identity Claims" section
+3. Click "Add New Claim" and select the claim type
+4. Enter the URL or domain
+5. Follow the verification instructions for your claim type
 
 ### How do I verify a website?
 
-1. Create a claim for your website URL
+1. Add a website claim from your edit page
 2. Place a file at `https://yourdomain.com/.well-known/anchorid.txt`
 3. The file must contain your full resolve URL: `https://anchorid.net/resolve/<your-uuid>`
-4. Trigger verification
+4. Click "Verify" on your claim in the edit page
 
 ### How do I verify a GitHub profile?
 
-1. Create a claim for your GitHub profile URL
+1. Add a GitHub claim from your edit page
 2. Create a repo named `<your-username>/<your-username>` if it doesn't exist
 3. Add your resolve URL to the README.md
-4. Trigger verification
+4. Click "Verify" on your claim in the edit page
+
+### How do I verify a DNS domain?
+
+1. Add a DNS claim from your edit page
+2. Create a TXT record at `_anchorid.yourdomain.com`
+3. The record must contain your full resolve URL: `https://anchorid.net/resolve/<your-uuid>`
+4. Click "Verify" on your claim in the edit page
+
+DNS verification uses DNS-over-HTTPS and may take a few minutes to propagate.
 
 ### What if verification fails?
 
@@ -159,7 +186,11 @@ Yes. The public endpoints are:
 - `GET /resolve/<uuid>` — Returns the canonical profile (JSON-LD)
 - `GET /claims/<uuid>` — Returns the claims ledger (JSON or HTML)
 
-Both support content negotiation via the `Accept` header.
+Authenticated endpoints (require session token from magic link):
+- `POST /claim` — Add or update a claim for your profile
+- `POST /claim/verify` — Trigger verification for one of your claims
+
+Public endpoints support content negotiation via the `Accept` header. Authenticated endpoints require `Authorization: Bearer <token>` header with your session token.
 
 ### Is there rate limiting?
 
@@ -197,11 +228,13 @@ Passwords create problems:
 
 Email magic links shift authentication to your email provider, which already handles account security. The backup token provides a fallback that doesn't require ongoing management.
 
-### Why can't I delete my profile?
+### Why can't I delete my profile after 7 days?
 
 Deletion undermines the core promise: a stable identifier that other systems can rely on. If identifiers can disappear, they're not stable.
 
-You can clear all optional content. The empty identifier still exists, which is the point.
+The 7-day grace period allows cleanup of test accounts and mistakes while preserving the long-term stability guarantee. After 7 days, other systems may have started referencing your identifier.
+
+You can clear all optional content at any time. The empty identifier still exists, which is the point.
 
 ### What happens if AnchorID shuts down?
 
@@ -230,10 +263,12 @@ If using a corporate email, check if external senders are blocked.
 ### My verification keeps failing
 
 Check:
-1. Proof file is accessible via HTTPS (try fetching it yourself)
-2. URL in proof file matches exactly (including trailing slash)
-3. No redirects that change the URL
-4. For GitHub: repo is `username/username` and README is in the main branch
+1. **Website claims**: Proof file is accessible via HTTPS (try fetching it yourself)
+2. **Website claims**: URL in proof file matches exactly (including trailing slash)
+3. **Website claims**: No redirects that change the URL
+4. **GitHub claims**: Repo is `username/username` and README is in the main branch
+5. **DNS claims**: TXT record is properly formatted and propagated (use a DNS lookup tool to verify)
+6. **DNS claims**: Record is at `_anchorid.yourdomain.com`, not at the root domain
 
 ### The edit link says "expired"
 
