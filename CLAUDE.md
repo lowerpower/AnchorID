@@ -80,9 +80,9 @@ AnchorID/
 | `GET /signup` | inline HTML | Signup form |
 | `POST /signup` | `handleSignup()` | Create profile, send magic link |
 | `GET /setup` | `handleSetupPage()` | Post-signup page, shows backup token |
-| `GET /login` | inline HTML | Login form |
+| `GET /login` | inline HTML | Login form (email magic link + backup token) |
 | `POST /login` | `handleLogin()` | Send magic link email |
-| `GET /edit` | `handleEditPage()` | Edit form (token or backup_token auth) |
+| `GET /edit` | `handleEditPage()` | Edit form with claims UI (token or backup_token auth) |
 | `POST /update` | `handleUpdate()` | Save profile changes |
 
 ### Admin Routes (cookie auth)
@@ -94,14 +94,19 @@ AnchorID/
 | `GET /admin/new` | inline HTML | New profile form |
 | `POST /admin/new` | `handleAdminCreate()` | Create profile |
 | `GET /admin/created/<uuid>` | `handleAdminCreatedGet()` | Show backup token |
-| `GET /admin/edit/<uuid>` | `handleAdminEdit()` | Edit profile |
-| `POST /admin/edit/<uuid>` | `handleAdminEditPost()` | Save profile |
+| `GET /admin/edit/<uuid>` | `handleAdminEdit()` | Edit profile, add email, delete profile |
+| `POST /admin/edit/<uuid>` | `handleAdminEditPost()` | Save profile, supports email addition |
+| `POST /admin/delete/<uuid>` | `handleAdminDelete()` | Delete profile (only if < 7 days old) |
 
 ### API Routes (Bearer auth)
-| Route | Handler | Description |
-|-------|---------|-------------|
-| `POST /claim` | `handleClaimUpsert()` | Add/update claim |
-| `POST /claim/verify` | `handleClaimVerify()` | Trigger verification |
+| Route | Handler | Description | Auth |
+|-------|---------|-------------|------|
+| `POST /claim` | `handleClaimUpsert()` | Add/update claim | Admin token OR user session token |
+| `POST /claim/verify` | `handleClaimVerify()` | Trigger verification | Admin token OR user session token |
+
+**Authentication for claim endpoints:**
+- **Admin access**: Use `Authorization: Bearer <ANCHOR_ADMIN_TOKEN>` - can manage claims for any profile
+- **User access**: Use `Authorization: Bearer <session_token>` - can only manage claims for own profile (UUID must match session)
 
 ---
 
@@ -182,11 +187,18 @@ npx wrangler kv key put --remote --binding ANCHOR_KV "page:privacy" --path ./src
 
 ### Claims System (`src/claims/`)
 
-Two claim types:
+Three claim types:
 - **Website**: Proof at `https://domain/.well-known/anchorid.txt` containing resolver URL
 - **GitHub**: Profile README containing resolver URL
+- **DNS**: TXT record at `_anchorid.domain.com` containing resolver URL
 
 Claim states: `pending` → `verified` or `failed`
+
+**User self-service claims:**
+- Users can add and verify claims through the `/edit` page UI
+- Claims are displayed with status badges (pending/verified/failed)
+- Users can trigger verification for any of their claims
+- Session token authentication ensures users can only manage their own claims
 
 ---
 
@@ -206,9 +218,37 @@ Claim states: `pending` → `verified` or `failed`
 ## Auth Mechanisms
 
 1. **Admin cookie** — Set via `/admin/login`, guards `/admin/*` routes
-2. **Bearer token** — `Authorization: Bearer <ANCHOR_ADMIN_TOKEN>` for API endpoints
-3. **Magic link tokens** — One-time tokens in KV, consumed on save
-4. **Backup tokens** — SHA-256 hash stored in profile, plaintext shown once at creation
+2. **Admin bearer token** — `Authorization: Bearer <ANCHOR_ADMIN_TOKEN>` for API endpoints (full access)
+3. **User session token** — `Authorization: Bearer <session_token>` for claim API endpoints (own profile only)
+4. **Magic link tokens** — One-time tokens in KV, consumed on save, also used as session tokens
+5. **Backup tokens** — SHA-256 hash stored in profile, plaintext shown once at creation
+
+---
+
+## Admin Features
+
+### Email Addition to Existing Profiles
+Admins can add email addresses to profiles that don't have one configured (legacy accounts created before email auth). From `/admin/edit/<uuid>`:
+- Inline form appears when `_emailHash` is not set
+- Validates email format and checks for duplicates
+- Creates `email:<sha256>` → UUID mapping in KV
+- Enables magic link login for the profile
+- Includes audit logging
+
+### Profile Deletion (< 7 Days)
+Admins can delete profiles that are less than 7 days old. From `/admin/edit/<uuid>`:
+- "Danger Zone" UI appears for profiles < 7 days old
+- "Profile Protection" notice appears for profiles >= 7 days old
+- Validates profile age using `dateCreated` field
+- Deletes all associated KV keys:
+  - `profile:<uuid>`
+  - `claims:<uuid>`
+  - `audit:<uuid>`
+  - `signup:<uuid>`
+  - `created:<uuid>`
+  - `email:<hash>` (if email configured)
+- CSRF protection and admin-only access
+- Redirects to `/admin` with success message
 
 ---
 
@@ -246,9 +286,10 @@ Claim states: `pending` → `verified` or `failed`
 
 See `todo.md` for the MVP checklist. Core functionality complete:
 - ✅ Identity resolution
-- ✅ Claims verification
+- ✅ Claims verification (website, GitHub, DNS)
 - ✅ Email magic link flow
 - ✅ Backup token recovery
-- ✅ Admin UI
+- ✅ Admin UI (with email addition and profile deletion)
+- ✅ User self-service claims UI
 - ✅ Rate limiting
 - ✅ Documentation

@@ -148,7 +148,7 @@
     <h2>Data retention</h2>
 
     <ul>
-      <li><strong>Profiles</strong> — Stored indefinitely. Profiles cannot be deleted (this is by design for identity permanence).</li>
+      <li><strong>Profiles</strong> — Stored indefinitely after 7 days. Profiles less than 7 days old can be deleted by administrators upon request.</li>
       <li><strong>Claims</strong> — Stored indefinitely as part of the public audit ledger.</li>
       <li><strong>Audit logs</strong> — Retained up to 100 entries per profile.</li>
       <li><strong>Rate limit counters</strong> — Expire automatically after one hour.</li>
@@ -169,16 +169,17 @@
 
     <h2>Data deletion</h2>
 
-    <p>AnchorID does not support profile deletion. This is intentional — the identifier is designed to be permanent so other systems can rely on it.</p>
+    <p>Profiles less than 7 days old can be deleted by administrators. After 7 days, profiles become permanent — this is intentional so other systems can rely on stable identifiers.</p>
 
     <p>You can:</p>
 
     <ul>
       <li>Clear all optional fields (name, description, URL, sameAs)</li>
       <li>Remove verified claims by removing proofs from your websites</li>
+      <li>Request deletion within 7 days of profile creation</li>
     </ul>
 
-    <p>The UUID itself will persist.</p>
+    <p>After 7 days, the UUID itself will persist permanently.</p>
 
     <hr />
 
