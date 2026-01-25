@@ -8,7 +8,7 @@ Frequently asked questions about AnchorID.
 
 ### What is AnchorID?
 
-AnchorID is a minimal identity resolver. It provides UUID-based identity anchors that can be linked to external profiles (websites, GitHub, etc.) through verifiable proofs.
+AnchorID is a minimal attribution resolver. It provides UUID-based attribution anchors that can be linked to external profiles (websites, GitHub, etc.) through verifiable proofs.
 
 Think of it as a stable reference point—a permanent identifier you control that other systems can point to without fear that its meaning will change.
 
@@ -119,7 +119,7 @@ Nothing. The `dateModified` timestamp only updates when something actually chang
 
 ### What is a claim?
 
-A claim is an assertion that you control an external identity (a website, GitHub profile, or domain). Claims must be verified before they appear in your public profile.
+A claim is an assertion that you control an external attribution surface (a website, GitHub profile, or domain). Claims must be verified before they appear in your public profile.
 
 ### How do I add and manage claims?
 

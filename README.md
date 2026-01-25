@@ -1,14 +1,14 @@
 
 # AnchorID
 
-**TL;DR:** AnchorID provides a durable, UUID-based identity anchor that lets people prove who they are across websites and platforms without relying on any single service.
+**TL;DR:** AnchorID provides a durable, UUID-based attribution anchor that allows work and ideas to be attributed to the same source across websites and platforms without relying on any single service.
 
 
-**AnchorID** is a minimal identity resolver for people — built on UUIDs, JSON-LD, and verifiable external claims.
+**AnchorID** is a minimal attribution resolver for people — built on UUIDs, JSON-LD, and verifiable external claims.
 
-It provides a stable, canonical identity record (`/resolve/<uuid>`) that can be linked to websites, GitHub profiles, and other public identities using simple, auditable proofs.
+It provides a stable, canonical attribution record (`/resolve/<uuid>`) that can be linked to websites, GitHub profiles, and other public attribution surfaces using simple, auditable proofs.
 
-AnchorID is designed for **longevity, decentralization, and crawlability**, not account silos or proprietary identity systems.
+AnchorID is designed for **longevity, decentralization, and crawlability**, not account silos or proprietary systems.
 
 ## Documentation
 
@@ -23,9 +23,9 @@ AnchorID is designed for **longevity, decentralization, and crawlability**, not 
 
 ## Why AnchorID Exists
 
-The modern web has no durable way to say *“this person is the same person”* across time, platforms, and failures. Usernames change, domains expire, companies disappear, and social graphs rot. Identity today is fragmented across silos that users do not control and cannot reliably preserve.
+The modern web has no durable way to say *"these works came from the same source"* across time, platforms, and failures. Usernames change, domains expire, companies disappear, and social graphs rot. Attribution today is fragmented across silos that users do not control and cannot reliably preserve.
 
-AnchorID exists to provide a **stable, platform-agnostic identity anchor**: a UUID-backed record that is independent of any single service, yet verifiable through many of them. It favors URLs over accounts, proofs over trust, and auditability over convenience. The goal is not to replace identity systems, but to give humans and machines a long-lived reference point that can survive migrations, outages, and decades of change.
+AnchorID exists to provide a **stable, platform-agnostic attribution anchor**: a UUID-backed record that is independent of any single service, yet verifiable through many of them. It favors URLs over accounts, proofs over trust, and auditability over convenience. The goal is to give humans and machines a long-lived reference point for attributing work that can survive migrations, outages, and decades of change.
 
 ---
 
@@ -33,24 +33,24 @@ AnchorID exists to provide a **stable, platform-agnostic identity anchor**: a UU
 
 At its core, AnchorID provides:
 
-* **Canonical identity URLs**
+* **Canonical attribution URLs**
   `https://anchorid.net/resolve/<uuid>`
 
 * **Machine-readable profiles** (schema.org JSON-LD)
 
 * **Human-readable claims pages**
 
-* **Verifiable external identity claims**
+* **Verifiable external attribution claims**
 
-* **Immutable identity anchors** decoupled from platforms
+* **Immutable attribution anchors** decoupled from platforms
 
-You can think of it as a **permanent “about me” record** that outlives any single website or service.
+You can think of it as a **permanent "about me" record** that outlives any single website or service.
 
 ---
 
 ## Core Endpoints
 
-### `/resolve/<uuid>` — Canonical identity record
+### `/resolve/<uuid>` — Canonical attribution record
 
 Returns a JSON-LD `Person` object.
 
@@ -71,7 +71,7 @@ Includes:
 
 ### `/claims/<uuid>` — Claims ledger (JSON + HTML)
 
-Returns the list of identity claims associated with a UUID.
+Returns the list of attribution claims associated with a UUID.
 
 * `Accept: application/json` → machine-readable claims
 * `Accept: text/html` → human-readable audit page
@@ -129,7 +129,7 @@ All rate limits reset automatically after 1 hour. When rate limited, endpoints r
 
 ---
 
-## Identity Claims
+## Attribution Claims
 
 AnchorID supports **self-asserted claims** that can be **verified automatically**.
 
@@ -149,7 +149,7 @@ AnchorID supports **self-asserted claims** that can be **verified automatically*
   _anchorid.example.com  TXT  "anchorid=urn:uuid:<uuid>"
   ```
 
-* **GitHub identity**
+* **GitHub profile**
   Proof via GitHub profile README (`username/username` repo)
 
 Each claim includes:
@@ -254,10 +254,10 @@ npm run deploy
 
 ### AnchorID *is for*:
 
-* **Independent creators, engineers, and researchers** who want a stable identity that outlives platforms.
+* **Independent creators, engineers, and researchers** who want a stable attribution anchor that outlives platforms.
 * **People publishing long-lived work** (blogs, papers, software, art) who care about attribution decades from now.
 * **Systems and crawlers** that need a canonical, machine-readable reference for a person.
-* **Decentralization-friendly projects** that prefer URLs, proofs, and auditability over opaque identity providers.
+* **Decentralization-friendly projects** that prefer URLs, proofs, and auditability.
 
 ### AnchorID *is not for*:
 
@@ -303,8 +303,7 @@ AnchorID assumes an adversarial web where links rot, platforms fail, and incenti
 * **Machine-readable always**
 * **Decentralization-friendly**
 
-AnchorID does not try to replace identity systems.
-It gives you a **durable anchor** that other systems can reference.
+AnchorID gives you a **durable attribution anchor** that other systems can reference.
 
 ---
 

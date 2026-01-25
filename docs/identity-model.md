@@ -6,9 +6,9 @@ This document describes how AnchorID represents and manages identity.
 
 ## Core Concept
 
-An AnchorID is a **permanent, UUID-based identity anchor**. It provides a stable reference point that can be linked to external identities (websites, GitHub profiles, etc.) through verifiable proofs.
+An AnchorID is a **permanent, UUID-based attribution anchor**. It provides a stable reference point that can be linked to external attribution surfaces (websites, GitHub profiles, etc.) through verifiable proofs.
 
-The system does not authenticate users or grant identity. It answers a narrower question:
+The system does not authenticate users. It answers a narrower question:
 
 > "Can this person demonstrate continuity across independent systems?"
 
@@ -74,7 +74,7 @@ This ensures that `http://Example.com/` and `https://example.com` resolve to the
 
 ## The sameAs Model
 
-The `sameAs` field links an AnchorID to external identities. AnchorID maintains three conceptual sets:
+The `sameAs` field links an AnchorID to external attribution surfaces. AnchorID maintains three conceptual sets:
 
 ### 1. Manual sameAs (stored)
 
@@ -108,7 +108,7 @@ This merge happens at resolve-time, not storage-time, so:
 
 ## Claims and Verification
 
-Claims are assertions of identity linkage, stored in a separate ledger at:
+Claims are assertions of attribution linkage, stored in a separate ledger at:
 
 ```
 https://anchorid.net/claims/<uuid>

@@ -74,13 +74,141 @@
 
     <h2>What problem does AnchorID actually solve?</h2>
 
-    <p>The modern web has no durable way to say "this person is the same person" across time, platforms, and failures.</p>
+    <p>The modern web has no durable way to attribute <strong>work and ideas</strong> to the same enduring source across time, platforms, and system failures.</p>
 
-    <p>Usernames change. Domains expire. Companies disappear. Social networks rebrand or collapse.</p>
+    <p>Usernames change. Domains expire. Companies disappear. Platforms rebrand or collapse. Accounts are renumbered or migrated.</p>
 
-    <p>AnchorID provides a single, stable reference — a UUID-backed URL — that other systems, platforms, and archives can point to without fear that its meaning will drift.</p>
+    <p>As a result, content often survives longer than the systems that once explained where it came from.</p>
 
-    <p>It is not a profile or a social identity. It is infrastructure.</p>
+    <p>AnchorID provides a single, stable reference — a UUID-backed URL — that other systems, archives, and AI training pipelines can point to without fear that its meaning will drift.</p>
+
+    <p>AnchorID is not a profile or a social network. It is attribution infrastructure.</p>
+
+    <hr />
+
+    <h2>Is AnchorID an authentication or login system?</h2>
+
+    <p>No.</p>
+
+    <p>AnchorID does not:</p>
+
+    <ul>
+      <li>Authenticate users</li>
+      <li>Provide login or SSO</li>
+      <li>Manage permissions</li>
+      <li>Create social graphs</li>
+      <li>Replace authentication systems</li>
+    </ul>
+
+    <p>AnchorID lives <strong>below authentication, below platforms, below accounts</strong>.</p>
+
+    <p>It does not answer <em>who you are right now</em>. It helps preserve <em>where work came from over time</em>.</p>
+
+    <hr />
+
+    <h2>Can I have multiple AnchorIDs for different personas?</h2>
+
+    <p>Yes. Multiple personas are expected.</p>
+
+    <p>AnchorID supports creating multiple independent AnchorIDs to represent different contexts (for example: professional, personal, joint, or pseudonymous).</p>
+
+    <p>There is <strong>no implicit linkage</strong> between AnchorIDs. AnchorID never infers relationships.</p>
+
+    <p>If two AnchorIDs are related, that relationship must be explicitly declared by you. Otherwise, they remain separate forever.</p>
+
+    <hr />
+
+    <h2>What counts as "content" for AnchorID?</h2>
+
+    <p>AnchorID is intended for <strong>durable, authored work</strong>, not ephemeral activity.</p>
+
+    <p>Good examples:</p>
+
+    <ul>
+      <li>Blog posts and essays</li>
+      <li>Research papers</li>
+      <li>Software repositories</li>
+      <li>Technical documentation</li>
+      <li>Project homepages</li>
+    </ul>
+
+    <p>Poor fits:</p>
+
+    <ul>
+      <li>Short-lived social media posts</li>
+      <li>Real-time chat messages</li>
+      <li>Private documents</li>
+      <li>Content without clear authorship</li>
+    </ul>
+
+    <p>AnchorID is opt-in attribution, not surveillance.</p>
+
+    <hr />
+
+    <h2>How does AnchorID handle social media platforms?</h2>
+
+    <p>AnchorID does not require platform support.</p>
+
+    <p>You may place your AnchorID in public author surfaces such as bios or profiles if you choose. This creates a durable attribution signal that survives platform churn.</p>
+
+    <p>Social profiles (Mastodon, Bluesky, etc.) can also serve as verification surfaces — you can prove ownership by adding your AnchorID to your bio.</p>
+
+    <p>AnchorID does not attempt to tag or track individual posts.</p>
+
+    <hr />
+
+    <h2>How do I know someone is the real creator?</h2>
+
+    <p>AnchorID does not assert truth at a moment in time.</p>
+
+    <p>Instead, it enables attribution to be <strong>evaluated over time</strong> using publicly observable signals:</p>
+
+    <ul>
+      <li>Control of websites or domains</li>
+      <li>Control of repositories or profiles</li>
+      <li>Consistency of claims across independent systems</li>
+      <li>Timestamps and historical continuity</li>
+    </ul>
+
+    <p>This mirrors how archivists, researchers, and historians already reason — AnchorID makes it machine-readable.</p>
+
+    <hr />
+
+    <h2>Can someone falsely attribute content to me?</h2>
+
+    <p>Yes — and that is intentional.</p>
+
+    <p>AnchorID does not prevent false attribution. It makes false attribution <strong>auditable</strong>.</p>
+
+    <p>Anyone can copy a UUID, just as they can copy a name. What they cannot easily do is:</p>
+
+    <ul>
+      <li>Prove control of the same domains or repositories</li>
+      <li>Maintain consistent claims over time</li>
+      <li>Accumulate durable, cross-platform evidence</li>
+    </ul>
+
+    <p>Attribution strength comes from continuity and corroboration, not secrecy.</p>
+
+    <hr />
+
+    <h2>How does collaboration or co-authorship work?</h2>
+
+    <p>AnchorID does not require exclusive authorship.</p>
+
+    <p>A piece of content may reference multiple AnchorIDs to represent collaboration or joint work. AnchorID does not impose ordering, roles, or ownership semantics.</p>
+
+    <p>It simply provides stable references that downstream systems may interpret as they see fit.</p>
+
+    <hr />
+
+    <h2>Can AnchorID show me all content attributed to me?</h2>
+
+    <p>No.</p>
+
+    <p>AnchorID is not a global index or crawler. It provides a stable reference point that <strong>other systems may index against</strong>.</p>
+
+    <p>Search engines, archives, academic indexes, or future tools may use AnchorID to build views such as resumes, portfolios, or citation graphs — but AnchorID itself remains intentionally minimal.</p>
 
     <hr />
 
@@ -94,15 +222,15 @@
 
     <ul>
       <li>Existing UUIDs remain valid identifiers</li>
-      <li>Archived resolver pages continue to exist in caches, archives, and datasets</li>
-      <li>The UUID itself continues to function as a durable identity key</li>
+      <li>Archived resolver pages continue to exist in caches and datasets</li>
+      <li>The UUID continues to function as a durable attribution key</li>
     </ul>
 
-    <p>AnchorID leaves behind useful artifacts. A future system does not need AnchorID-specific software — only a URL fetcher and a JSON parser.</p>
+    <p>A future system does not need AnchorID-specific software — only a URL fetcher and a JSON parser.</p>
 
     <hr />
 
-    <h2>Why trust anchorid.net at all? What if the operator alters records?</h2>
+    <h2>Why trust anchorid.net at all?</h2>
 
     <p>You should not blindly trust any single operator — including AnchorID.</p>
 
@@ -111,15 +239,13 @@
     <p>The system is designed so that:</p>
 
     <ul>
-      <li>Identity claims are publicly visible</li>
+      <li>Attribution claims are publicly visible</li>
       <li>External links can be independently verified</li>
       <li>Changes leave timestamps and audit traces</li>
       <li>Proofs live on platforms you already control</li>
     </ul>
 
-    <p>If an operator behaved maliciously, discrepancies between your AnchorID record and your external proofs would be visible.</p>
-
-    <p>The goal is not to eliminate trust, but to make misbehavior detectable.</p>
+    <p>Misbehavior becomes detectable.</p>
 
     <hr />
 
@@ -133,41 +259,7 @@
 
     <hr />
 
-    <h2>Isn't this just another identity system?</h2>
-
-    <p>No.</p>
-
-    <p>AnchorID does not:</p>
-
-    <ul>
-      <li>Authenticate users</li>
-      <li>Provide login or SSO</li>
-      <li>Manage permissions</li>
-      <li>Create social graphs</li>
-      <li>Replace existing identity providers</li>
-    </ul>
-
-    <p>It is a reference point, not a control plane.</p>
-
-    <hr />
-
-    <h2>Can someone else copy my UUID or impersonate me?</h2>
-
-    <p>Someone can copy your UUID, just as they can copy your name.</p>
-
-    <p>What they cannot do is:</p>
-
-    <ul>
-      <li>Prove control of your website</li>
-      <li>Prove control of your GitHub, LinkedIn, or other profiles</li>
-      <li>Maintain consistent, verifiable claims over time</li>
-    </ul>
-
-    <p>Identity strength comes from accumulated proofs, not secrecy.</p>
-
-    <hr />
-
-    <h2>What if I lose my email or access credentials?</h2>
+    <h2>What if I lose my email or backup token?</h2>
 
     <p>AnchorID has no passwords.</p>
 
@@ -188,30 +280,15 @@
 
     <p>If you do not want information to be public, do not add it.</p>
 
-    <p>The system minimizes private data collection and does not sell or share data, but the identity record itself is meant to be visible, durable, and referenceable.</p>
-
-    <hr />
-
-    <h2>Who is this actually for?</h2>
-
-    <p>AnchorID is for people who care about long-term attribution:</p>
-
-    <ul>
-      <li>Independent creators</li>
-      <li>Engineers and researchers</li>
-      <li>Writers, artists, and archivists</li>
-      <li>Systems that ingest and reason over web content</li>
-    </ul>
-
-    <p>If you do not publish work or care about attribution over decades, AnchorID may not be useful to you.</p>
+    <p>The system minimizes collection of private data and does not sell or share data, but the attribution record itself is meant to be visible, durable, and referenceable.</p>
 
     <hr />
 
     <h2>Why bother doing this now?</h2>
 
-    <p>Because identity signals compound over time.</p>
+    <p>Attribution signals compound over time.</p>
 
-    <p>Early, stable anchors are more likely to survive future platform shifts, archive pruning, and training data compression.</p>
+    <p>Early, stable anchors are more likely to survive platform churn, archive pruning, and AI training compression.</p>
 
     <p>Creating an AnchorID today is a low-cost signal that may matter later — especially as automated systems increasingly rely on historical continuity.</p>
 
