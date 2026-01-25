@@ -86,6 +86,49 @@ This page acts as a **public verification ledger**.
 
 ---
 
+## Rate Limits
+
+All endpoints are protected with rate limiting to prevent abuse while maintaining availability for legitimate use.
+
+### Public Endpoints (Generous Limits)
+
+| Endpoint | Limit | Scope | Purpose |
+|----------|-------|-------|---------|
+| `/resolve/<uuid>` | 300/hour | Per IP | Allows search engines and aggregators |
+| `/claims/<uuid>` | 300/hour | Per IP | Allows verification services |
+
+### User Endpoints (Balanced Limits)
+
+| Endpoint | Limit | Scope | Purpose |
+|----------|-------|-------|---------|
+| `/signup` | 10/hour | Per IP | Prevent spam accounts |
+| `/login` | 10/hour | Per IP | Prevent enumeration |
+| `/login` | 3/hour | Per email | Prevent targeted attacks |
+| `/edit` | 30/hour | Per IP | Allow browsing, prevent scraping |
+| `/update` | 60/hour | Per IP | Allow editing sessions |
+| `/update` | 20/hour | Per UUID | Prevent rapid changes |
+
+### Claim Endpoints (Dual Protection)
+
+| Endpoint | Limit | Scope | Purpose |
+|----------|-------|-------|---------|
+| `/claim` | 30/hour | Per IP | Prevent claim spam |
+| `/claim` | 10/hour | Per UUID | Limit per profile |
+| `/claim/verify` | 20/hour | Per IP | Prevent verification spam |
+| `/claim/verify` | 20/hour | Per UUID | Limit per profile |
+
+### Admin Endpoints (Strict Limits)
+
+| Endpoint | Limit | Scope | Purpose |
+|----------|-------|-------|---------|
+| `/admin/login` | 5/hour | Per IP | Prevent brute force |
+
+All rate limits reset automatically after 1 hour. When rate limited, endpoints return HTTP 429 with a `Retry-After: 3600` header.
+
+**Design Philosophy**: Public endpoints have generous limits to support legitimate automated use (search engines, verification services). User and admin endpoints balance security with usability.
+
+---
+
 ## Identity Claims
 
 AnchorID supports **self-asserted claims** that can be **verified automatically**.

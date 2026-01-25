@@ -272,7 +272,14 @@ export default {
 
     // Admin routes
     if (path === "/admin/login" && request.method === "GET") return handleAdminLoginPage(request, env);
-    if (path === "/admin/login" && request.method === "POST") return handleAdminLoginPost(request, env);
+    if (path === "/admin/login" && request.method === "POST") {
+      // Per-IP rate limit for admin login to prevent brute force
+      const ipLimit = parseInt(env.IP_ADMIN_LOGIN_RL_PER_HOUR || "5", 10);
+      const ipRateLimited = await checkIpRateLimit(request, env, "ip:admin_login", ipLimit);
+      if (ipRateLimited) return ipRateLimited;
+
+      return handleAdminLoginPost(request, env);
+    }
     if (path === "/admin/logout" && request.method === "POST") return handleAdminLogoutPost(request, env);
 
     if (path === "/admin" && request.method === "GET") return handleAdminHome(request, env);
@@ -490,6 +497,11 @@ export default {
 
 	// Public claims list
 	if (path.startsWith("/claims/") && (request.method === "GET" || request.method === "HEAD")) {
+		// Per-IP rate limit for public claims endpoint
+		const ipLimit = parseInt(env.IP_CLAIMS_RL_PER_HOUR || "300", 10);
+		const ipRateLimited = await checkIpRateLimit(request, env, "ip:claims", ipLimit);
+		if (ipRateLimited) return ipRateLimited;
+
   		const uuid = path.slice("/claims/".length);
 
   		// If browser asks for HTML, serve the human page (GET only)
@@ -607,6 +619,11 @@ export default {
 
     // Resolver (v1): /resolve/<uuid>
     if (path.startsWith("/resolve/")) {
+      // Per-IP rate limit for public resolver endpoint
+      const ipLimit = parseInt(env.IP_RESOLVE_RL_PER_HOUR || "300", 10);
+      const ipRateLimited = await checkIpRateLimit(request, env, "ip:resolve", ipLimit);
+      if (ipRateLimited) return ipRateLimited;
+
       return handleResolve(request, env);
     }
 

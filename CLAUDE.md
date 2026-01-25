@@ -23,6 +23,16 @@ npm run kv:get:prod -- "profile:UUID"             # Get specific profile
 npx wrangler kv key put --remote --binding ANCHOR_KV "key" --path ./file  # Upload content
 ```
 
+**Security Testing**:
+```bash
+npm test                          # Run all tests (includes security & load tests)
+npm test test/security.spec.ts    # Run security tests only
+npm test test/load.spec.ts        # Run load tests only
+npm test -- --grep "Rate Limiting"  # Run specific test suite
+```
+
+See `docs/security-testing.md` for detailed testing guide and manual verification procedures.
+
 ---
 
 ## Project Structure

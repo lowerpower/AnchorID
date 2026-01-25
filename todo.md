@@ -110,8 +110,17 @@
 - [x] `/resolve` output is stable, canonical, and explainable
 - [x] Edit page has clear UX with field explanations
 - [x] Setup flow allows immediate editing before first save
-- [ ] System survives hostile-but-boring internet traffic
+- [x] System survives hostile-but-boring internet traffic
 
 ---
 
 _When every box above is checked, AnchorID is MVP-complete._
+
+## ✅ **AnchorID is now MVP-complete!** 🎉
+
+Security hardening complete as of 2026-01-24:
+- ✅ Rate limiting on all endpoints (public, admin, user)
+- ✅ Comprehensive security test suite (test/security.spec.ts)
+- ✅ Load testing suite (test/load.spec.ts)
+- ✅ Complete threat model documentation
+- ✅ Security testing guide (docs/security-testing.md)

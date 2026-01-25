@@ -78,18 +78,25 @@ AnchorID explicitly does **not** provide:
 
 **Mitigations**:
 
-| Endpoint | Limit | Scope |
-|----------|-------|-------|
-| `/signup` | 10/hour | Per IP |
-| `/login` | 10/hour | Per IP |
-| `/login` | 3/hour | Per email |
-| `/edit` | 30/hour | Per IP |
-| `/update` | 60/hour | Per IP |
-| `/update` | 20/hour | Per UUID |
+| Endpoint | Limit | Scope | Rationale |
+|----------|-------|-------|-----------|
+| `/resolve/<uuid>` | 300/hour | Per IP | Public endpoint, generous limit for search engines/aggregators |
+| `/claims/<uuid>` | 300/hour | Per IP | Public endpoint, allows verification services |
+| `/admin/login` | 5/hour | Per IP | Strict limit to prevent brute force attacks |
+| `/signup` | 10/hour | Per IP | Prevent spam account creation |
+| `/login` | 10/hour | Per IP | Prevent login enumeration attacks |
+| `/login` | 3/hour | Per email | Prevent targeted account enumeration |
+| `/edit` | 30/hour | Per IP | Allow legitimate browsing, prevent scraping |
+| `/update` | 60/hour | Per IP | Allow active editing sessions |
+| `/update` | 20/hour | Per UUID | Prevent rapid-fire profile changes |
+| `/claim` | 30/hour | Per IP | Prevent claim spam from single IP |
+| `/claim` | 10/hour | Per UUID | Prevent excessive claims per profile |
+| `/claim/verify` | 20/hour | Per IP | Prevent verification spam |
+| `/claim/verify` | 20/hour | Per UUID | Prevent verification hammering |
 
-Rate limits are enforced in KV with automatic TTL expiration.
+Rate limits are enforced in KV with automatic TTL expiration (1 hour).
 
-**Residual Risk**: Distributed attacks from many IPs can still cause elevated load. Cloudflare's infrastructure provides additional DDoS protection.
+**Residual Risk**: Distributed attacks from many IPs can still cause elevated load. Cloudflare's infrastructure provides additional DDoS protection. Public endpoints (`/resolve`, `/claims`) have generous limits to accommodate legitimate use cases like search engines.
 
 ---
 
