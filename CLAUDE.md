@@ -13,8 +13,35 @@ npm run cf-typegen   # Generate Cloudflare types
 
 **Secrets** (set via `npx wrangler secret put <NAME>`):
 - `ANCHOR_ADMIN_TOKEN` — Admin API access
-- `RESEND_API_KEY` — Email delivery (Resend)
-- `MAIL_SEND_SECRET` — Email delivery (mycal.net fallback)
+- `RESEND_API_KEY` — Email delivery (Resend fallback)
+- `MAIL_SEND_SECRET` — Email delivery (mycal.net preferred)
+- `BREVO_API_KEY` — Email delivery (Brevo for specified domains)
+- `BREVO_FROM` — Sender email address for Brevo
+- `BREVO_DOMAINS` — Comma-separated domains for Brevo routing (e.g., "outlook.com,hotmail.com")
+
+**Email Provider Routing**:
+AnchorID supports three email providers with intelligent domain-based routing:
+
+1. **Brevo** (for specified domains)
+   - Used when: Recipient domain matches any domain in `BREVO_DOMAINS`
+   - Supports subdomain matching: `outlook.com` matches both `user@outlook.com` and `user@mail.outlook.com`
+   - Configuration: Requires `BREVO_API_KEY`, `BREVO_FROM`, and `BREVO_DOMAINS`
+
+2. **mycal.net relay** (preferred for other domains)
+   - Used when: Brevo doesn't match and `MAIL_SEND_SECRET` is configured
+   - Configuration: Requires `MAIL_SEND_SECRET`
+
+3. **Resend** (fallback)
+   - Used when: No Brevo match and no mycal.net configuration
+   - Configuration: Requires `RESEND_API_KEY` and `EMAIL_FROM`
+
+**Example Configuration**:
+```bash
+# Route Microsoft domains through Brevo
+npx wrangler secret put BREVO_API_KEY      # Paste: xkeysib-...
+npx wrangler secret put BREVO_FROM         # Paste: noreply@anchorid.net
+npx wrangler secret put BREVO_DOMAINS      # Paste: outlook.com,hotmail.com,live.com
+```
 
 **KV Operations**:
 ```bash
@@ -172,7 +199,11 @@ npx wrangler kv key put --remote --binding ANCHOR_KV "page:privacy" --path ./src
 |----------|---------|-------------|
 | `ANCHOR_ADMIN_TOKEN` | — | Admin API token (secret) |
 | `RESEND_API_KEY` | — | Resend email API key (secret) |
+| `EMAIL_FROM` | — | Sender address for Resend (required if using Resend) |
 | `MAIL_SEND_SECRET` | — | mycal.net email relay secret (secret) |
+| `BREVO_API_KEY` | — | Brevo email API key (secret) |
+| `BREVO_FROM` | — | Sender address for Brevo (required if using Brevo) |
+| `BREVO_DOMAINS` | — | Comma-separated domains for Brevo routing (e.g., "outlook.com,hotmail.com") |
 | `LOGIN_TTL_SECONDS` | 900 | Magic link token lifetime |
 | `LOGIN_RL_PER_HOUR` | 3 | Max login emails per email/hour |
 | `UPDATE_RL_PER_HOUR` | 20 | Max updates per UUID/hour |

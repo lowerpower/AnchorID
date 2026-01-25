@@ -12,9 +12,13 @@ export interface Env {
   ANCHOR_ADMIN_TOKEN?: string;
   ANCHOR_ADMIN_COOKIE?: string;
 
-  // Email login/update
-  RESEND_API_KEY?: string;
-  EMAIL_FROM?: string;
+  // Email providers
+  MAIL_SEND_SECRET?: string;  // mycal.net relay
+  RESEND_API_KEY?: string;    // Resend API
+  EMAIL_FROM?: string;        // Sender address (required for Resend)
+  BREVO_API_KEY?: string;     // Brevo API key
+  BREVO_FROM?: string;        // Sender email for Brevo
+  BREVO_DOMAINS?: string;     // Comma-separated domains (e.g., "outlook.com,hotmail.com")
 
   // TTL + limits
   LOGIN_TTL_SECONDS?: string; // default 900

@@ -46,6 +46,9 @@ export interface Env {
   MAIL_SEND_SECRET?: string;  // mycal.net relay (preferred)
   RESEND_API_KEY?: string;    // Resend API (fallback)
   EMAIL_FROM?: string;        // Sender address (required for Resend)
+  BREVO_API_KEY?: string;     // Brevo API key
+  BREVO_FROM?: string;        // Sender email for Brevo
+  BREVO_DOMAINS?: string;     // Comma-separated domains (e.g., "outlook.com,hotmail.com")
 
   // TTL + limits
   LOGIN_TTL_SECONDS?: string;    // default 900
@@ -53,11 +56,14 @@ export interface Env {
   UPDATE_RL_PER_HOUR?: string;   // default 20 (per UUID)
 
   // Per-IP rate limits
+  IP_RESOLVE_RL_PER_HOUR?: string; // default 300 (per IP for /resolve/<uuid> endpoint)
+  IP_CLAIMS_RL_PER_HOUR?: string;  // default 300 (per IP for /claims/<uuid> endpoint)
   IP_LOGIN_RL_PER_HOUR?: string;   // default 10 (per IP for login attempts)
   IP_EDIT_RL_PER_HOUR?: string;    // default 30 (per IP for edit page loads)
   IP_UPDATE_RL_PER_HOUR?: string;  // default 60 (per IP for update submissions)
   IP_CLAIM_RL_PER_HOUR?: string;   // default 30 (per IP for claim creation)
   IP_VERIFY_RL_PER_HOUR?: string;  // default 20 (per IP for claim verification)
+  IP_ADMIN_LOGIN_RL_PER_HOUR?: string; // default 5 (per IP for admin login)
 
   // Per-UUID rate limits for claims
   CLAIM_RL_PER_HOUR?: string;      // default 10 (per UUID for claim creation)
