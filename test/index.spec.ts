@@ -16,7 +16,7 @@ describe('AnchorID worker', () => {
 		await waitOnExecutionContext(ctx);
 		const html = await response.text();
 		expect(html).toContain('<title>AnchorID</title>');
-		expect(html).toContain('Canonical UUID identity anchors');
+		expect(html).toContain('A permanent attribution anchor');
 		expect(html).toContain('Create Your AnchorID');
 	});
 
@@ -24,7 +24,7 @@ describe('AnchorID worker', () => {
 		const response = await SELF.fetch('https://example.com');
 		const html = await response.text();
 		expect(html).toContain('<title>AnchorID</title>');
-		expect(html).toContain('Canonical UUID identity anchors');
+		expect(html).toContain('A permanent attribution anchor');
 		expect(html).toContain('Create Your AnchorID');
 	});
 });

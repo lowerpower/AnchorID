@@ -345,7 +345,7 @@ export default {
   </nav>
 
   <h1>AnchorID</h1>
-  <p>Canonical UUID identity anchors and resolvers. Create a permanent, decentralized identity anchor that you control.</p>
+  <p>A permanent attribution anchor for long-lived work. Durable, UUID-based attribution that survives platform changes and outlives any single service.</p>
 
   <div class="actions">
     <a href="/create" class="primary">Create Your AnchorID</a>
