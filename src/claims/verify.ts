@@ -58,6 +58,98 @@ export function buildDnsProof(qname: string, uuid: string): ClaimProof {
   return { kind: "dns_txt", qname: qname.toLowerCase(), expectedToken: canonicalToken };
 }
 
+/**
+ * Parse @user@instance.social format to URL
+ * Returns null if format is invalid
+ */
+export function parseFediverseHandle(input: string): string | null {
+  // Match @user@instance or user@instance
+  const match = input.match(/^@?([^@\s]+)@([^@\s]+)$/);
+  if (!match) return null;
+
+  const [, username, instance] = match;
+  if (!username || !instance) return null;
+
+  // Basic validation
+  if (username.length === 0 || instance.length === 0) return null;
+  if (instance.includes('/')) return null;  // Domain shouldn't have path
+
+  return `https://${instance}/@${username}`;
+}
+
+/**
+ * Validate URL for SSRF protection
+ * Blocks localhost, private IPs, and cloud metadata endpoints
+ */
+export function validateProfileUrl(urlString: string): { ok: boolean; error?: string; url?: URL } {
+  let url: URL;
+
+  try {
+    url = new URL(urlString);
+  } catch {
+    return { ok: false, error: "invalid_url" };
+  }
+
+  // Must be HTTPS
+  if (url.protocol !== 'https:') {
+    return { ok: false, error: "must_be_https" };
+  }
+
+  const hostname = url.hostname.toLowerCase();
+
+  // Block localhost and loopback
+  if (hostname === 'localhost' || hostname === '0.0.0.0') {
+    return { ok: false, error: "blocked_localhost" };
+  }
+
+  // Block 127.x.x.x
+  if (hostname.startsWith('127.')) {
+    return { ok: false, error: "blocked_loopback" };
+  }
+
+  // Block AWS/GCP metadata endpoints
+  if (hostname === '169.254.169.254' || hostname.startsWith('169.254.')) {
+    return { ok: false, error: "blocked_metadata_endpoint" };
+  }
+
+  // Block private IP ranges (10.x, 192.168.x, 172.16-31.x)
+  if (hostname.startsWith('10.')) {
+    return { ok: false, error: "blocked_private_ip" };
+  }
+  if (hostname.startsWith('192.168.')) {
+    return { ok: false, error: "blocked_private_ip" };
+  }
+  // 172.16.0.0 - 172.31.255.255
+  const match172 = hostname.match(/^172\.(\d+)\./);
+  if (match172) {
+    const octet = parseInt(match172[1], 10);
+    if (octet >= 16 && octet <= 31) {
+      return { ok: false, error: "blocked_private_ip" };
+    }
+  }
+
+  return { ok: true, url };
+}
+
+export function claimIdForSocial(url: string): string {
+  try {
+    const u = new URL(url);
+    // Use hostname + pathname for ID to handle different profiles on same instance
+    const path = u.pathname.replace(/\/$/, '');  // Remove trailing slash
+    return `social:${u.hostname.toLowerCase()}${path}`;
+  } catch {
+    return `social:${url}`;
+  }
+}
+
+export function buildSocialProof(inputUrl: string, resolverUrl: string): ClaimProof {
+  return {
+    kind: "profile_page",
+    url: inputUrl,
+    mustContain: resolverUrl,
+  };
+}
+
 async function fetchText(url: string): Promise<{ ok: boolean; status: number; text: string }> {
   const r = await fetch(url, {
     method: "GET",
@@ -387,8 +479,8 @@ export async function verifyClaim(
     return verifyDnsClaim(claim, kv, bypassCache);
   }
 
-  // Handle website and github claims
-  if (claim.proof.kind === "well_known" || claim.proof.kind === "github_readme") {
+  // Handle website, github, and social profile claims
+  if (claim.proof.kind === "well_known" || claim.proof.kind === "github_readme" || claim.proof.kind === "profile_page") {
     const { ok, status, text } = await fetchText(claim.proof.url);
 
     if (!ok) return { status: "failed", failReason: `fetch_failed:${status}` };

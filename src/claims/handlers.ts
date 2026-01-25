@@ -7,9 +7,13 @@ import {
   claimIdForWebsite,
   claimIdForGitHub,
   claimIdForDns,
+  claimIdForSocial,
   buildWellKnownProof,
   buildGitHubReadmeProof,
   buildDnsProof,
+  buildSocialProof,
+  parseFediverseHandle,
+  validateProfileUrl,
   verifyClaim,
 } from "./verify";
 import { getErrorInfo } from "./errors";
@@ -184,11 +188,11 @@ export async function handlePostClaim(request: Request,   env: Env): Promise<Res
 
   const uuid = String(payload.uuid || "").trim();
   const type = String(payload.type || "").trim();
-  // normalize FIRST, before building ids or proofs
-  const url = normalizeIdentityUrl(String(payload.url || ""));
+  // normalize FIRST, before building ids or proofs (except for social, which needs special handling)
+  const url = type === "social" ? String(payload.url || "").trim() : normalizeIdentityUrl(String(payload.url || ""));
 
   if (!isUuid(uuid)) return new Response("Bad UUID", { status: 400 });
-  if (type !== "website" && type !== "github" && type !== "dns") return new Response("Bad type", { status: 400 });
+  if (type !== "website" && type !== "github" && type !== "dns" && type !== "social") return new Response("Bad type", { status: 400 });
 
   const resolverUrl = resolverUrlFor(uuid);
   const now = nowIso();
@@ -252,6 +256,37 @@ export async function handlePostClaim(request: Request,   env: Env): Promise<Res
       id,
       type: "dns",
       url: displayUrl,
+      status: "self_asserted",
+      proof,
+      createdAt: now,
+      updatedAt: now,
+    };
+  } else if (type === "social") {
+    // Parse @user@instance format or accept full URL
+    let profileUrl = url;
+
+    // Try parsing as Fediverse handle first
+    if (url.includes('@') && !url.startsWith('http')) {
+      const parsed = parseFediverseHandle(url);
+      if (!parsed) {
+        return new Response("Invalid Fediverse handle format. Use @user@instance.social or full URL", { status: 400 });
+      }
+      profileUrl = parsed;
+    }
+
+    // Validate URL for SSRF protection
+    const validation = validateProfileUrl(profileUrl);
+    if (!validation.ok) {
+      return new Response(`Invalid URL: ${validation.error}`, { status: 400 });
+    }
+
+    const id = claimIdForSocial(profileUrl);
+    const proof = buildSocialProof(profileUrl, resolverUrl);
+
+    claim = {
+      id,
+      type: "social",
+      url: profileUrl,
       status: "self_asserted",
       proof,
       createdAt: now,

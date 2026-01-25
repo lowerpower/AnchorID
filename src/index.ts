@@ -1804,6 +1804,7 @@ ${claims.length === 0 ? `<div style="background:#f6f6f6;padding:14px;border-radi
         <option value="website">Website (.well-known/anchorid.txt)</option>
         <option value="github">GitHub (profile README)</option>
         <option value="dns">DNS (TXT record)</option>
+        <option value="social">Social Profile (Mastodon, Bluesky, etc.)</option>
       </select>
 
       <label style="display:block;margin-bottom:8px;font-weight:500" id="urlLabel">URL or Domain</label>
@@ -1856,6 +1857,10 @@ ${claims.length === 0 ? `<div style="background:#f6f6f6;padding:14px;border-radi
       urlLabel.textContent = "Domain";
       urlInput.placeholder = "example.com or _anchorid.example.com";
       dnsHint.style.display = "block";
+    } else if (type === "social") {
+      urlLabel.textContent = "Profile URL or @handle";
+      urlInput.placeholder = "@user@mastodon.social or https://bsky.app/profile/user.bsky.social";
+      dnsHint.style.display = "none";
     }
   });
 
