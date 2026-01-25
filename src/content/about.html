@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <title>About | AnchorID</title>
-  <meta name="description" content="AnchorID provides a permanent, UUID-based identity anchor that lets you prove who you are across websites and platforms." />
+  <meta name="description" content="A permanent attribution anchor for long-lived work. AnchorID provides a stable, canonical reference that allows work and ideas to be attributed to the same source across time, platforms, and system failures." />
 
   <link rel="canonical" href="https://anchorid.net/about" />
 
@@ -63,132 +63,200 @@
       <a href="/privacy">Privacy</a>
     </nav>
     <h1>What is AnchorID?</h1>
-    <p class="kicker">A permanent identity anchor for the long term.</p>
+    <p class="kicker">A permanent attribution anchor for long-lived work.</p>
     <hr />
   </header>
 
   <main class="wrap">
+    <p>AnchorID provides a stable, canonical reference that allows <strong>work and ideas</strong> to be attributed to the same enduring source across time, platforms, and system failures.</p>
+
+    <p>It is infrastructure for attribution — not authentication.</p>
+
+    <hr />
+
     <h2>The problem</h2>
 
-    <p>The modern web has no durable way to say <em>"this person is the same person"</em> across time, platforms, and failures.</p>
+    <p>The modern web has no durable way to say:</p>
+
+    <blockquote style="margin: 16px 0; padding-left: 16px; border-left: 3px solid var(--rule); font-style: italic;">
+      "These artifacts originate from the same enduring source."
+    </blockquote>
+
+    <p>Over time:</p>
 
     <ul>
       <li>Usernames change</li>
       <li>Domains expire</li>
       <li>Companies disappear</li>
-      <li>Social networks collapse or rebrand</li>
+      <li>Platforms rebrand or collapse</li>
+      <li>Accounts are renumbered or migrated</li>
     </ul>
 
-    <p>Identity today is fragmented across silos that you do not control and cannot reliably preserve. When a platform dies, part of your identity goes with it.</p>
+    <p>As a result, attribution fragments.</p>
+
+    <p>When a platform dies, content may survive — but <strong>its connection to the original author often does not</strong>. Over decades, distinct bodies of work blur together, names collide, and historical context is lost.</p>
+
+    <p>This problem is becoming more acute as AI systems increasingly ingest, compress, and retrain on large volumes of web content. Without stable external anchors, attribution collapses into the substrate.</p>
 
     <hr />
 
     <h2>The solution</h2>
 
-    <p>AnchorID gives you a <strong>permanent, UUID-based identity anchor</strong> that is independent of any single service, yet verifiable through many of them.</p>
+    <p>AnchorID provides a <strong>permanent, UUID-based attribution anchor</strong> that is independent of any single platform, yet verifiable through many of them.</p>
+
+    <p>Each AnchorID is expressed as a canonical URL:</p>
+
+    <p><code>https://anchorid.net/resolve/&lt;UUID&gt;</code></p>
+
+    <p>Example:</p>
+
+    <p><code>https://anchorid.net/resolve/4ff7ed97-b78f-4ae6-9011-5af714ee241c</code></p>
+
+    <p>This URL returns a <strong>machine-readable JSON-LD record</strong> that links to the author's known identity surfaces (websites, repositories, profiles).</p>
 
     <div class="callout">
-      <p>Think of it as a permanent "about me" record that outlives any single website or service.</p>
+      <p>Platforms and accounts may change. The anchor does not.</p>
     </div>
 
-    <p>Your AnchorID is a canonical URL:</p>
+    <hr />
 
-    <p><code>https://anchorid.net/resolve/&lt;your-uuid&gt;</code></p>
+    <h2>What AnchorID is (and is not)</h2>
 
-    <p>This URL returns a machine-readable identity record that links to your other profiles. When platforms change, your anchor remains stable.</p>
+    <p>AnchorID <strong>is</strong>:</p>
+
+    <ul>
+      <li>A stable reference point for long-lived attribution</li>
+      <li>A root node for a personal or organizational knowledge graph</li>
+      <li>A way for humans and machines to disambiguate authorship over time</li>
+    </ul>
+
+    <p>AnchorID <strong>is not</strong>:</p>
+
+    <ul>
+      <li>Authentication or login (not OAuth, not SSO)</li>
+      <li>A universal identity system</li>
+      <li>A social network or reputation system</li>
+      <li>A permission or access control layer</li>
+    </ul>
+
+    <p>AnchorID lives <strong>below authentication, below platforms, below accounts</strong>. It does not try to answer <em>who you are right now</em>. It helps preserve <em>where work came from over time</em>.</p>
+
+    <hr />
+
+    <h2>Multiple personas are expected</h2>
+
+    <p>AnchorID does not assume a single global identity.</p>
+
+    <p>You may create multiple independent AnchorIDs to represent different personas or contexts (for example: professional, personal, joint, or pseudonymous).</p>
+
+    <p>There is <strong>no implicit linkage</strong> between AnchorIDs. Relationships are created only if you explicitly add them.</p>
 
     <hr />
 
     <h2>How it works</h2>
 
     <p><strong>1. Create your anchor</strong></p>
-    <p>Sign up with your email. You receive a permanent UUID and a backup recovery token.</p>
+    <p>Sign up with your email to receive a permanent UUID and a one-time backup recovery token.</p>
 
-    <p><strong>2. Link your identities</strong></p>
-    <p>Add your website, GitHub, LinkedIn, and other profiles to your anchor. These become your <code>sameAs</code> links.</p>
+    <p><strong>2. Link attribution surfaces</strong></p>
+    <p>Add your website, GitHub, publications, or other public surfaces using <code>sameAs</code> links.</p>
 
-    <p><strong>3. Verify ownership</strong></p>
-    <p>Prove you control external profiles by placing a small proof file on your website or in your GitHub README. Verified links carry more weight.</p>
+    <p><strong>3. Prove control (optional but recommended)</strong></p>
+    <p>Publish a small proof file on a website, domain, GitHub profile, or social profile you control. AnchorID supports four verification methods: website (.well-known/anchorid.txt), GitHub (profile README), DNS (TXT record), and social profiles (Mastodon, Bluesky, etc.). Verified proofs strengthen attribution signals.</p>
 
-    <p><strong>4. Use it everywhere</strong></p>
-    <p>Place your AnchorID on profiles, publications, and bios. It becomes your canonical identity reference.</p>
+    <p><strong>4. Use it as a reference</strong></p>
+    <p>Place your AnchorID on author bios, repositories, publications, and durable content.</p>
+
+    <p>AnchorID does not assert truth at a moment in time. It enables attribution to be <strong>evaluated over time</strong>.</p>
+
+    <hr />
+
+    <h2>Proof over prevention</h2>
+
+    <p>AnchorID does not attempt to prevent false attribution.</p>
+
+    <p>Instead, it makes attribution <strong>auditable</strong>.</p>
+
+    <p>Anyone can copy a UUID — just as they can copy a name. What they cannot easily do is:</p>
+
+    <ul>
+      <li>Prove control of the same domains or repositories</li>
+      <li>Maintain consistent, verifiable claims over time</li>
+      <li>Accumulate durable, cross-platform evidence</li>
+    </ul>
+
+    <p>Attribution strength comes from <strong>consistency and continuity</strong>, not secrecy.</p>
 
     <hr />
 
     <h2>Built to last</h2>
 
-    <p>Most identity systems fail not because they lack features, but because they assume the world will cooperate with them. They assume platforms will remain stable, registries will be funded forever, and users will keep up with key rotations.</p>
+    <p>Most identity systems fail because they assume the world will cooperate with them.</p>
 
-    <p>AnchorID is built from deliberately boring components:</p>
+    <p>AnchorID assumes the opposite.</p>
+
+    <p>It is built from deliberately boring components:</p>
 
     <ul>
-      <li><strong>UUIDs</strong> — universally unique, no central registry</li>
-      <li><strong>HTTPS URLs</strong> — work everywhere, archived by crawlers</li>
+      <li><strong>UUIDs</strong> — globally unique, no central registry</li>
+      <li><strong>HTTPS URLs</strong> — fetchable, archivable, ubiquitous</li>
       <li><strong>Plain JSON</strong> — readable by any system</li>
-      <li><strong>schema.org vocabularies</strong> — standard, well-documented</li>
+      <li><strong>schema.org vocabularies</strong> — well-documented and widely implemented</li>
     </ul>
 
-    <p>These are not cutting-edge technologies. That is the point.</p>
-
     <div class="callout">
-      <p>A future system does not need AnchorID-specific software to understand your record — it only needs a URL fetcher and a JSON parser.</p>
+      <p>A future system does not need AnchorID-specific software to understand an AnchorID record. It only needs a URL fetcher and a JSON parser.</p>
     </div>
 
-    <p>AnchorID assumes it will someday be abandoned. A good identity system should leave behind artifacts that remain useful even if the original operator disappears, the code is no longer maintained, or the documentation is lost.</p>
+    <p>AnchorID assumes it may someday be abandoned. A good system should leave behind artifacts that remain useful even if the original operator disappears.</p>
 
     <hr />
 
     <h2>No accounts, no passwords</h2>
 
-    <p>AnchorID has no login system in the traditional sense:</p>
+    <p>AnchorID does not use traditional accounts:</p>
 
     <ul>
-      <li><strong>Email magic links</strong> — request an edit link, click it, done</li>
-      <li><strong>Backup token</strong> — a recovery code shown once at creation</li>
-      <li><strong>No passwords to forget</strong> — or to be breached</li>
+      <li>One-time email magic links for edits</li>
+      <li>A single backup recovery token shown at creation</li>
+      <li>No passwords to forget or leak</li>
     </ul>
 
-    <p>Your email provider already handles account security. AnchorID doesn't duplicate that work.</p>
+    <p>Email is used for control and notification — <strong>not as identity</strong>.</p>
 
     <hr />
 
     <h2>Who AnchorID is for</h2>
 
     <ul>
-      <li><strong>Independent creators, engineers, and researchers</strong> who want a stable identity that outlives platforms</li>
-      <li><strong>People publishing long-lived work</strong> (blogs, papers, software, art) who care about attribution decades from now</li>
-      <li><strong>Systems and crawlers</strong> that need a canonical, machine-readable reference for a person</li>
+      <li>Independent creators, engineers, and researchers</li>
+      <li>People publishing long-lived work (software, writing, research, art)</li>
+      <li>Archivists, crawlers, and systems that need canonical attribution references</li>
     </ul>
 
-    <h2>Who AnchorID is not for</h2>
-
-    <ul>
-      <li><strong>Authentication or login flows</strong> — this is not OAuth or SSO</li>
-      <li><strong>Real-time social graphs</strong> — no followers, no feeds</li>
-      <li><strong>Anonymous personas</strong> — AnchorID links identities, not hides them</li>
-    </ul>
+    <p>If you care about attribution surviving decades of platform change, AnchorID may be useful.</p>
 
     <hr />
 
-    <h2>The philosophy</h2>
+    <h2>Philosophy</h2>
 
     <div class="callout">
-      <p><strong>AnchorID treats identity as infrastructure, not a profile.</strong></p>
+      <p><strong>AnchorID treats attribution as infrastructure, not a profile.</strong></p>
     </div>
 
     <ul>
-      <li><strong>Stability over novelty</strong> — boring tech ages better</li>
-      <li><strong>Proof over trust</strong> — claims are publicly verifiable</li>
-      <li><strong>URLs over accounts</strong> — no walled gardens</li>
-      <li><strong>Durability over convenience</strong> — optimized for decades, not days</li>
+      <li><strong>Stability over novelty</strong></li>
+      <li><strong>Proof over trust</strong></li>
+      <li><strong>URLs over accounts</strong></li>
+      <li><strong>Durability over convenience</strong></li>
     </ul>
 
-    <p>AnchorID is not trying to be the center of identity. It is trying to be a <strong>stable reference point</strong> — something other systems can point at without fear that the meaning will drift.</p>
+    <p>AnchorID is not trying to be the center of identity. It is trying to be a <strong>stable reference point</strong> — something other systems can point to without fear that its meaning will drift.</p>
 
     <hr />
 
     <div class="cta">
-      <a href="/create">Create Your AnchorID</a>
+      <a href="/signup">Create Your AnchorID</a>
     </div>
 
     <p class="small" style="text-align: center; margin-top: 24px;">
