@@ -236,18 +236,26 @@ npx wrangler kv key put --remote --binding ANCHOR_KV "page:privacy" --path ./src
 
 ### Claims System (`src/claims/`)
 
-Three claim types:
+Four claim types:
 - **Website**: Proof at `https://domain/.well-known/anchorid.txt` containing resolver URL
 - **GitHub**: Profile README containing resolver URL
 - **DNS**: TXT record at `_anchorid.domain.com` containing resolver URL
+- **Social**: Profile page bio/description containing resolver URL (Mastodon, Bluesky, etc.)
 
-Claim states: `pending` → `verified` or `failed`
+Claim states: `self_asserted` → `verified` or `failed`
 
 **User self-service claims:**
 - Users can add and verify claims through the `/edit` page UI
-- Claims are displayed with status badges (pending/verified/failed)
+- Claims are displayed with status badges (self_asserted/verified/failed)
 - Users can trigger verification for any of their claims
 - Session token authentication ensures users can only manage their own claims
+
+**Social profile claims:**
+- Supports Fediverse/Mastodon: `@user@instance.social` or full URL
+- Supports Bluesky, forums, and any public HTTPS profile
+- SSRF protection blocks localhost, private IPs, cloud metadata endpoints
+- Verification: fetches profile page and searches for resolver URL in bio/description
+- Input formats: `@mycal@noauthority.social` or `https://noauthority.social/@mycal`
 
 ---
 
@@ -335,8 +343,8 @@ Admins can delete profiles that are less than 7 days old. From `/admin/edit/<uui
 
 See `todo.md` for the MVP checklist. Core functionality complete:
 - ✅ Identity resolution
-- ✅ Claims verification (website, GitHub, DNS)
-- ✅ Email magic link flow
+- ✅ Claims verification (website, GitHub, DNS, social profiles)
+- ✅ Email magic link flow with domain-based routing (Brevo, mycal.net, Resend)
 - ✅ Backup token recovery
 - ✅ Admin UI (with email addition and profile deletion)
 - ✅ User self-service claims UI

@@ -92,7 +92,7 @@
           "Author disambiguation",
           "Identity ambiguity reduction"
         ],
-        "dateModified": "2026-01-15T20:25:00Z",
+        "dateModified": "2026-01-25T18:00:00Z",
         "inLanguage": "en"
       },
       {
@@ -272,6 +272,72 @@ Canonical identity: https://anchorid.net/resolve/&lt;UUID&gt;</code></pre>
     </ol>
 
     <p>If only one link is possible, <strong>keep the resolver</strong>.</p>
+
+    <hr />
+
+    <h2>Verifiable claims</h2>
+
+    <p>
+      AnchorID allows you to <strong>verify ownership</strong> of websites, code repositories, domains, and social profiles by placing your resolver URL in specific locations.
+      Verified claims strengthen your identity graph and provide cryptographic proof of continuity across platforms.
+    </p>
+
+    <h3>Claim types</h3>
+
+    <p>Four verification methods are supported:</p>
+
+    <ul>
+      <li>
+        <strong>Website</strong>: Place resolver URL at <code>https://yourdomain.com/.well-known/anchorid.txt</code>
+      </li>
+      <li>
+        <strong>GitHub</strong>: Add resolver URL to your profile README (<code>github.com/username/username/README.md</code>)
+      </li>
+      <li>
+        <strong>DNS</strong>: Add TXT record at <code>_anchorid.yourdomain.com</code> with value <code>anchorid=urn:uuid:&lt;UUID&gt;</code>
+      </li>
+      <li>
+        <strong>Social Profile</strong>: Add resolver URL to your bio/description on Mastodon, Bluesky, or any public profile
+      </li>
+    </ul>
+
+    <h3>Social profile verification</h3>
+
+    <p>
+      For Fediverse (Mastodon) and other social platforms, add your resolver URL directly to your profile bio or description.
+      AnchorID will verify ownership by fetching your public profile and confirming the URL is present.
+    </p>
+
+    <p>Supported platforms include:</p>
+
+    <ul>
+      <li>Mastodon and Fediverse instances (any instance)</li>
+      <li>Bluesky</li>
+      <li>Public forums and community platforms</li>
+      <li>Any profile page accessible via HTTPS without authentication</li>
+    </ul>
+
+    <p><strong>Example Mastodon bio:</strong></p>
+
+    <pre><code>Software engineer, open web advocate.
+Canonical identity: https://anchorid.net/resolve/&lt;UUID&gt;</code></pre>
+
+    <p>
+      You can add social profile claims using either the Fediverse handle format (<code>@user@instance.social</code>) or direct profile URL.
+    </p>
+
+    <h3>Why verify claims?</h3>
+
+    <ul>
+      <li>Verified claims appear in your canonical resolver profile automatically</li>
+      <li>Provides cryptographic proof you control multiple platforms</li>
+      <li>Strengthens identity attribution for AI systems and search engines</li>
+      <li>Enables bidirectional verification (similar to Mastodon's rel="me")</li>
+    </ul>
+
+    <p>
+      Manage your claims through the <a href="/edit">edit interface</a> after signing up.
+    </p>
 
     <hr />
 
