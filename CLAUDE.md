@@ -106,8 +106,12 @@ AnchorID/
 | Route | Handler | Description |
 |-------|---------|-------------|
 | `GET /` | inline HTML | Homepage with signup/login links |
+| `GET /about` | KV `page:about` | About page |
 | `GET /guide` | KV `page:guide` | Placement guide |
+| `GET /proofs` | KV `page:proofs` | Proofs overview |
+| `GET /faq` | KV `page:faq` | FAQ page |
 | `GET /privacy` | KV `page:privacy` | Privacy policy |
+| `GET /sitemap.xml` | KV `page:sitemap` | XML sitemap |
 | `GET /resolve/<uuid>` | `handleResolve()` | Canonical Person JSON-LD |
 | `GET /claims/<uuid>` | `handleClaimsGet()` | Claims ledger (JSON or HTML) |
 
@@ -153,11 +157,20 @@ HTML pages served from KV storage. Source files in `src/content/`.
 
 **Deploy commands:**
 ```bash
+# About page
+npx wrangler kv key put --remote --binding ANCHOR_KV "page:about" --path ./src/content/about.html
+
 # Guide page
 npx wrangler kv key put --remote --binding ANCHOR_KV "page:guide" --path ./src/content/guide.html
 
+# FAQ page
+npx wrangler kv key put --remote --binding ANCHOR_KV "page:faq" --path ./src/content/faq.html
+
 # Privacy policy
 npx wrangler kv key put --remote --binding ANCHOR_KV "page:privacy" --path ./src/content/privacy.html
+
+# Sitemap
+npx wrangler kv key put --remote --binding ANCHOR_KV "page:sitemap" --path ./src/content/sitemap.xml
 ```
 
 **To add a new static page:**

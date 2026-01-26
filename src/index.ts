@@ -399,6 +399,21 @@ export default {
       });
     }
 
+    // Sitemap
+    if (path === "/sitemap.xml") {
+      const xml = await env.ANCHOR_KV.get("page:sitemap");
+      if (!xml) {
+        return new Response("Sitemap not found", { status: 404 });
+      }
+      return new Response(xml, {
+        headers: {
+          "content-type": "application/xml; charset=utf-8",
+          "cache-control":
+            "public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800",
+        },
+      });
+    }
+
     // Proofs page
     if (path === "/proofs" || path === "/proofs/") {
       const html = await env.ANCHOR_KV.get("page:proofs");

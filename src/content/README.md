@@ -12,5 +12,6 @@ Publish pages:
   npx wrangler kv key put --remote --binding ANCHOR_KV "page:proofs-dns" --path ./src/content/proofs-dns.html
   npx wrangler kv key put --remote --binding ANCHOR_KV "page:proofs-github" --path ./src/content/proofs-github.html
   npx wrangler kv key put --remote --binding ANCHOR_KV "page:privacy" --path ./src/content/privacy.html
+  npx wrangler kv key put --remote --binding ANCHOR_KV "page:sitemap" --path ./src/content/sitemap.xml
 
 
