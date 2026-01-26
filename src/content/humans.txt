@@ -1,0 +1,13 @@
+/* TEAM */
+    Maintained by: Mycal (Mike Johnson)
+    AnchorID: https://anchorid.net/resolve/4ff7ed97-b78f-4ae6-9011-5af714ee241c
+    Twitter: https://x.com/mycal_1
+    GitHub: https://github.com/lowerpower
+    From: Petaluma, California
+
+/* SITE */
+    Last updated: 2026-01-25
+    Standards: HTML5, CSS3, JSON-LD, Schema.org
+    Components: Cloudflare Workers, KV Storage
+    Philosophy: Attribution as Infrastructure.
+    Software: Deliberately boring. Built to last.

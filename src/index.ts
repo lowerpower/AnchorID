@@ -574,6 +574,36 @@ export default {
       });
     }
 
+    // Robots.txt
+    if (path === "/robots.txt") {
+      const txt = await env.ANCHOR_KV.get("page:robots");
+      if (!txt) {
+        return new Response("robots.txt not found", { status: 404 });
+      }
+      return new Response(txt, {
+        headers: {
+          "content-type": "text/plain; charset=utf-8",
+          "cache-control":
+            "public, max-age=86400, s-maxage=604800",
+        },
+      });
+    }
+
+    // Humans.txt
+    if (path === "/humans.txt") {
+      const txt = await env.ANCHOR_KV.get("page:humans");
+      if (!txt) {
+        return new Response("humans.txt not found", { status: 404 });
+      }
+      return new Response(txt, {
+        headers: {
+          "content-type": "text/plain; charset=utf-8",
+          "cache-control":
+            "public, max-age=86400, s-maxage=604800",
+        },
+      });
+    }
+
     // Proofs page
     if (path === "/proofs" || path === "/proofs/") {
       const html = await env.ANCHOR_KV.get("page:proofs");

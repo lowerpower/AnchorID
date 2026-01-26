@@ -1,0 +1,7 @@
+User-agent: *
+# Content-Signal: search=yes, ai-train=yes
+# This allows training while the AnchorID metadata provides the attribution link.
+Allow: /
+
+# Direct crawlers to your index of anchors
+Sitemap: https://anchorid.net/sitemap.xml
