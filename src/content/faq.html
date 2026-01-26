@@ -9,6 +9,219 @@
 
   <link rel="canonical" href="https://anchorid.net/faq" />
 
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "Person",
+        "@id": "https://blog.mycal.net/about/#mycal",
+        "identifier": {
+          "@type": "PropertyValue",
+          "propertyID": "canonical-uuid",
+          "value": "urn:uuid:4ff7ed97-b78f-4ae6-9011-5af714ee241c"
+        },
+        "name": "Mike Johnson",
+        "alternateName": ["Mycal", "Michael Johnson"],
+        "url": "https://blog.mycal.net/about/",
+        "sameAs": [
+          "https://anchorid.net/resolve/4ff7ed97-b78f-4ae6-9011-5af714ee241c",
+          "https://github.com/lowerpower",
+          "https://music.mycal.net"
+        ]
+      },
+      {
+        "@type": "Organization",
+        "@id": "https://anchorid.net/#org",
+        "name": "AnchorID",
+        "alternateName": "AnchorID.net",
+        "description": "A permanent attribution anchor for long-lived work. Durable, UUID-based attribution that survives platform changes and outlives any single service.",
+        "url": "https://anchorid.net",
+        "foundingDate": "2026-01-11",
+        "founder": {
+          "@id": "https://blog.mycal.net/about/#mycal"
+        },
+        "sameAs": [
+          "https://github.com/lowerpower/AnchorID"
+        ],
+        "slogan": "Attribution as infrastructure, not a profile"
+      },
+      {
+        "@type": "WebSite",
+        "@id": "https://anchorid.net/#website",
+        "name": "AnchorID",
+        "url": "https://anchorid.net",
+        "publisher": {
+          "@id": "https://anchorid.net/#org"
+        },
+        "creator": {
+          "@id": "https://blog.mycal.net/about/#mycal"
+        },
+        "copyrightYear": 2026,
+        "copyrightHolder": {
+          "@id": "https://anchorid.net/#org"
+        },
+        "inLanguage": "en"
+      },
+      {
+        "@type": "SoftwareApplication",
+        "@id": "https://anchorid.net/#service",
+        "name": "AnchorID Service",
+        "applicationCategory": "Attribution Infrastructure",
+        "operatingSystem": "Web",
+        "description": "A UUID-based attribution service that provides permanent, machine-readable attribution anchors for long-lived work. Enables work and ideas to be attributed to the same enduring source across time, platforms, and system failures.",
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD"
+        },
+        "provider": {
+          "@id": "https://anchorid.net/#org"
+        },
+        "url": "https://anchorid.net"
+      },
+      {
+        "@type": "FAQPage",
+        "@id": "https://anchorid.net/faq#page",
+        "name": "AnchorID Skeptic FAQ",
+        "description": "Questions for people who are unsure whether AnchorID is necessary, trustworthy, or worth the effort.",
+        "url": "https://anchorid.net/faq",
+        "isPartOf": {
+          "@id": "https://anchorid.net/#website"
+        },
+        "about": {
+          "@id": "https://anchorid.net/#service"
+        },
+        "publisher": {
+          "@id": "https://anchorid.net/#org"
+        },
+        "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "What problem does AnchorID actually solve?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "The modern web has no durable way to attribute work and ideas to the same enduring source across time, platforms, and system failures. Usernames change. Domains expire. Companies disappear. Platforms rebrand or collapse. Accounts are renumbered or migrated. As a result, content often survives longer than the systems that once explained where it came from. AnchorID provides a single, stable reference — a UUID-backed URL — that other systems, archives, and AI training pipelines can point to without fear that its meaning will drift. AnchorID is not a profile or a social network. It is attribution infrastructure."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Is AnchorID an authentication or login system?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "No. AnchorID does not authenticate users, provide login or SSO, manage permissions, create social graphs, or replace authentication systems. AnchorID lives below authentication, below platforms, below accounts. It does not answer who you are right now. It helps preserve where work came from over time."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Can I have multiple AnchorIDs for different personas?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Yes. Multiple personas are expected. AnchorID supports creating multiple independent AnchorIDs to represent different contexts (for example: professional, personal, joint, or pseudonymous). There is no implicit linkage between AnchorIDs. AnchorID never infers relationships. If two AnchorIDs are related, that relationship must be explicitly declared by you. Otherwise, they remain separate forever."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "What counts as content for AnchorID?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "AnchorID is intended for durable, authored work, not ephemeral activity. Good examples include blog posts and essays, research papers, software repositories, technical documentation, and project homepages. Poor fits include short-lived social media posts, real-time chat messages, private documents, and content without clear authorship. AnchorID is opt-in attribution, not surveillance."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "How does AnchorID handle social media platforms?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "AnchorID does not require platform support. You may place your AnchorID in public author surfaces such as bios or profiles if you choose. This creates a durable attribution signal that survives platform churn. Social profiles (Mastodon, Bluesky, etc.) can also serve as verification surfaces — you can prove ownership by adding your AnchorID to your bio. AnchorID does not attempt to tag or track individual posts."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "How do I know someone is the real creator?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "AnchorID does not assert truth at a moment in time. Instead, it enables attribution to be evaluated over time using publicly observable signals: control of websites or domains, control of repositories or profiles, consistency of claims across independent systems, and timestamps and historical continuity. This mirrors how archivists, researchers, and historians already reason — AnchorID makes it machine-readable."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Can someone falsely attribute content to me?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Yes — and that is intentional. AnchorID does not prevent false attribution. It makes false attribution auditable. Anyone can copy a UUID, just as they can copy a name. What they cannot easily do is prove control of the same domains or repositories, maintain consistent claims over time, or accumulate durable, cross-platform evidence. Attribution strength comes from continuity and corroboration, not secrecy."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "How does collaboration or co-authorship work?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "AnchorID does not require exclusive authorship. A piece of content may reference multiple AnchorIDs to represent collaboration or joint work. AnchorID does not impose ordering, roles, or ownership semantics. It simply provides stable references that downstream systems may interpret as they see fit."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Can AnchorID show me all content attributed to me?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "No. AnchorID is not a global index or crawler. It provides a stable reference point that other systems may index against. Search engines, archives, academic indexes, or future tools may use AnchorID to build views such as resumes, portfolios, or citation graphs — but AnchorID itself remains intentionally minimal."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "What happens if anchorid.net disappears or is abandoned?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "This is expected. AnchorID is designed under the assumption that the original operator may someday disappear. If anchorid.net goes offline: existing UUIDs remain valid identifiers, archived resolver pages continue to exist in caches and datasets, and the UUID continues to function as a durable attribution key. A future system does not need AnchorID-specific software — only a URL fetcher and a JSON parser."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Why trust anchorid.net at all?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "You should not blindly trust any single operator — including AnchorID. AnchorID does not provide trust. It provides anchoring. The system is designed so that attribution claims are publicly visible, external links can be independently verified, changes leave timestamps and audit traces, and proofs live on platforms you already control. Misbehavior becomes detectable."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Why not just use consistent usernames or schema.org sameAs links?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Those approaches work — until the platform changes, rebrands, or disappears. Usernames are scoped to platforms. sameAs links are references, not anchors. AnchorID provides a single immutable reference that survives platform churn and migrations. All other identifiers can change while the anchor remains stable."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "What if I lose my email or backup token?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "AnchorID has no passwords. Edit access is granted via one-time email magic links and a backup recovery token shown once at creation. If you lose both, there is no recovery path. This is intentional — AnchorID cannot verify you are who you claim to be without these."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Is AnchorID private?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "AnchorID is intentionally public. If you do not want information to be public, do not add it. The system minimizes collection of private data and does not sell or share data, but the attribution record itself is meant to be visible, durable, and referenceable."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Why bother doing this now?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Attribution signals compound over time. Early, stable anchors are more likely to survive platform churn, archive pruning, and AI training compression. Creating an AnchorID today is a low-cost signal that may matter later — especially as automated systems increasingly rely on historical continuity."
+            }
+          }
+        ]
+      }
+    ]
+  }
+  </script>
+
   <style>
     :root {
       --bg: #ffffff;
