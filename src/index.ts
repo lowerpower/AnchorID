@@ -982,6 +982,7 @@ async function handleSignupPage(request: Request, env: Env): Promise<Response> {
   .card.info { background:#e8f4fd; border:1px solid #b8daff; }
   label { font-weight:600; display:block; margin-bottom:6px; }
   input { width:100%; box-sizing:border-box; padding:10px; border:1px solid #ddd; border-radius:8px; font:inherit; }
+  input[type="radio"], input[type="checkbox"] { width:auto; }
   input:focus { outline:2px solid #1a73e8; border-color:#1a73e8; }
   input.error { border-color:#dc3545; }
   button { padding:12px 20px; border-radius:10px; border:1px solid #111; background:#111; color:#fff; cursor:pointer; font:inherit; font-weight:500; }
@@ -1487,6 +1488,7 @@ async function handleLoginPage(request: Request, env: Env): Promise<Response> {
   .card { background:#f6f6f6; padding:14px; border-radius:10px; margin-bottom:14px; }
   label { font-weight:600; display:block; margin-bottom:6px; }
   input { width:100%; box-sizing:border-box; padding:10px; border:1px solid #ddd; border-radius:8px; font:inherit; }
+  input[type="radio"], input[type="checkbox"] { width:auto; }
   button { padding:10px 14px; border-radius:10px; border:1px solid #111; background:#111; color:#fff; cursor:pointer; font:inherit; }
   .hint { color:#555; font-size:13px; margin-top:6px; }
   a { color:#1a73e8; text-decoration:none; }
@@ -1819,6 +1821,7 @@ async function handleEditPage(request: Request, env: Env): Promise<Response> {
   .field { margin-bottom:20px; }
   .field label { font-weight:500; display:block; margin-bottom:4px; }
   .field input, .field textarea { width:100%; padding:8px; border:1px solid #ccc; border-radius:6px; font:inherit; box-sizing:border-box; }
+  .field input[type="radio"], .field input[type="checkbox"] { width:auto; }
   .field textarea { resize:vertical; }
   .hint { color:#555; font-size:13px; margin-top:4px; }
   .hint-secondary { color:#777; font-size:12px; margin-top:2px; }
