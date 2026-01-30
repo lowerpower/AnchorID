@@ -34,6 +34,19 @@ To create your own AnchorID:
    ```html
    <link href="https://anchorid.net/resolve/<your-uuid>" rel="me">
 
+**Or include it in schema.org JSON-LD:**
+
+```json
+{
+  "@type": "Person",
+  "@id": "https://your-site.com/#me",
+  "sameAs": [
+    "https://anchorid.net/resolve/<your-uuid>"
+  ]
+}
+```
+That’s it — your AnchorID is now a durable, cross-platform attribution anchor.
+
 
 ## Documentation
 
