@@ -1,9 +1,10 @@
 
 # AnchorID
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/lowerpower/AnchorID)
+[![Deploy to Cloudflare](https://img.shields.io/badge/Deploy-Cloudflare-f38020?logo=cloudflare&logoColor=white)](
+https://deploy.workers.cloudflare.com/?url=https://github.com/lowerpower/AnchorID)
 
-**TL;DR:** AnchorID provides a durable, UUID-based attribution anchor that allows work and ideas to be attributed to the same source across websites and platforms without relying on any single service.
+**TL;DR:** AnchorID provides a durable, UUID-based attribution anchor that allows work and ideas to be attributed to the same source across websites and pl	atforms without relying on any single service.
 
 **AnchorID** is a minimal attribution resolver for people — built on UUIDs, JSON-LD, and verifiable external claims.
 
