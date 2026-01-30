@@ -1,5 +1,7 @@
 
 # AnchorID
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/lowerpower/AnchorID)
 
 **TL;DR:** AnchorID provides a durable, UUID-based attribution anchor that allows work and ideas to be attributed to the same source across websites and platforms without relying on any single service.
 
@@ -312,6 +314,17 @@ AnchorID gives you a **durable attribution anchor** that other systems can refer
 Active development.
 Single-maintainer project.
 Schema-first, migration-light, intentionally boring.
+
+---
+
+## Contributing
+
+AnchorID is early-stage and single-maintainer. Issues, PRs, and discussions are welcome — especially for:
+- New proof types
+- Self-hosting improvements
+- Documentation / examples
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) (coming soon) for guidelines.
 
 ---
 
