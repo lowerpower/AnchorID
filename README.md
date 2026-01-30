@@ -5,6 +5,11 @@
 
 **TL;DR:** AnchorID provides a durable, UUID-based attribution anchor that allows work and ideas to be attributed to the same source across websites and platforms without relying on any single service.
 
+**AnchorID** is a minimal attribution resolver for people — built on UUIDs, JSON-LD, and verifiable external claims.
+
+It provides a stable, canonical attribution record (`/resolve/<uuid>`) that can be linked to websites, GitHub profiles, and other public attribution surfaces using simple, auditable proofs.
+
+AnchorID is designed for **longevity, decentralization, and crawlability**, not account silos or proprietary systems.
 
 ### Get Started in 4 Steps
 
@@ -29,13 +34,6 @@ To create your own AnchorID:
    ```html
    <link href="https://anchorid.net/resolve/<your-uuid>" rel="me">
 
-
-
-**AnchorID** is a minimal attribution resolver for people — built on UUIDs, JSON-LD, and verifiable external claims.
-
-It provides a stable, canonical attribution record (`/resolve/<uuid>`) that can be linked to websites, GitHub profiles, and other public attribution surfaces using simple, auditable proofs.
-
-AnchorID is designed for **longevity, decentralization, and crawlability**, not account silos or proprietary systems.
 
 ## Documentation
 
