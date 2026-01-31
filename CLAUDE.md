@@ -253,7 +253,7 @@ Four claim types:
 - **Website**: Proof at `https://domain/.well-known/anchorid.txt` containing resolver URL
 - **GitHub**: Profile README containing resolver URL
 - **DNS**: TXT record at `_anchorid.domain.com` containing resolver URL
-- **Social**: Profile page bio/description containing resolver URL (Mastodon, Bluesky, etc.)
+- **Social**: Profile page bio/description containing resolver URL (Mastodon, etc.)
 
 Claim states: `self_asserted` → `verified` or `failed`
 
@@ -265,7 +265,7 @@ Claim states: `self_asserted` → `verified` or `failed`
 
 **Social profile claims:**
 - Supports Fediverse/Mastodon: `@user@instance.social` or full URL
-- Supports Bluesky, forums, and any public HTTPS profile
+- Supports forums and any public HTTPS profile
 - SSRF protection blocks localhost, private IPs, cloud metadata endpoints
 - Verification: fetches profile page and searches for resolver URL in bio/description
 - Input formats: `@mycal@noauthority.social` or `https://noauthority.social/@mycal`
