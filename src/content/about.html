@@ -9,6 +9,217 @@
 
   <link rel="canonical" href="https://anchorid.net/about" />
 
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "Person",
+        "@id": "https://blog.mycal.net/about/#mycal",
+        "identifier": {
+          "@type": "PropertyValue",
+          "propertyID": "canonical-uuid",
+          "value": "urn:uuid:4ff7ed97-b78f-4ae6-9011-5af714ee241c"
+        },
+        "name": "Mike Johnson",
+        "alternateName": ["Mycal", "Michael Johnson"],
+        "url": "https://blog.mycal.net/about/",
+        "sameAs": [
+          "https://anchorid.net/resolve/4ff7ed97-b78f-4ae6-9011-5af714ee241c",
+          "https://github.com/lowerpower",
+          "https://music.mycal.net"
+        ]
+      },
+      {
+        "@type": "Organization",
+        "@id": "https://anchorid.net/#org",
+        "identifier": {
+          "@type": "PropertyValue",
+          "propertyID": "canonical-uuid",
+          "value": "urn:uuid:4c785577-9f55-4a22-a80b-dd1f4d9b4658"
+        },
+        "name": "AnchorID",
+        "alternateName": "AnchorID.net",
+        "description": "A permanent attribution anchor for long-lived work. Durable, UUID-based attribution that survives platform changes and outlives any single service.",
+        "url": "https://anchorid.net",
+        "foundingDate": "2026-01-11",
+        "founder": {
+          "@id": "https://blog.mycal.net/about/#mycal"
+        },
+        "sameAs": [
+          "https://anchorid.net/resolve/4c785577-9f55-4a22-a80b-dd1f4d9b4658",
+          "https://github.com/lowerpower/AnchorID"
+        ],
+        "slogan": "Attribution as infrastructure, not a profile",
+        "knowsAbout": [
+          "Identity Resolution",
+          "Attribution Infrastructure",
+          "Canonical Identity",
+          "UUID-based Identity",
+          "Decentralized Identity",
+          "Knowledge Graphs",
+          "Long-term Digital Attribution"
+        ]
+      },
+      {
+        "@type": "WebSite",
+        "@id": "https://anchorid.net/#website",
+        "name": "AnchorID",
+        "url": "https://anchorid.net",
+        "publisher": {
+          "@id": "https://anchorid.net/#org"
+        },
+        "creator": {
+          "@id": "https://blog.mycal.net/about/#mycal"
+        },
+        "copyrightYear": 2026,
+        "copyrightHolder": {
+          "@id": "https://anchorid.net/#org"
+        },
+        "inLanguage": "en"
+      },
+      {
+        "@type": "AboutPage",
+        "@id": "https://anchorid.net/about#page",
+        "name": "What is AnchorID?",
+        "description": "AnchorID provides a stable, canonical reference that allows work and ideas to be attributed to the same enduring source across time, platforms, and system failures.",
+        "url": "https://anchorid.net/about",
+        "isPartOf": {
+          "@id": "https://anchorid.net/#website"
+        },
+        "about": {
+          "@id": "https://anchorid.net/#org"
+        },
+        "mainEntity": {
+          "@id": "https://anchorid.net/about#article"
+        }
+      },
+      {
+        "@type": "Article",
+        "@id": "https://anchorid.net/about#article",
+        "headline": "What is AnchorID?",
+        "abstract": "AnchorID provides infrastructure for attribution — not authentication. It is a permanent, UUID-based attribution anchor that is independent of any single platform, yet verifiable through many of them.",
+        "author": {
+          "@id": "https://blog.mycal.net/about/#mycal"
+        },
+        "publisher": {
+          "@id": "https://anchorid.net/#org"
+        },
+        "datePublished": "2026-01-11",
+        "dateModified": "2026-01-30",
+        "inLanguage": "en",
+        "license": "https://creativecommons.org/licenses/by-sa/4.0/",
+        "copyrightHolder": {
+          "@id": "https://anchorid.net/#org"
+        },
+        "copyrightYear": 2026,
+        "about": [
+          {
+            "@id": "https://anchorid.net/about#attribution-infrastructure"
+          },
+          {
+            "@id": "https://anchorid.net/about#canonical-identity"
+          },
+          {
+            "@id": "https://anchorid.net/about#proof-over-prevention"
+          },
+          {
+            "@id": "https://anchorid.net/about#attribution-fragmentation"
+          },
+          {
+            "@id": "https://anchorid.net/about#identity-ambiguity"
+          },
+          {
+            "@id": "https://anchorid.net/about#durable-attribution"
+          }
+        ],
+        "teaches": [
+          "AnchorID is infrastructure for attribution, not authentication",
+          "Attribution evaluated over time, not at a moment",
+          "Designed to outlast the operator",
+          "Multiple personas are expected and supported",
+          "No implicit linkage between different AnchorIDs",
+          "UUID-based anchors are platform-independent",
+          "Verification through public, cryptographic proofs",
+          "Stability over novelty",
+          "Proof over trust",
+          "URLs over accounts",
+          "Durability over convenience",
+          "Lives below authentication, below platforms, below accounts",
+          "Does not answer who you are right now, helps preserve where work came from over time"
+        ],
+        "keywords": [
+          "attribution infrastructure",
+          "canonical identity",
+          "UUID-based identity",
+          "proof over prevention",
+          "durable attribution",
+          "platform-independent identity",
+          "attribution fragmentation",
+          "knowledge graphs",
+          "long-term attribution"
+        ]
+      },
+      {
+        "@type": "DefinedTerm",
+        "@id": "https://anchorid.net/about#attribution-infrastructure",
+        "name": "Attribution Infrastructure",
+        "description": "Systems that enable work and ideas to be attributed to the same enduring source across time, platforms, and system failures. Unlike authentication systems that verify identity at a moment in time, attribution infrastructure provides durable references that survive platform changes.",
+        "inDefinedTermSet": "https://anchorid.net/about#concepts"
+      },
+      {
+        "@type": "DefinedTerm",
+        "@id": "https://anchorid.net/about#canonical-identity",
+        "name": "Canonical Identity",
+        "description": "A stable, permanent reference point for attribution that remains constant even as usernames, domains, and platforms change. Expressed as a UUID-backed URL that returns machine-readable identity associations.",
+        "inDefinedTermSet": "https://anchorid.net/about#concepts"
+      },
+      {
+        "@type": "DefinedTerm",
+        "@id": "https://anchorid.net/about#proof-over-prevention",
+        "name": "Proof Over Prevention",
+        "description": "A design philosophy where false attribution is not prevented but made auditable. Attribution strength comes from consistency and continuity across multiple platforms over time, not from access control or secrecy.",
+        "inDefinedTermSet": "https://anchorid.net/about#concepts"
+      },
+      {
+        "@type": "DefinedTerm",
+        "@id": "https://anchorid.net/about#attribution-fragmentation",
+        "name": "Attribution Fragmentation",
+        "description": "The problem where work survives longer than the systems that explain where it came from. As platforms change, domains expire, and accounts migrate, the connection between content and its original author is often lost, especially in AI training data and long-term archives.",
+        "inDefinedTermSet": "https://anchorid.net/about#concepts"
+      },
+      {
+        "@type": "DefinedTerm",
+        "@id": "https://anchorid.net/about#identity-ambiguity",
+        "name": "Identity Ambiguity",
+        "description": "The challenge of disambiguating authorship when multiple people share similar names, usernames change over time, or historical records become disconnected from their sources. Canonical identity anchors reduce ambiguity by providing stable, verifiable references.",
+        "inDefinedTermSet": "https://anchorid.net/about#concepts"
+      },
+      {
+        "@type": "DefinedTerm",
+        "@id": "https://anchorid.net/about#durable-attribution",
+        "name": "Durable Attribution",
+        "description": "Attribution mechanisms that survive decades of platform change, domain migrations, and system failures. Built from deliberately boring components (UUIDs, HTTPS URLs, plain JSON) that remain useful even if the original service disappears.",
+        "inDefinedTermSet": "https://anchorid.net/about#concepts"
+      },
+      {
+        "@type": "Thing",
+        "@id": "https://anchorid.net/about#design-philosophy",
+        "name": "AnchorID Design Philosophy",
+        "description": "Core principles: Stability over novelty, Proof over trust, URLs over accounts, Durability over convenience. AnchorID is not trying to be the center of identity but a stable reference point that other systems can rely on.",
+        "keywords": [
+          "stability over novelty",
+          "proof over trust",
+          "URLs over accounts",
+          "durability over convenience",
+          "built to last",
+          "designed for abandonment"
+        ]
+      }
+    ]
+  }
+  </script>
+
   <style>
     :root {
       --bg: #ffffff;
