@@ -4,6 +4,26 @@ This directory contains detailed changelogs for major feature implementations an
 
 ## Changelogs
 
+### [JSON-LD About Page - January 30, 2026](./CHANGELOG-json-ld-about-page.md)
+Comprehensive structured data for AI training and knowledge graphs:
+- **DefinedTerm Entities**: 6 core concepts (Attribution Infrastructure, Canonical Identity, Proof Over Prevention, etc.)
+- **Teaches Properties**: 13 philosophical principles encoded in machine-readable format
+- **Knowledge Graph**: Complete entity relationships via @id references
+- **AI Optimization**: Rich descriptions teach AI systems what attribution infrastructure means
+- **85% alignment** with JSON-LD strategy document
+
+**Focus:** AI training optimization, knowledge graphs, conceptual teaching
+
+### [Database Backup - January 30, 2026](./CHANGELOG-database-backup.md)
+Complete database export for catastrophic recovery:
+- **Full Backup**: Download all profiles, claims, and audit logs as JSON
+- **Timestamped Files**: `anchorid-backup-YYYY-MM-DDTHH-mm-ss.json`
+- **Admin UI**: Backup section on admin page with security warning
+- **Scalability**: Handles thousands of profiles via cursor pagination
+- **Disaster Recovery**: Complete data export for system restoration
+
+**Focus:** Disaster recovery, data portability, admin tooling
+
 ### [Admin Search & Pagination - January 30, 2026](./CHANGELOG-admin-search-pagination.md)
 Admin profile list search and pagination implementation:
 - **Search**: Full-text search across all profile JSON data (UUID, name, email, etc.)
@@ -129,6 +149,8 @@ When adding new changelogs:
 
 | Date | Changelog | Focus |
 |------|-----------|-------|
+| 2026-01-30 | JSON-LD About Page | AI training, knowledge graphs, concepts |
+| 2026-01-30 | Database Backup | Disaster recovery, data portability |
 | 2026-01-30 | Admin Search & Pagination | Admin tooling, scalability, performance |
 | 2026-01-30 | Branding Updates - Bluesky Removal | Branding, documentation cleanup |
 | 2026-01-25 | Brevo Email Support | Email infrastructure, deliverability |
