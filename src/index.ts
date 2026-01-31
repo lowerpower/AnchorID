@@ -714,11 +714,11 @@ export default {
       });
     }
 
-    // /create redirects to /signup (semantic alias)
-    if (path === "/create" || path === "/create/") {
+    // /signup redirects to /create (semantic alias)
+    if (path === "/signup" || path === "/signup/") {
       return new Response(null, {
-        status: 302,
-        headers: { "location": "/signup" },
+        status: 301,
+        headers: { "location": "/create" },
       });
     }
 
@@ -854,11 +854,11 @@ export default {
       return handleResolve(request, env);
     }
 
-    // Public signup (self-service identity creation)
-    if (path === "/signup" && request.method === "GET") {
+    // Public create (self-service identity creation)
+    if (path === "/create" && request.method === "GET") {
       return handleSignupPage(request, env);
     }
-    if (path === "/signup" && request.method === "POST") {
+    if (path === "/create" && request.method === "POST") {
       return handleSignup(request, env);
     }
 
@@ -1027,7 +1027,7 @@ async function handleSignupPage(request: Request, env: Env): Promise<Response> {
   </ol>
 </div>
 
-<form method="post" action="/signup" id="signupForm">
+<form method="post" action="/create" id="signupForm">
   <input type="hidden" name="_csrf" value="${escapeHtml(csrfToken)}">
 
   <div class="card required">
@@ -1169,7 +1169,7 @@ async function handleSignup(request: Request, env: Env): Promise<Response> {
   const email = rawEmail.toLowerCase();
 
   if (!isValidEmail(email)) {
-    return htmlError("Invalid Email", "Please provide a valid email address.", "/signup");
+    return htmlError("Invalid Email", "Please provide a valid email address.", "/create");
   }
 
   const emailHash = await sha256Hex(email);
@@ -1580,7 +1580,7 @@ async function handleLoginPage(request: Request, env: Env): Promise<Response> {
 </div>
 
 <p style="margin-top:24px;font-size:13px;color:#555">
-  Don't have an AnchorID? <a href="/signup">Create one</a>
+  Don't have an AnchorID? <a href="/create">Create one</a>
 </p>
 
 <script>

@@ -16,8 +16,8 @@ AnchorID is designed for **longevity, decentralization, and crawlability**, not 
 
 To create your own AnchorID:
 
-1. **Sign up**  
-   Visit [https://anchorid.net/signup](https://anchorid.net/signup)  
+1. **Create your identity**
+   Visit [https://anchorid.net/create](https://anchorid.net/create)
    You'll receive your permanent UUID via a magic link email.
 
 2. **Receive your UUID**  
@@ -140,7 +140,7 @@ All endpoints are protected with rate limiting to prevent abuse while maintainin
 
 | Endpoint | Limit | Scope | Purpose |
 |----------|-------|-------|---------|
-| `/signup` | 10/hour | Per IP | Prevent spam accounts |
+| `/create` | 10/hour | Per IP | Prevent spam accounts |
 | `/login` | 10/hour | Per IP | Prevent enumeration |
 | `/login` | 3/hour | Per email | Prevent targeted attacks |
 | `/edit` | 30/hour | Per IP | Allow browsing, prevent scraping |

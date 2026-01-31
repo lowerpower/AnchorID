@@ -125,9 +125,10 @@ AnchorID/
 ### Public Auth Flow
 | Route | Handler | Description |
 |-------|---------|-------------|
-| `GET /signup` | inline HTML | Signup form |
-| `POST /signup` | `handleSignup()` | Create profile, send magic link |
-| `GET /setup` | `handleSetupPage()` | Post-signup page, shows backup token |
+| `GET /create` | inline HTML | Create new identity form |
+| `POST /create` | `handleSignup()` | Create profile, send magic link |
+| `GET /signup` | redirect | Alias to /create |
+| `GET /setup` | `handleSetupPage()` | Post-setup page, shows backup token |
 | `GET /login` | inline HTML | Login form (email magic link + backup token) |
 | `POST /login` | `handleLogin()` | Send magic link email |
 | `GET /edit` | `handleEditPage()` | Edit form with claims UI (token or backup_token auth) |
