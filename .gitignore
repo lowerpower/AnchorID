@@ -15,8 +15,16 @@ npm-debug.log*
 .vscode/
 .DS_Store
 
+# Drafts / Working files
+4ff7ed97-b78f-4ae6-9011-5af714ee241c
+JSON-LD-STRAT.md
+about-new.md
+generic-claim.md
+new-faq.md
+x-com-claim-generic-claim.md
+test_send.sh
+test/ratelimit-test.sh
 
 pnpm-lock.yaml
-
 
 mycal.profile.json
