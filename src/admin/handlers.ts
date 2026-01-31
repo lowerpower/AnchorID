@@ -349,23 +349,89 @@ export async function handleAdminLogoutPost(req: Request, env: Env): Promise<Res
   });
 }
 
+// Helper function to fetch all profile UUIDs (paginated through KV list cursor)
+async function fetchAllProfileUUIDs(env: Env): Promise<string[]> {
+  const uuids: string[] = [];
+  let cursor: string | undefined;
+
+  do {
+    const list = await env.ANCHOR_KV.list({
+      prefix: "profile:",
+      limit: 1000,
+      cursor
+    });
+
+    uuids.push(
+      ...list.keys
+        .map(k => k.name.slice("profile:".length))
+        .filter(Boolean)
+    );
+
+    cursor = list.list_complete ? undefined : list.cursor;
+  } while (cursor);
+
+  return uuids.sort();
+}
+
+// Helper to build query string for pagination
+function buildQueryString(query: string, page: number): string {
+  const params = new URLSearchParams();
+  if (query) params.set('q', query);
+  if (page > 1) params.set('page', page.toString());
+  return params.toString();
+}
+
 export async function handleAdminHome(req: Request, env: Env): Promise<Response> {
   const denied = requireAdminCookie(req, env);
   if (denied) return denied;
 
   const csrf = csrfInput(req);
 
-  // Check for deleted profile success message
+  // Parse query parameters
   const url = new URL(req.url);
+  const query = (url.searchParams.get("q") || "").trim();
+  const pageParam = parseInt(url.searchParams.get("page") || "1", 10);
+  const currentPage = Math.max(1, isNaN(pageParam) ? 1 : pageParam);
   const deletedName = url.searchParams.get("deleted") || "";
 
-  const list = await env.ANCHOR_KV.list({ prefix: "profile:", limit: 200 });
-  const uuids = list.keys
-    .map((k) => k.name.slice("profile:".length))
-    .filter(Boolean)
-    .sort();
+  const perPage = 100;
 
-  const items = uuids
+  // Fetch all profile UUIDs
+  const allUuids = await fetchAllProfileUUIDs(env);
+
+  // Filter by search query if provided
+  let filteredUuids = allUuids;
+
+  if (query) {
+    const queryLower = query.toLowerCase();
+    const matchingUuids: string[] = [];
+
+    // Fetch all profiles and search through their JSON data
+    for (const uuid of allUuids) {
+      const profile = await env.ANCHOR_KV.get(`profile:${uuid}`, { type: "json" });
+      if (profile) {
+        const profileJson = JSON.stringify(profile).toLowerCase();
+        if (profileJson.includes(queryLower)) {
+          matchingUuids.push(uuid);
+        }
+      }
+    }
+
+    filteredUuids = matchingUuids;
+  }
+
+  // Pagination metadata
+  const total = filteredUuids.length;
+  const totalPages = Math.ceil(total / perPage);
+  const startIndex = (currentPage - 1) * perPage;
+  const endIndex = Math.min(startIndex + perPage, total);
+  const hasPrev = currentPage > 1;
+  const hasNext = currentPage < totalPages;
+
+  // Get current page items
+  const pageUuids = filteredUuids.slice(startIndex, endIndex);
+
+  const items = pageUuids
     .map((u) => `<li><a href="/admin/edit/${escapeHtml(u)}">${escapeHtml(u)}</a></li>`)
     .join("");
 
@@ -375,6 +441,14 @@ export async function handleAdminHome(req: Request, env: Env): Promise<Response>
 <style>
   .alert { padding:12px 14px; border-radius:10px; margin-bottom:14px; }
   .alert-success { background:#d4edda; border:1px solid #c3e6cb; color:#155724; }
+  .search-box { margin-bottom:20px; }
+  .search-box input { padding:8px 12px; width:400px; max-width:100%; border:1px solid #ccc; border-radius:6px; font:inherit; }
+  .search-box button { padding:8px 16px; margin-left:8px; border:1px solid #111; background:#111; color:#fff; border-radius:6px; cursor:pointer; font:inherit; }
+  .search-box a { margin-left:8px; }
+  .result-summary { color:#666; font-size:14px; margin-bottom:12px; }
+  .pagination { margin-top:20px; display:flex; gap:12px; align-items:center; }
+  .pagination a { text-decoration:none; color:#1a73e8; }
+  .pagination span.disabled { color:#ccc; }
 </style>
 </head>
 <body style="font-family:system-ui;max-width:720px;margin:40px auto;padding:0 16px;line-height:1.45">
@@ -384,8 +458,35 @@ ${deletedName ? `<div class="alert alert-success">✓ Profile deleted: <strong>$
 
 <p><a href="/admin/new">Create new profile</a></p>
 
+<form method="get" action="/admin" class="search-box">
+  <input
+    type="text"
+    name="q"
+    value="${escapeHtml(query)}"
+    placeholder="Search profiles (UUID, name, email, etc.)">
+  <button type="submit">Search</button>
+  ${query ? '<a href="/admin">Clear</a>' : ''}
+</form>
+
 <h2>Profiles</h2>
+
+<p class="result-summary">
+  ${query ? `Found ${total} matching profile${total !== 1 ? 's' : ''}` : `Showing ${total} profile${total !== 1 ? 's' : ''}`}${totalPages > 1 ? ` (page ${currentPage} of ${totalPages})` : ''}
+</p>
+
 <ul>${items || "<li>(none)</li>"}</ul>
+
+${totalPages > 1 ? `
+<nav class="pagination">
+  ${hasPrev
+    ? `<a href="/admin?${buildQueryString(query, currentPage - 1)}">← Previous</a>`
+    : '<span class="disabled">← Previous</span>'}
+  <span>Page ${currentPage} of ${totalPages}</span>
+  ${hasNext
+    ? `<a href="/admin?${buildQueryString(query, currentPage + 1)}">Next →</a>`
+    : '<span class="disabled">Next →</span>'}
+</nav>
+` : ''}
 
 <form method="post" action="/admin/logout" style="margin-top:24px">
   ${csrf}
