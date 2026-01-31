@@ -6,7 +6,7 @@
     From: Petaluma, California
 
 /* SITE */
-    Last updated: 2026-01-25
+    Last updated: 2026-01-31
     Standards: HTML5, CSS3, JSON-LD, Schema.org
     Components: Cloudflare Workers, KV Storage
     Philosophy: Attribution as Infrastructure.
