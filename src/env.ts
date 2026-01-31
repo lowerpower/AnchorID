@@ -13,12 +13,13 @@ export interface Env {
   ANCHOR_ADMIN_COOKIE?: string;
 
   // Email providers
-  MAIL_SEND_SECRET?: string;  // mycal.net relay
-  RESEND_API_KEY?: string;    // Resend API
-  EMAIL_FROM?: string;        // Sender address (required for Resend)
-  BREVO_API_KEY?: string;     // Brevo API key
-  BREVO_FROM?: string;        // Sender email for Brevo
-  BREVO_DOMAINS?: string;     // Comma-separated domains (e.g., "outlook.com,hotmail.com")
+  MAIL_SEND_SECRET?: string;       // mycal.net relay (or custom endpoint)
+  MYCAL_MAIL_ENDPOINT?: string;    // Custom mail endpoint URL (defaults to https://www.mycal.net/api/send.php)
+  RESEND_API_KEY?: string;         // Resend API
+  EMAIL_FROM?: string;             // Sender address (required for Resend)
+  BREVO_API_KEY?: string;          // Brevo API key
+  BREVO_FROM?: string;             // Sender email for Brevo
+  BREVO_DOMAINS?: string;          // Comma-separated domains (e.g., "outlook.com,hotmail.com")
 
   // TTL + limits
   LOGIN_TTL_SECONDS?: string; // default 900

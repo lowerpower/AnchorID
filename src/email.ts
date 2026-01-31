@@ -4,12 +4,13 @@
  */
 
 export interface EmailEnv {
-  MAIL_SEND_SECRET?: string;  // mycal.net relay
-  RESEND_API_KEY?: string;    // Resend API
-  EMAIL_FROM?: string;        // Sender address (required for Resend)
-  BREVO_API_KEY?: string;     // Brevo API key
-  BREVO_FROM?: string;        // Sender email for Brevo
-  BREVO_DOMAINS?: string;     // Comma-separated domains (e.g., "outlook.com,hotmail.com")
+  MAIL_SEND_SECRET?: string;       // mycal.net relay (or custom endpoint)
+  MYCAL_MAIL_ENDPOINT?: string;    // Custom mail endpoint URL (defaults to https://www.mycal.net/api/send.php)
+  RESEND_API_KEY?: string;         // Resend API
+  EMAIL_FROM?: string;             // Sender address (required for Resend)
+  BREVO_API_KEY?: string;          // Brevo API key
+  BREVO_FROM?: string;             // Sender email for Brevo
+  BREVO_DOMAINS?: string;          // Comma-separated domains (e.g., "outlook.com,hotmail.com")
 }
 
 export interface EmailResult {
@@ -56,8 +57,9 @@ export async function sendEmail(
 
   // Prefer mycal.net relay for non-Brevo domains
   if (env.MAIL_SEND_SECRET) {
+    const endpoint = env.MYCAL_MAIL_ENDPOINT || "https://www.mycal.net/api/send.php";
     console.log(`[EMAIL] Routing ${to.split('@')[1]} → mycal.net`);
-    return sendViaMycal(env.MAIL_SEND_SECRET, to, subject, text);
+    return sendViaMycal(endpoint, env.MAIL_SEND_SECRET, to, subject, text);
   }
 
   // Fallback to Resend
@@ -70,13 +72,14 @@ export async function sendEmail(
 }
 
 async function sendViaMycal(
+  endpoint: string,
   secret: string,
   to: string,
   subject: string,
   body: string
 ): Promise<EmailResult> {
   try {
-    const res = await fetch("https://www.mycal.net/api/send.php", {
+    const res = await fetch(endpoint, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
