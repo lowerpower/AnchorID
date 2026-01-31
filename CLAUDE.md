@@ -31,7 +31,8 @@ AnchorID supports three email providers with intelligent domain-based routing:
 2. **mycal-style mailer** (preferred for other domains)
    - Used when: Brevo doesn't match and mycal-style mailer is configured
    - Configuration: Requires both `MAIL_SEND_SECRET` and `MYCAL_MAIL_ENDPOINT`
-   - Compatible with any endpoint that accepts POST with JSON body `{to, subject, body}` and `X-Mail-Secret` header
+   - Compatible with any endpoint that implements the mycal-style mailer API (see `docs/mycal-style-mailer-spec.md`)
+   - Simple HTTP POST with JSON body `{to, subject, body}` and `X-Mail-Secret` header
 
 3. **Resend** (fallback)
    - Used when: No Brevo match and no mycal-style mailer configuration
@@ -288,6 +289,7 @@ Claim states: `self_asserted` → `verified` or `failed`
 | `docs/threat-model.md` | Security model and mitigations |
 | `docs/faq.md` | Frequently asked questions |
 | `docs/why-anchorid-is-deliberately-boring.md` | Design philosophy |
+| `docs/mycal-style-mailer-spec.md` | Email API specification for compatible endpoints |
 | `todo.md` | MVP implementation checklist |
 
 ---
