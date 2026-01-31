@@ -44,12 +44,13 @@ export interface Env {
   ANCHOR_ADMIN_COOKIE?: string;
 
   // Email providers (at least one required for magic links)
-  MAIL_SEND_SECRET?: string;  // mycal.net relay (preferred)
-  RESEND_API_KEY?: string;    // Resend API (fallback)
-  EMAIL_FROM?: string;        // Sender address (required for Resend)
-  BREVO_API_KEY?: string;     // Brevo API key
-  BREVO_FROM?: string;        // Sender email for Brevo
-  BREVO_DOMAINS?: string;     // Comma-separated domains (e.g., "outlook.com,hotmail.com")
+  MAIL_SEND_SECRET?: string;       // mycal-style mailer secret
+  MYCAL_MAIL_ENDPOINT?: string;    // mycal-style mailer endpoint URL (required if using MAIL_SEND_SECRET)
+  RESEND_API_KEY?: string;         // Resend API (fallback)
+  EMAIL_FROM?: string;             // Sender address (required for Resend)
+  BREVO_API_KEY?: string;          // Brevo API key
+  BREVO_FROM?: string;             // Sender email for Brevo
+  BREVO_DOMAINS?: string;          // Comma-separated domains (e.g., "outlook.com,hotmail.com")
 
   // TTL + limits
   LOGIN_TTL_SECONDS?: string;    // default 900

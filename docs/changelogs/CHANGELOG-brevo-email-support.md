@@ -29,7 +29,7 @@ Intelligent routing based on recipient email domain:
 
 **Routing Priority:**
 1. **Brevo** (if domain matches `BREVO_DOMAINS`)
-2. **mycal.net** (if `MAIL_SEND_SECRET` is set)
+2. **mycal-style mailer** (if `MAIL_SEND_SECRET` and `MYCAL_MAIL_ENDPOINT` are set)
 3. **Resend** (if `RESEND_API_KEY` and `EMAIL_FROM` are set)
 4. **Fail** (no_email_provider)
 
@@ -71,7 +71,7 @@ Added routing decision logging for observability:
 
 ```
 [EMAIL] Routing outlook.com → Brevo
-[EMAIL] Routing gmail.com → mycal.net
+[EMAIL] Routing gmail.com → mycal-style mailer
 [EMAIL] Routing example.com → Resend
 ```
 

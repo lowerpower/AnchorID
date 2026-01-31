@@ -1,6 +1,6 @@
 /**
  * Email provider abstraction for AnchorID magic links.
- * Supports Brevo (domain-based routing), mycal.net relay (preferred), and Resend (fallback).
+ * Supports Brevo (domain-based routing), mycal-style mailer (preferred), and Resend (fallback).
  */
 
 export interface EmailEnv {
