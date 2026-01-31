@@ -57,6 +57,29 @@ method is preferred.
 
 ## Troubleshooting
 
+### Self-Check (Command Line)
+
+**Pro-Tip:** Verify your DNS record yourself before clicking "Verify" in AnchorID.
+
+Open your terminal and run:
+
+```bash
+dig +short TXT _anchorid.example.com
+```
+
+Replace `example.com` with your actual domain. You should see output like:
+
+```
+"anchorid=urn:uuid:4ff7ed97-b78f-4ae6-9011-5af714ee241c"
+```
+
+**If you don't see your UUID in the output, AnchorID won't be able to see it either!**
+
+Alternative using `nslookup`:
+```bash
+nslookup -type=TXT _anchorid.example.com
+```
+
 ### "No TXT records found"
 - Confirm the record exists at `_anchorid.<domain>` (recommended) or at apex (if you chose apex).
 - Confirm you saved/published the DNS changes in your provider.

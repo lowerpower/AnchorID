@@ -127,6 +127,18 @@
 
     <h2>Troubleshooting</h2>
 
+    <h3>Self-Check (Command Line)</h3>
+    <div class="callout">
+      <p><strong>Pro-Tip:</strong> Verify your DNS record yourself before clicking "Verify" in AnchorID.</p>
+      <p>Open your terminal and run:</p>
+      <pre><code>dig +short TXT _anchorid.example.com</code></pre>
+      <p>Replace <code>example.com</code> with your actual domain. You should see output like:</p>
+      <pre><code>"anchorid=urn:uuid:4ff7ed97-b78f-4ae6-9011-5af714ee241c"</code></pre>
+      <p><strong>If you don't see your UUID in the output, AnchorID won't be able to see it either!</strong></p>
+      <p>Alternative using <code>nslookup</code>:</p>
+      <pre><code>nslookup -type=TXT _anchorid.example.com</code></pre>
+    </div>
+
     <h3>"No TXT records found"</h3>
     <ul>
       <li>Confirm the record exists at <code>_anchorid.&lt;domain&gt;</code> (recommended) or at apex (if you chose apex)</li>
