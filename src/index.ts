@@ -14,6 +14,7 @@ import {
   handleAdminRotateToken,
   handleAdminDebugKv,
   handleAdminDelete,
+  handleAdminBackup,
 } from "./admin/handlers";
 
 
@@ -312,6 +313,7 @@ export default {
     const mDelete = path.match(/^\/admin\/delete\/([0-9a-f-]{36})$/i);
     if (mDelete && request.method === "POST") return handleAdminDelete(request, env, mDelete[1].toLowerCase());
 
+    if (path === "/admin/backup" && request.method === "GET") return handleAdminBackup(request, env);
 
     // Homepage
     if (path === "/" || path === "/index.html") {

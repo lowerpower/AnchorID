@@ -441,6 +441,13 @@ export async function handleAdminHome(req: Request, env: Env): Promise<Response>
 <style>
   .alert { padding:12px 14px; border-radius:10px; margin-bottom:14px; }
   .alert-success { background:#d4edda; border:1px solid #c3e6cb; color:#155724; }
+  .alert-warning { background:#fff3cd; border:1px solid #ffc107; color:#856404; }
+  .backup-section { background:#f8f9fa; border:1px solid #dee2e6; padding:14px; border-radius:10px; margin-bottom:20px; }
+  .backup-section h2 { margin:0 0 8px 0; font-size:16px; }
+  .backup-section p { margin:0 0 10px 0; font-size:14px; color:#555; }
+  .backup-section button { padding:8px 16px; background:#111; color:#fff; border:1px solid #111; border-radius:6px; cursor:pointer; font:inherit; }
+  .backup-section button:hover { background:#333; }
+  .backup-section .hint { font-size:12px; color:#666; margin-top:8px; }
   .search-box { margin-bottom:20px; }
   .search-box input { padding:8px 12px; width:400px; max-width:100%; border:1px solid #ccc; border-radius:6px; font:inherit; }
   .search-box button { padding:8px 16px; margin-left:8px; border:1px solid #111; background:#111; color:#fff; border-radius:6px; cursor:pointer; font:inherit; }
@@ -457,6 +464,18 @@ export async function handleAdminHome(req: Request, env: Env): Promise<Response>
 ${deletedName ? `<div class="alert alert-success">✓ Profile deleted: <strong>${escapeHtml(deletedName)}</strong></div>` : ""}
 
 <p><a href="/admin/new">Create new profile</a></p>
+
+<div class="backup-section">
+  <h2>📥 Database Backup</h2>
+  <p>Download a complete backup of all profiles, claims, and audit logs.</p>
+  <form method="get" action="/admin/backup" style="margin:0">
+    <button type="submit">Download Full Backup</button>
+    <span class="hint">JSON format · ${total} profile${total !== 1 ? 's' : ''}</span>
+  </form>
+  <div class="alert alert-warning" style="margin-top:10px;font-size:13px">
+    ⚠️ <strong>Security Notice:</strong> This backup contains sensitive data including email hashes and authentication credentials. Store securely.
+  </div>
+</div>
 
 <form method="get" action="/admin" class="search-box">
   <input
@@ -1628,6 +1647,58 @@ export async function handleAdminDelete(
     headers: {
       Location: `/admin?deleted=${encodeURIComponent(name)}`,
       "cache-control": "no-store"
+    },
+  });
+}
+
+// GET /admin/backup - Download complete database backup as JSON
+export async function handleAdminBackup(req: Request, env: Env): Promise<Response> {
+  const denied = requireAdminCookie(req, env);
+  if (denied) return denied;
+
+  // Fetch all profile UUIDs
+  const uuids = await fetchAllProfileUUIDs(env);
+
+  // Build backup metadata
+  const backup = {
+    metadata: {
+      timestamp: new Date().toISOString(),
+      anchorid_version: "1.0",
+      backup_type: "full",
+      profile_count: uuids.length,
+      generator: "AnchorID Admin Backup"
+    },
+    profiles: [] as any[]
+  };
+
+  // Fetch each profile with associated data
+  for (const uuid of uuids) {
+    const profile = await env.ANCHOR_KV.get(`profile:${uuid}`, { type: "json" });
+    const claims = await env.ANCHOR_KV.get(`claims:${uuid}`, { type: "json" }) || [];
+    const audit = await env.ANCHOR_KV.get(`audit:${uuid}`, { type: "json" }) || [];
+
+    if (profile) {
+      backup.profiles.push({
+        uuid,
+        profile,
+        claims,
+        audit,
+      });
+    }
+  }
+
+  // Generate filename with timestamp
+  const timestamp = new Date().toISOString().replace(/:/g, '-').replace(/\..+/, '');
+  const filename = `anchorid-backup-${timestamp}.json`;
+
+  // Return as downloadable JSON file
+  return new Response(JSON.stringify(backup, null, 2), {
+    status: 200,
+    headers: {
+      "content-type": "application/json; charset=utf-8",
+      "content-disposition": `attachment; filename="${filename}"`,
+      "cache-control": "no-store",
+      "x-content-type-options": "nosniff",
     },
   });
 }
