@@ -14,8 +14,8 @@ npm run cf-typegen   # Generate Cloudflare types
 **Secrets** (set via `npx wrangler secret put <NAME>`):
 - `ANCHOR_ADMIN_TOKEN` — Admin API access
 - `RESEND_API_KEY` — Email delivery (Resend fallback)
-- `MAIL_SEND_SECRET` — Email delivery (mycal.net or custom endpoint)
-- `MYCAL_MAIL_ENDPOINT` — Custom mail endpoint URL (optional, defaults to https://www.mycal.net/api/send.php)
+- `MAIL_SEND_SECRET` — mycal-style mailer secret (required with MYCAL_MAIL_ENDPOINT)
+- `MYCAL_MAIL_ENDPOINT` — mycal-style mailer endpoint URL (required with MAIL_SEND_SECRET)
 - `BREVO_API_KEY` — Email delivery (Brevo for specified domains)
 - `BREVO_FROM` — Sender email address for Brevo
 - `BREVO_DOMAINS` — Comma-separated domains for Brevo routing (e.g., "outlook.com,hotmail.com")
@@ -28,13 +28,13 @@ AnchorID supports three email providers with intelligent domain-based routing:
    - Supports subdomain matching: `outlook.com` matches both `user@outlook.com` and `user@mail.outlook.com`
    - Configuration: Requires `BREVO_API_KEY`, `BREVO_FROM`, and `BREVO_DOMAINS`
 
-2. **mycal.net relay** (preferred for other domains)
-   - Used when: Brevo doesn't match and `MAIL_SEND_SECRET` is configured
-   - Configuration: Requires `MAIL_SEND_SECRET`
-   - Optional: `MYCAL_MAIL_ENDPOINT` to use custom endpoint (defaults to https://www.mycal.net/api/send.php)
+2. **mycal-style mailer** (preferred for other domains)
+   - Used when: Brevo doesn't match and mycal-style mailer is configured
+   - Configuration: Requires both `MAIL_SEND_SECRET` and `MYCAL_MAIL_ENDPOINT`
+   - Compatible with any endpoint that accepts POST with JSON body `{to, subject, body}` and `X-Mail-Secret` header
 
 3. **Resend** (fallback)
-   - Used when: No Brevo match and no mycal.net configuration
+   - Used when: No Brevo match and no mycal-style mailer configuration
    - Configuration: Requires `RESEND_API_KEY` and `EMAIL_FROM`
 
 **Example Configuration**:
@@ -43,6 +43,10 @@ AnchorID supports three email providers with intelligent domain-based routing:
 npx wrangler secret put BREVO_API_KEY      # Paste: xkeysib-...
 npx wrangler secret put BREVO_FROM         # Paste: noreply@anchorid.net
 npx wrangler secret put BREVO_DOMAINS      # Paste: outlook.com,hotmail.com,live.com
+
+# Configure mycal-style mailer for other domains
+npx wrangler secret put MAIL_SEND_SECRET       # Paste: your-secret-key
+npx wrangler secret put MYCAL_MAIL_ENDPOINT    # Paste: https://example.com/api/send
 ```
 
 **KV Operations**:
@@ -215,8 +219,8 @@ npx wrangler kv key put --remote --binding ANCHOR_KV "page:sitemap" --path ./src
 | `ANCHOR_ADMIN_TOKEN` | — | Admin API token (secret) |
 | `RESEND_API_KEY` | — | Resend email API key (secret) |
 | `EMAIL_FROM` | — | Sender address for Resend (required if using Resend) |
-| `MAIL_SEND_SECRET` | — | mycal.net email relay secret (secret) |
-| `MYCAL_MAIL_ENDPOINT` | https://www.mycal.net/api/send.php | Custom mail endpoint URL (optional) |
+| `MAIL_SEND_SECRET` | — | mycal-style mailer secret (required with MYCAL_MAIL_ENDPOINT) |
+| `MYCAL_MAIL_ENDPOINT` | — | mycal-style mailer endpoint URL (required with MAIL_SEND_SECRET) |
 | `BREVO_API_KEY` | — | Brevo email API key (secret) |
 | `BREVO_FROM` | — | Sender address for Brevo (required if using Brevo) |
 | `BREVO_DOMAINS` | — | Comma-separated domains for Brevo routing (e.g., "outlook.com,hotmail.com") |

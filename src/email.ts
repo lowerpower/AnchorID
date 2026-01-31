@@ -4,8 +4,8 @@
  */
 
 export interface EmailEnv {
-  MAIL_SEND_SECRET?: string;       // mycal.net relay (or custom endpoint)
-  MYCAL_MAIL_ENDPOINT?: string;    // Custom mail endpoint URL (defaults to https://www.mycal.net/api/send.php)
+  MAIL_SEND_SECRET?: string;       // mycal-style mailer secret
+  MYCAL_MAIL_ENDPOINT?: string;    // mycal-style mailer endpoint URL (required if using MAIL_SEND_SECRET)
   RESEND_API_KEY?: string;         // Resend API
   EMAIL_FROM?: string;             // Sender address (required for Resend)
   BREVO_API_KEY?: string;          // Brevo API key
@@ -23,7 +23,7 @@ export interface EmailResult {
  */
 export function hasEmailConfig(env: EmailEnv): boolean {
   return !!(
-    env.MAIL_SEND_SECRET ||
+    (env.MAIL_SEND_SECRET && env.MYCAL_MAIL_ENDPOINT) ||
     (env.BREVO_API_KEY && env.BREVO_FROM) ||
     (env.RESEND_API_KEY && env.EMAIL_FROM)
   );
@@ -55,11 +55,10 @@ export async function sendEmail(
     }
   }
 
-  // Prefer mycal.net relay for non-Brevo domains
-  if (env.MAIL_SEND_SECRET) {
-    const endpoint = env.MYCAL_MAIL_ENDPOINT || "https://www.mycal.net/api/send.php";
-    console.log(`[EMAIL] Routing ${to.split('@')[1]} → mycal.net`);
-    return sendViaMycal(endpoint, env.MAIL_SEND_SECRET, to, subject, text);
+  // Prefer mycal-style mailer for non-Brevo domains
+  if (env.MAIL_SEND_SECRET && env.MYCAL_MAIL_ENDPOINT) {
+    console.log(`[EMAIL] Routing ${to.split('@')[1]} → mycal-style mailer`);
+    return sendViaMycal(env.MYCAL_MAIL_ENDPOINT, env.MAIL_SEND_SECRET, to, subject, text);
   }
 
   // Fallback to Resend

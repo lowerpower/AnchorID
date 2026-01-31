@@ -13,8 +13,8 @@ export interface Env {
   ANCHOR_ADMIN_COOKIE?: string;
 
   // Email providers
-  MAIL_SEND_SECRET?: string;       // mycal.net relay (or custom endpoint)
-  MYCAL_MAIL_ENDPOINT?: string;    // Custom mail endpoint URL (defaults to https://www.mycal.net/api/send.php)
+  MAIL_SEND_SECRET?: string;       // mycal-style mailer secret
+  MYCAL_MAIL_ENDPOINT?: string;    // mycal-style mailer endpoint URL (required if using MAIL_SEND_SECRET)
   RESEND_API_KEY?: string;         // Resend API
   EMAIL_FROM?: string;             // Sender address (required for Resend)
   BREVO_API_KEY?: string;          // Brevo API key
