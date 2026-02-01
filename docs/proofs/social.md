@@ -1,16 +1,20 @@
 # docs/proofs/social.md
 
-# Social Profile Proof
+# Public Profile Proof
 
-Social profile proof lets you prove you control a social media account, forum profile, or any public profile page by adding your AnchorID resolver URL to your bio/description.
+Public profile proof lets you verify control of **any publicly accessible profile page** by adding your AnchorID resolver URL to your bio/description.
 
 This is an **account-control** proof. It demonstrates you control an account at a moment in time, not legal identity.
+
+**About the name:** Despite being called "social proof," this method works with **any public HTTPS profile page** — not just social media. It applies to forums, community sites, personal websites with public bios, or any platform where you can edit a publicly visible profile field.
 
 ---
 
 ## Supported Platforms
 
-Social proof works with any public profile accessible via HTTPS without authentication:
+**This works with any public profile accessible via HTTPS without authentication.**
+
+Examples include:
 
 - **Mastodon / Fediverse** - ActivityPub instances
 - **Forums** - Discourse, phpBB, custom forums
@@ -130,14 +134,18 @@ Make sure the handle format is correct:
 
 ---
 
-## What social proof is good for
+## What public profile proof is good for
 
-- **Community identity** - Link your AnchorID to forum accounts
-- **Social presence** - Connect Mastodon/Fediverse profiles
-- **Distributed identity** - Multiple profiles across platforms
+Use this proof type to verify control of:
+
+- **Social media accounts** - Mastodon, Fediverse, Bluesky
+- **Community platforms** - Forums, Stack Overflow, Hacker News
+- **Professional networks** - LinkedIn, AngelList, or industry-specific platforms
+- **Personal sites with bios** - Portfolio sites, About pages, author profiles
+- **Distributed identity** - Multiple profiles across different platforms
 - **Attribution signals** - Help others find your canonical identity
 
-**Proof strength:** Social profile proof is a **moderate signal**. It proves you control an account but not domain ownership.
+**Proof strength:** Public profile proof is a **moderate signal**. It proves you control an account but not domain ownership.
 
 For stronger signals, combine with:
 - [Website proof](website.md) (domain control)

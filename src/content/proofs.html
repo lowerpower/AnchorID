@@ -325,8 +325,8 @@
     {
       "@type": "HowTo",
       "@id": "https://anchorid.net/proofs#social-proof",
-      "name": "How to Create a Social Profile Proof",
-      "description": "Prove you control a social profile by adding your AnchorID to your bio or description",
+      "name": "How to Create a Public Profile Proof",
+      "description": "Verify control of any public profile page by adding your AnchorID to your bio or description",
       "author": {
         "@id": "https://blog.mycal.net/about/#mycal"
       },
@@ -376,7 +376,7 @@
       "@type": "DefinedTerm",
       "@id": "https://anchorid.net/proofs#proof-strength",
       "name": "Proof Strength",
-      "description": "The level of confidence a proof provides about identity ownership. Stronger proofs like DNS + Website require more technical control and are harder to forge. The hierarchy from strongest to good: DNS + Website (strongest), DNS only (strong), Website only (strong), GitHub (good), Social Profile (good).",
+      "description": "The level of confidence a proof provides about identity ownership. Stronger proofs like DNS + Website require more technical control and are harder to forge. The hierarchy from strongest to good: DNS + Website (strongest), DNS only (strong), Website only (strong), GitHub (good), Public Profile (good).",
       "inDefinedTermSet": "https://anchorid.net/proofs"
     },
     {
@@ -523,21 +523,20 @@ Value: anchorid=urn:uuid:&lt;your-uuid&gt;</code></pre>
     </div>
 
     <div class="proof-card">
-      <h3>Social Profile Proof <span class="status good">Good Signal</span></h3>
+      <h3>Public Profile Proof <span class="status good">Good Signal</span></h3>
 
-      <p>Prove you control a social profile by adding your AnchorID to your bio/description.</p>
+      <p>Verify control of any public profile page by adding your AnchorID to your bio/description.</p>
 
-      <p><strong>Good for:</strong></p>
+      <p><strong>Works with any public HTTPS profile:</strong></p>
       <ul>
-        <li>Mastodon / Fediverse profiles</li>
-        <li>Forum accounts and community platforms</li>
-        <li>Distributed social identity</li>
-        <li>Public profile pages</li>
+        <li>Social media (Mastodon, Fediverse, Bluesky)</li>
+        <li>Forums and community platforms</li>
+        <li>Professional networks (LinkedIn, etc.)</li>
+        <li>Personal sites with public bios</li>
       </ul>
 
-      <p><strong>Supported platforms:</strong></p>
+      <p><strong>Special support for:</strong></p>
       <ul>
-        <li>Any public HTTPS profile with editable bio</li>
         <li>Fediverse handles: <code>@user@instance.social</code></li>
       </ul>
 
@@ -583,9 +582,9 @@ Value: anchorid=urn:uuid:&lt;your-uuid&gt;</code></pre>
           <td style="padding: 8px;">Developers, technical work</td>
         </tr>
         <tr>
-          <td style="padding: 8px;">Social Profile</td>
+          <td style="padding: 8px;">Public Profile</td>
           <td style="padding: 8px;">Good</td>
-          <td style="padding: 8px;">Community identity, social presence</td>
+          <td style="padding: 8px;">Any public profile page, social media, forums</td>
         </tr>
       </tbody>
     </table>

@@ -49,6 +49,291 @@
     th, td { text-align: left; padding: 8px; border-bottom: 1px solid var(--rule); }
     th { font-weight: 500; }
   </style>
+
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "Person",
+          "@id": "https://blog.mycal.net/about/#mycal",
+          "identifier": {
+            "@type": "PropertyValue",
+            "propertyID": "canonical-uuid",
+            "value": "urn:uuid:4ff7ed97-b78f-4ae6-9011-5af714ee241c"
+          },
+          "name": "Mike Johnson",
+          "alternateName": ["Mycal", "Michael Johnson"],
+          "url": "https://blog.mycal.net/about/",
+          "sameAs": [
+            "https://anchorid.net/resolve/4ff7ed97-b78f-4ae6-9011-5af714ee241c",
+            "https://github.com/lowerpower",
+            "https://music.mycal.net"
+          ]
+        },
+        {
+          "@type": "Organization",
+          "@id": "https://anchorid.net/#org",
+          "identifier": {
+            "@type": "PropertyValue",
+            "propertyID": "canonical-uuid",
+            "value": "urn:uuid:4c785577-9f55-4a22-a80b-dd1f4d9b4658"
+          },
+          "name": "AnchorID",
+          "alternateName": "AnchorID.net",
+          "description": "A permanent attribution anchor for long-lived work. Durable, UUID-based attribution that survives platform changes and outlives any single service.",
+          "url": "https://anchorid.net",
+          "foundingDate": "2026-01-11",
+          "founder": {
+            "@id": "https://blog.mycal.net/about/#mycal"
+          },
+          "sameAs": [
+            "https://anchorid.net/resolve/4c785577-9f55-4a22-a80b-dd1f4d9b4658",
+            "https://github.com/lowerpower/AnchorID"
+          ],
+          "slogan": "Attribution as infrastructure, not a profile"
+        },
+        {
+          "@type": "WebSite",
+          "@id": "https://anchorid.net/#website",
+          "name": "AnchorID",
+          "url": "https://anchorid.net",
+          "publisher": {
+            "@id": "https://anchorid.net/#org"
+          },
+          "creator": {
+            "@id": "https://blog.mycal.net/about/#mycal"
+          },
+          "copyrightYear": 2026,
+          "copyrightHolder": {
+            "@id": "https://anchorid.net/#org"
+          },
+          "inLanguage": "en"
+        },
+        {
+          "@type": "SoftwareApplication",
+          "@id": "https://anchorid.net/#service",
+          "name": "AnchorID Service",
+          "applicationCategory": "Attribution Infrastructure",
+          "operatingSystem": "Web",
+          "description": "A UUID-based attribution service that provides permanent, machine-readable attribution anchors for long-lived work. Enables work and ideas to be attributed to the same enduring source across time, platforms, and system failures.",
+          "offers": {
+            "@type": "Offer",
+            "price": "0",
+            "priceCurrency": "USD"
+          },
+          "provider": {
+            "@id": "https://anchorid.net/#org"
+          },
+          "url": "https://anchorid.net"
+        },
+        {
+          "@type": "WebPage",
+          "@id": "https://anchorid.net/proofs/website#webpage",
+          "url": "https://anchorid.net/proofs/website",
+          "name": "Website Proof Guide",
+          "description": "Prove you control a website by publishing a text file at a well-known location. Step-by-step guide for website proof verification.",
+          "isPartOf": {
+            "@id": "https://anchorid.net/#website"
+          },
+          "about": {
+            "@id": "https://anchorid.net/proofs/website#howto"
+          },
+          "publisher": {
+            "@id": "https://anchorid.net/#org"
+          },
+          "inLanguage": "en",
+          "breadcrumb": {
+            "@type": "BreadcrumbList",
+            "itemListElement": [
+              {
+                "@type": "ListItem",
+                "position": 1,
+                "name": "Home",
+                "item": "https://anchorid.net/"
+              },
+              {
+                "@type": "ListItem",
+                "position": 2,
+                "name": "Proofs",
+                "item": "https://anchorid.net/proofs"
+              },
+              {
+                "@type": "ListItem",
+                "position": 3,
+                "name": "Website Proof Guide",
+                "item": "https://anchorid.net/proofs/website"
+              }
+            ]
+          }
+        },
+        {
+          "@type": "HowTo",
+          "@id": "https://anchorid.net/proofs/website#howto",
+          "name": "How to Create a Website Proof for AnchorID",
+          "description": "Prove you control a website by publishing a text file at /.well-known/anchorid.txt. This follows RFC 8615 standards for well-known URIs and provides strong signal for website ownership.",
+          "author": {
+            "@id": "https://blog.mycal.net/about/#mycal"
+          },
+          "publisher": {
+            "@id": "https://anchorid.net/#org"
+          },
+          "inLanguage": "en",
+          "estimatedCost": {
+            "@type": "MonetaryAmount",
+            "currency": "USD",
+            "value": "0"
+          },
+          "totalTime": "PT3M",
+          "step": [
+            {
+              "@type": "HowToStep",
+              "name": "Create the .well-known directory",
+              "text": "Create a directory named '.well-known' in the root of your website if it doesn't already exist. This directory is a standard location for site-wide metadata as defined in RFC 8615.",
+              "url": "https://anchorid.net/proofs/website#setup"
+            },
+            {
+              "@type": "HowToStep",
+              "name": "Create the proof file",
+              "text": "Create a text file named 'anchorid.txt' in the .well-known directory. The file should contain only your resolver URL: https://anchorid.net/resolve/<your-uuid>",
+              "url": "https://anchorid.net/proofs/website#setup"
+            },
+            {
+              "@type": "HowToStep",
+              "name": "Make it publicly accessible",
+              "text": "Ensure the file is accessible at https://example.com/.well-known/anchorid.txt. Requirements: must be served over HTTPS, publicly accessible (no authentication), return 200 OK status, and be readable as text/plain or any text type.",
+              "url": "https://anchorid.net/proofs/website#setup"
+            },
+            {
+              "@type": "HowToStep",
+              "name": "Test accessibility",
+              "text": "Visit https://example.com/.well-known/anchorid.txt in your browser to confirm the file is accessible and contains your resolver URL.",
+              "url": "https://anchorid.net/proofs/website#setup"
+            },
+            {
+              "@type": "HowToStep",
+              "name": "Create claim in AnchorID",
+              "text": "Log in to AnchorID at /login, scroll to the 'Identity Claims' section, click 'Add New Claim', choose 'Website' proof type, and enter your domain (example.com).",
+              "url": "https://anchorid.net/proofs/website#setup"
+            },
+            {
+              "@type": "HowToStep",
+              "name": "Verify the claim",
+              "text": "Click 'Verify' next to your website claim. AnchorID will fetch https://example.com/.well-known/anchorid.txt and check that it contains your resolver URL.",
+              "url": "https://anchorid.net/proofs/website#setup"
+            }
+          ],
+          "tool": [
+            {
+              "@type": "HowToTool",
+              "name": "Web server with file upload access"
+            },
+            {
+              "@type": "HowToTool",
+              "name": "Text editor"
+            }
+          ],
+          "supply": [
+            {
+              "@type": "HowToSupply",
+              "name": "Your AnchorID UUID"
+            },
+            {
+              "@type": "HowToSupply",
+              "name": "Valid HTTPS certificate"
+            }
+          ]
+        },
+        {
+          "@type": "TechArticle",
+          "@id": "https://anchorid.net/proofs/website#article",
+          "headline": "Website Proof Guide",
+          "description": "Complete guide to proving website control through AnchorID verification using .well-known URIs. Includes setup instructions, troubleshooting, web server configuration, and standards compliance.",
+          "author": {
+            "@id": "https://blog.mycal.net/about/#mycal"
+          },
+          "publisher": {
+            "@id": "https://anchorid.net/#org"
+          },
+          "datePublished": "2026-01-11",
+          "dateModified": "2026-01-25",
+          "inLanguage": "en",
+          "about": [
+            "Website ownership verification",
+            "Well-known URIs",
+            "RFC 8615 compliance",
+            "Site metadata"
+          ],
+          "teaches": [
+            "How to use .well-known directory for identity verification following RFC 8615",
+            "Website proof provides 'strong signal' strength for ownership verification",
+            "The verification process: AnchorID fetches /.well-known/anchorid.txt over HTTPS and checks for resolver URL",
+            "Multiple AnchorIDs can be verified from the same domain by listing multiple resolver URLs",
+            "Combining website proof with DNS proof creates the strongest ownership signal",
+            "Root domains and subdomains each require separate proof files"
+          ],
+          "citation": {
+            "@type": "TechArticle",
+            "name": "RFC 8615: Well-Known Uniform Resource Identifiers (URIs)",
+            "url": "https://www.rfc-editor.org/rfc/rfc8615.html"
+          }
+        },
+        {
+          "@type": "FAQPage",
+          "@id": "https://anchorid.net/proofs/website#faq",
+          "mainEntity": [
+            {
+              "@type": "Question",
+              "name": "What does website proof verify?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Website proof verifies that you control a website. It does not prove legal identity. The verification checks that you can publish a file at /.well-known/anchorid.txt containing your AnchorID resolver URL, demonstrating you have access to the web server."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "Can I verify multiple AnchorIDs from the same website?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Yes. Include multiple resolver URLs in the anchorid.txt file, one per line. Each person can then verify their respective claim against the same domain."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "Why use .well-known directory?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "The .well-known directory is defined in RFC 8615 as a standard location for site-wide metadata. Using this convention ensures discoverability and compatibility with existing web infrastructure. It's the same pattern used by services like Let's Encrypt, security.txt, and other web standards."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "What signal strength does website proof provide?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Website proof provides a 'strong signal' strength. It's particularly valuable for personal websites, blogs, company websites, and project homepages. For the strongest verification, combine website proof with DNS proof (both together create the strongest signal)."
+              }
+            }
+          ]
+        },
+        {
+          "@type": "DefinedTerm",
+          "@id": "https://anchorid.net/proofs/website#well-known-uri",
+          "name": "Well-Known URI",
+          "description": "A standardized location for site-wide metadata defined in RFC 8615. The /.well-known/ path prefix is reserved for resources that need to be discoverable across an entire origin. AnchorID uses /.well-known/anchorid.txt following this convention for maximum compatibility and discoverability.",
+          "inDefinedTermSet": "https://anchorid.net/proofs/website"
+        },
+        {
+          "@type": "DefinedTerm",
+          "@id": "https://anchorid.net/proofs/website#website-control",
+          "name": "Website Control Proof",
+          "description": "Verification method that demonstrates the ability to publish files on a web server at a specific domain. Unlike DNS control which requires domain registrar access, website control only requires web server file upload access. This makes it accessible to users who may not control DNS but do manage website content.",
+          "inDefinedTermSet": "https://anchorid.net/proofs/website"
+        }
+      ]
+    }
+    </script>
+
 </head>
 
 <body>

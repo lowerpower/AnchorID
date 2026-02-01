@@ -22,11 +22,11 @@ Prove ownership of a GitHub account by adding AnchorID to profile README
 **Signal strength:** Good
 **Best for:** Developers, open source contributors, technical identity
 
-### [Social Profile Proof](./social.md)
-Prove ownership of a social profile by adding AnchorID to your bio
+### [Public Profile Proof](./social.md)
+Verify control of any public profile page by adding AnchorID to your bio
 
 **Signal strength:** Good
-**Best for:** Mastodon/Fediverse, forums, community platforms, social presence
+**Best for:** Social media, forums, community platforms, any public HTTPS profile
 
 ## Overview
 
