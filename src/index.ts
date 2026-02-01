@@ -36,6 +36,7 @@ import {
   handleGetClaimsHtml,
   handlePostClaim,
   handlePostClaimVerify,
+  handlePostClaimDelete,
 } from "./claims/handlers";
 
 import { loadClaims } from "./claims/store";
@@ -881,6 +882,90 @@ https://anchorid.net/resolve/4ff7ed97-b78f-4ae6-9011-5af714ee241c
 					headers: request.headers,
 					body: bodyText,
 				}), env as any);
+			}
+		}
+
+		return new Response("Unauthorized", { status: 401 });
+	}
+
+	// Token-gated: delete claim (admin or user for own profile)
+	if (path === "/claim/delete" && request.method === "POST") {
+		// Per-IP rate limit (same as claim creation to prevent deletion spam)
+		const ipLimit = parseInt(env.IP_CLAIM_RL_PER_HOUR || "30", 10);
+		const ipRateLimited = await checkIpRateLimit(request, env, "ip:claim", ipLimit);
+		if (ipRateLimited) return ipRateLimited;
+
+		// Parse body to get UUID
+		const bodyText = await request.text();
+		const payload: any = JSON.parse(bodyText);
+		const targetUuid = String(payload.uuid || "").trim().toLowerCase();
+
+		// Track auth method for audit logging
+		let authMethod: "admin" | "session_token" = "session_token";
+
+		// Check admin auth first
+		const adminDenied = requireAdmin(request, env);
+		if (!adminDenied) {
+			authMethod = "admin";
+			// Admin has access to all profiles (skip per-UUID rate limit for admins)
+			const response = await handlePostClaimDelete(new Request(request.url, {
+				method: request.method,
+				headers: request.headers,
+				body: bodyText,
+			}), env as any);
+
+			// Add audit log if deletion was successful
+			if (response.ok) {
+				const result: any = await response.clone().json();
+				await appendAuditLog(
+					env,
+					targetUuid,
+					request,
+					"claim_deleted",
+					authMethod,
+					[],
+					`Deleted ${result.deletedClaim?.type} claim for ${result.deletedClaim?.url}`
+				);
+			}
+
+			return response;
+		}
+
+		// Not admin - check if user session for own profile
+		const authHeader = request.headers.get("authorization") || "";
+		const sessionToken = authHeader.replace(/^Bearer\s+/i, "").trim();
+
+		if (sessionToken) {
+			const session = (await env.ANCHOR_KV.get(`login:${sessionToken}`, { type: "json" })) as any | null;
+			if (session?.uuid && String(session.uuid).toLowerCase() === targetUuid) {
+				// User authenticated for their own profile - use moderate rate limit for deletions
+				const maxPerHour = parseInt(env.CLAIM_RL_PER_HOUR || "10", 10);
+				const rl = await incrWithTtl(env.ANCHOR_KV, `rl:claim:${targetUuid}`, 3600);
+				if (rl > maxPerHour) {
+					return json({ error: "rate_limited", message: "Too many claim operations" }, 429, { "cache-control": "no-store", "retry-after": "3600" });
+				}
+
+				const response = await handlePostClaimDelete(new Request(request.url, {
+					method: request.method,
+					headers: request.headers,
+					body: bodyText,
+				}), env as any);
+
+				// Add audit log if deletion was successful
+				if (response.ok) {
+					const result: any = await response.clone().json();
+					await appendAuditLog(
+						env,
+						targetUuid,
+						request,
+						"claim_deleted",
+						authMethod,
+						[],
+						`Deleted ${result.deletedClaim?.type} claim for ${result.deletedClaim?.url}`
+					);
+				}
+
+				return response;
 			}
 		}
 
@@ -2058,10 +2143,20 @@ ${claims.length === 0 ? `<div style="background:#f6f6f6;padding:14px;border-radi
           ${c.failReason ? `<div style="margin-top:8px;color:#721c24;font-size:12px">Error: ${escapeHtml(c.failReason)}</div>` : ""}
           ${c.lastCheckedAt ? `<div style="margin-top:6px;font-size:11px;color:#777">Last checked: ${escapeHtml(c.lastCheckedAt)}</div>` : ""}
         </div>
-        <button type="button" class="verify-claim-btn" data-claim-id="${escapeHtml(c.id)}"
-          style="padding:6px 12px;font-size:12px;margin-left:10px;white-space:nowrap;cursor:pointer;background:#111;color:#fff;border:1px solid #111;border-radius:6px">
-          Verify
-        </button>
+        <div style="display:flex;flex-direction:column;gap:6px;margin-left:10px">
+          <button type="button" class="verify-claim-btn" data-claim-id="${escapeHtml(c.id)}"
+            style="padding:6px 12px;font-size:12px;white-space:nowrap;cursor:pointer;background:#111;color:#fff;border:1px solid #111;border-radius:6px">
+            Verify
+          </button>
+          <button type="button" class="delete-claim-btn"
+            data-claim-id="${escapeHtml(c.id)}"
+            data-claim-type="${escapeHtml(typeDisplayName)}"
+            data-claim-url="${escapeHtml(c.url)}"
+            data-claim-status="${escapeHtml(c.status)}"
+            style="padding:6px 12px;font-size:12px;white-space:nowrap;cursor:pointer;background:#fff;color:#856404;border:1px solid #ddd;border-radius:6px">
+            Delete
+          </button>
+        </div>
       </div>
     </div>`;
   }).join("")}
@@ -2106,6 +2201,34 @@ ${claims.length === 0 ? `<div style="background:#f6f6f6;padding:14px;border-radi
   AnchorID favors durability over convenience.<br>
   Most changes are reversible. The identifier is not.
 </div>
+
+<!-- Delete Claim Confirmation Modal -->
+<div id="deleteClaimModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:10000;justify-content:center;align-items:center">
+  <div style="background:#fff;border-radius:12px;padding:24px;max-width:500px;width:90%;box-shadow:0 4px 20px rgba(0,0,0,0.15)">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <h3 style="margin:0;font-size:18px;font-weight:600;color:#721c24">Delete this claim?</h3>
+      <button id="closeDeleteModal" style="background:none;border:none;font-size:24px;cursor:pointer;color:#999;line-height:1">&times;</button>
+    </div>
+
+    <div id="deleteModalClaimInfo" style="background:#f8f9fa;padding:14px;border-radius:6px;border:1px solid #e0e0e0;margin-bottom:16px;font-size:13px">
+      <!-- Claim details will be inserted here -->
+    </div>
+
+    <div style="background:#fff3cd;border:1px solid #ffc107;color:#856404;padding:12px;border-radius:6px;margin-bottom:20px;font-size:13px">
+      <strong>⚠️ Warning:</strong> This will permanently remove this claim from your AnchorID record. This action cannot be undone.
+    </div>
+
+    <div style="display:flex;gap:12px;justify-content:flex-end">
+      <button id="cancelDeleteBtn" style="padding:10px 20px;background:#fff;color:#333;border:1px solid #ddd;border-radius:6px;cursor:pointer;font-size:14px;font-weight:500">
+        Cancel
+      </button>
+      <button id="confirmDeleteBtn" style="padding:10px 20px;background:#dc3545;color:#fff;border:1px solid #dc3545;border-radius:6px;cursor:pointer;font-size:14px;font-weight:500">
+        Delete Claim
+      </button>
+    </div>
+  </div>
+</div>
+
 <script>
 // Claim form handling
 (function() {
@@ -2205,6 +2328,89 @@ ${claims.length === 0 ? `<div style="background:#f6f6f6;padding:14px;border-radi
         this.disabled = false;
       }
     });
+  });
+
+  // Delete claim buttons with two-step confirmation
+  const deleteModal = document.getElementById("deleteClaimModal");
+  const deleteModalClaimInfo = document.getElementById("deleteModalClaimInfo");
+  const confirmDeleteBtn = document.getElementById("confirmDeleteBtn");
+  const cancelDeleteBtn = document.getElementById("cancelDeleteBtn");
+  const closeModalBtn = document.getElementById("closeDeleteModal");
+  let pendingDeleteClaimId = null;
+
+  document.querySelectorAll(".delete-claim-btn").forEach(btn => {
+    btn.addEventListener("click", function() {
+      const claimId = this.getAttribute("data-claim-id");
+      const claimType = this.getAttribute("data-claim-type");
+      const claimUrl = this.getAttribute("data-claim-url");
+      const claimStatus = this.getAttribute("data-claim-status");
+
+      pendingDeleteClaimId = claimId;
+
+      // Populate modal with claim details
+      deleteModalClaimInfo.innerHTML = \`
+        <div style="margin-bottom:12px"><strong>Claim Type:</strong> \${claimType}</div>
+        <div style="margin-bottom:12px"><strong>URL:</strong> <code style="font-size:13px;word-break:break-all">\${claimUrl}</code></div>
+        <div style="margin-bottom:12px"><strong>Status:</strong> \${claimStatus}</div>
+      \`;
+
+      // Show modal
+      deleteModal.style.display = "flex";
+    });
+  });
+
+  // Cancel deletion
+  function closeDeleteModal() {
+    deleteModal.style.display = "none";
+    pendingDeleteClaimId = null;
+  }
+
+  cancelDeleteBtn.addEventListener("click", closeDeleteModal);
+  closeModalBtn.addEventListener("click", closeDeleteModal);
+
+  // Close modal on outside click
+  deleteModal.addEventListener("click", function(e) {
+    if (e.target === deleteModal) {
+      closeDeleteModal();
+    }
+  });
+
+  // Confirm deletion
+  confirmDeleteBtn.addEventListener("click", async function() {
+    if (!pendingDeleteClaimId) return;
+
+    confirmDeleteBtn.textContent = "Deleting...";
+    confirmDeleteBtn.disabled = true;
+
+    try {
+      const res = await fetch("/claim/delete", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer " + sessionToken
+        },
+        body: JSON.stringify({ uuid: profileUuid, claimId: pendingDeleteClaimId })
+      });
+
+      if (res.ok) {
+        closeDeleteModal();
+        // Show success message and reload
+        const successMsg = document.createElement("div");
+        successMsg.style.cssText = "position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#155724;color:#fff;padding:12px 24px;border-radius:6px;z-index:10001";
+        successMsg.textContent = "✓ Claim deleted successfully";
+        document.body.appendChild(successMsg);
+        setTimeout(() => location.reload(), 1500);
+      } else {
+        const text = await res.text();
+        alert("Failed to delete claim: " + text);
+        confirmDeleteBtn.textContent = "Delete Claim";
+        confirmDeleteBtn.disabled = false;
+      }
+    } catch (err) {
+      alert("Network error: " + err.message);
+      confirmDeleteBtn.textContent = "Delete Claim";
+      confirmDeleteBtn.disabled = false;
+    }
   });
 })();
 </script>
@@ -2500,11 +2706,13 @@ async function checkIpRateLimit(
 
 interface AuditEntry {
   timestamp: string;
-  action: "create" | "update" | "rotate_token";
-  method: "admin" | "magic_link" | "backup_token";
+  action: "create" | "update" | "rotate_token" | "claim_deleted";
+  method: "admin" | "magic_link" | "backup_token" | "session_token";
   ipHash: string;
   changes?: string[];
   summary?: string;
+  claimType?: string;
+  claimUrl?: string;
 }
 
 async function appendAuditLog(

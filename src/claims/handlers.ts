@@ -393,5 +393,57 @@ export async function handlePostClaimVerify(
   });
 }
 
+/**
+ * Delete a claim from a user's profile
+ * Requires authentication (admin or user session token)
+ * Note: Audit logging is handled by the caller in index.ts
+ */
+export async function handlePostClaimDelete(
+  request: Request,
+  env: Env
+): Promise<Response> {
+  const payload: any = await request.json().catch(() => null);
+  if (!payload) return new Response("Bad JSON", { status: 400 });
+
+  const uuid = String(payload.uuid || "").trim();
+  const claimId = String(payload.claimId || "").trim();
+
+  if (!isUuid(uuid)) return new Response("Bad UUID", { status: 400 });
+  if (!claimId) return new Response("Bad claim ID", { status: 400 });
+
+  // Load current claims
+  const list = await loadClaims(env, uuid);
+  const idx = list.findIndex((c) => c.id === claimId);
+
+  if (idx < 0) {
+    return new Response("Claim not found", { status: 404 });
+  }
+
+  // Store claim info for response (will be used for audit logging by caller)
+  const deletedClaim = list[idx];
+
+  // Remove the claim from the array
+  const updated = [...list.slice(0, idx), ...list.slice(idx + 1)];
+
+  // Save updated claims list
+  await saveClaims(env, uuid, updated);
+
+  return new Response(JSON.stringify({
+    ok: true,
+    message: "Claim deleted successfully",
+    deletedClaimId: claimId,
+    deletedClaim: {
+      type: deletedClaim.type,
+      url: deletedClaim.url,
+      status: deletedClaim.status
+    }
+  }, null, 2), {
+    headers: {
+      "content-type": "application/json; charset=utf-8",
+      ...securityHeaders(),
+    },
+  });
+}
+
 
 
