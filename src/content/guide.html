@@ -184,7 +184,7 @@
         "Why consistent phrasing matters for machine association and preventing vector collapse",
         "Placement priority: public author surfaces > technical hubs > individual content items",
         "The canonical line must be used verbatim: 'Canonical identity: https://anchorid.net/resolve/<UUID>'",
-        "Four verification methods strengthen identity graphs: website, DNS, GitHub, social profiles",
+        "Four verification methods strengthen identity graphs: website, DNS, GitHub, public profiles",
         "The resolver page functions as the root node of the identity graph",
         "AnchorID treats attribution as infrastructure, not a profile"
       ]
@@ -229,7 +229,7 @@
         {
           "@type": "HowToStep",
           "name": "Verify your claims (optional)",
-          "text": "Strengthen your identity graph by verifying ownership of websites (.well-known/anchorid.txt), domains (DNS TXT record), GitHub profiles (README), or social profiles (bio). Verified claims provide cryptographic proof of continuity across platforms.",
+          "text": "Strengthen your identity graph by verifying ownership of websites (.well-known/anchorid.txt), domains (DNS TXT record), GitHub profiles (README), or public profiles (bio). Verified claims provide cryptographic proof of continuity across platforms.",
           "url": "https://anchorid.net/guide#verifiable-claims"
         }
       ]
@@ -333,7 +333,7 @@
     <pre><code>https://anchorid.net/resolve/4ff7ed97-b78f-4ae6-9011-5af714ee241c</code></pre>
 
     <p>
-      All other identity links (blogs, social profiles, archives, code repositories) should <strong>fan out from this resolver</strong>.
+      All other identity links (blogs, public profiles, archives, code repositories) should <strong>fan out from this resolver</strong>.
     </p>
 
     <hr />
@@ -450,7 +450,7 @@ Canonical identity: https://anchorid.net/resolve/&lt;UUID&gt;</code></pre>
     <h2>Verifiable claims</h2>
 
     <p>
-      AnchorID allows you to <strong>verify ownership</strong> of websites, code repositories, domains, and social profiles by placing your resolver URL in specific locations.
+      AnchorID allows you to <strong>verify ownership</strong> of websites, code repositories, domains, and public profiles by placing your resolver URL in specific locations.
       Verified claims strengthen your identity graph and provide cryptographic proof of continuity across platforms.
     </p>
 
@@ -469,14 +469,14 @@ Canonical identity: https://anchorid.net/resolve/&lt;UUID&gt;</code></pre>
         <strong>DNS</strong>: Add TXT record at <code>_anchorid.yourdomain.com</code> with value <code>anchorid=urn:uuid:&lt;UUID&gt;</code>
       </li>
       <li>
-        <strong>Social Profile</strong>: Add resolver URL to your bio/description on Mastodon or any public profile
+        <strong>Public Profile</strong>: Add resolver URL to your bio/description on any public profile page
       </li>
     </ul>
 
-    <h3>Social profile verification</h3>
+    <h3>Public profile verification</h3>
 
     <p>
-      For Fediverse (Mastodon) and other social platforms, add your resolver URL directly to your profile bio or description.
+      For any public profile page (Fediverse, forums, social media, etc.), add your resolver URL directly to your bio or description.
       AnchorID will verify ownership by fetching your public profile and confirming the URL is present.
     </p>
 
@@ -494,7 +494,7 @@ Canonical identity: https://anchorid.net/resolve/&lt;UUID&gt;</code></pre>
 Canonical identity: https://anchorid.net/resolve/&lt;UUID&gt;</code></pre>
 
     <p>
-      You can add social profile claims using either the Fediverse handle format (<code>@user@instance.social</code>) or direct profile URL.
+      You can add public profile claims using either the Fediverse handle format (<code>@user@instance.social</code>) or direct profile URL.
     </p>
 
     <h3>Why verify claims?</h3>

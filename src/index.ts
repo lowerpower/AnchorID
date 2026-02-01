@@ -2054,7 +2054,7 @@ ${claims.length === 0 ? `<div style="background:#f6f6f6;padding:14px;border-radi
         <option value="website">Website (.well-known/anchorid.txt)</option>
         <option value="github">GitHub (profile README)</option>
         <option value="dns">DNS (TXT record)</option>
-        <option value="social">Social Profile (Mastodon, etc.)</option>
+        <option value="social">Public Profile (any public bio)</option>
       </select>
 
       <label style="display:block;margin-bottom:8px;font-weight:500" id="urlLabel">URL or Domain</label>

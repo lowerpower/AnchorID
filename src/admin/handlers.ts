@@ -1196,7 +1196,7 @@ ${claims.length === 0 ? `<div class="card" style="margin:14px 0">
         <option value="website">Website (.well-known/anchorid.txt)</option>
         <option value="github">GitHub (profile README)</option>
         <option value="dns">DNS (TXT record)</option>
-        <option value="social">Social Profile (bio/description)</option>
+        <option value="social">Public Profile (bio/description)</option>
       </select>
 
       <label style="display:block;margin-bottom:8px">
