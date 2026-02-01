@@ -2,61 +2,97 @@
 
 # Public Profile Proof
 
-Public profile proof lets you verify control of **any publicly accessible profile page** by adding your AnchorID resolver URL to your bio/description.
+Public profile proof lets you verify control of **ANY publicly accessible page** by adding your AnchorID resolver URL. Works with social media profiles, forum accounts, GitHub repositories, project documentation, personal sites, and any public page with editable content.
 
-This is an **account-control** proof. It demonstrates you control an account at a moment in time, not legal identity.
+This is an **edit-access** proof. It demonstrates you can edit a specific public page at a moment in time, not legal identity.
 
-**About the name:** Despite being called "social proof," this method works with **any public HTTPS profile page** — not just social media. It applies to forums, community sites, personal websites with public bios, or any platform where you can edit a publicly visible profile field.
+**About the name:** Despite being called "social proof," this method works with **any public HTTPS page** — not just social media. It applies to GitHub repositories, project documentation, forums, community sites, personal websites, or any public page where you can add text. The name is historical; think of it as "public page verification."
 
 ---
 
 ## Supported Platforms
 
-**This works with any public profile accessible via HTTPS without authentication.**
+**This works with ANY publicly accessible HTTPS page, not just social media.**
 
 Examples include:
 
+- **GitHub repositories** - Any public repo README, docs, or CONTRIBUTORS.md
+- **Project documentation** - Public docs sites, wikis, project pages
 - **Mastodon / Fediverse** - ActivityPub instances
 - **Forums** - Discourse, phpBB, custom forums
 - **Community platforms** - Reddit, Hacker News, Stack Overflow
 - **Profile pages** - Personal sites with public bios
-- **Any public HTTPS profile** with editable bio/description
+- **Any public HTTPS page** with editable content
+
+---
+
+## Repository Attribution
+
+Unlike the [GitHub profile proof](./github.md) (which verifies your GitHub identity), public profile proof can verify you have **edit access to ANY public repository**.
+
+This is useful for:
+
+- **Proving contribution to specific projects** - Show you have write access to a repository
+- **Attributing work on repositories you don't own** - Link your identity to projects you contribute to
+- **Linking project documentation to your identity** - Claim ownership of specific docs or wikis
+- **Multi-repository attribution** - Verify access to multiple projects without needing separate GitHub profile proof
+
+**Just add your AnchorID to any public README, docs file, or CONTRIBUTORS.md**
+
+Example URLs:
+```
+https://github.com/username/projectname
+https://github.com/org/repo/blob/main/README.md
+https://github.com/org/repo/blob/main/docs/contributors.md
+https://raw.githubusercontent.com/user/repo/main/README.md
+```
+
+AnchorID will fetch the public page and verify your resolver URL appears in the content.
 
 ---
 
 ## Setup Instructions
 
-### 1. Add AnchorID to your profile bio
+### 1. Add AnchorID to any public page
 
-Edit your profile and add your resolver URL anywhere in your bio or description:
+Edit any public page you have access to and add your resolver URL anywhere in the content:
 
 ```
 https://anchorid.net/resolve/<your-uuid>
 ```
 
-**Example bio:**
+**Example for profile bio:**
 ```
 Software developer interested in open source.
 Canonical identity: https://anchorid.net/resolve/4ff7ed97-b78f-4ae6-9011-5af714ee241c
 ```
 
-The URL just needs to appear somewhere in your profile text. AnchorID will search the entire page for it.
+**Example for repository README:**
+```markdown
+# My Project
+
+This project is maintained by [Your Name].
+
+Canonical identity: https://anchorid.net/resolve/4ff7ed97-b78f-4ae6-9011-5af714ee241c
+```
+
+The URL just needs to appear somewhere in the page content. AnchorID will search the entire page for it.
 
 ### 2. Create the claim in AnchorID
 
 1. Go to [/login](https://anchorid.net/login) and authenticate
 2. Scroll to "Identity Claims" section
 3. Click "Add New Claim"
-4. Choose **Social Profile** proof type
-5. Enter your profile URL or Fediverse handle
+4. Choose **Public Profile** proof type
+5. Enter the page URL (profile URL, repo URL, Fediverse handle, etc.)
 6. Click "Add Claim"
 
 ### 3. Verify the claim
 
-After adding your AnchorID to your bio, click the "Verify" button next to your claim.
+After adding your AnchorID to the public page, click the "Verify" button next to your claim.
 
 AnchorID will:
-1. Fetch your public profile page
+1. Fetch the public page
 2. Search for your resolver URL
 3. Mark the claim as **verified** if found ✅
 
@@ -138,6 +174,8 @@ Make sure the handle format is correct:
 
 Use this proof type to verify control of:
 
+- **Repository attribution** - Prove you can edit specific GitHub repos or projects
+- **Project contributions** - Link your work on open source projects to your identity
 - **Social media accounts** - Mastodon, Fediverse, Bluesky
 - **Community platforms** - Forums, Stack Overflow, Hacker News
 - **Professional networks** - LinkedIn, AngelList, or industry-specific platforms
@@ -169,7 +207,9 @@ AnchorID only fetches the public profile page to verify your resolver URL appear
 
 ---
 
-## Example: Mastodon Setup
+## Examples
+
+### Example 1: Mastodon Setup
 
 1. Log in to your Mastodon instance
 2. Go to Preferences → Profile → Bio
@@ -179,3 +219,26 @@ AnchorID only fetches the public profile page to verify your resolver URL appear
 6. Click "Verify"
 
 Your Mastodon profile is now linked to your AnchorID! ✅
+
+### Example 2: GitHub Repository
+
+1. Open a public repository you have write access to
+2. Edit the README.md (or create CONTRIBUTORS.md, docs/about.md, etc.)
+3. Add anywhere in the file:
+   ```
+   Canonical identity: https://anchorid.net/resolve/<your-uuid>
+   ```
+4. Commit and push changes
+5. In AnchorID, add claim with the repo URL:
+   ```
+   https://github.com/username/projectname
+   ```
+   or direct file URL:
+   ```
+   https://github.com/org/repo/blob/main/README.md
+   ```
+6. Click "Verify"
+
+Your contribution to this repository is now verifiable via your AnchorID! ✅
+
+**Tip:** You can verify multiple repositories by adding separate claims for each one. This is useful for proving you contribute to multiple open source projects or maintaining attribution across different codebases.

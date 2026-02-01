@@ -330,34 +330,37 @@
       <a href="/privacy">Privacy</a>
     </nav>
     <h1>Public Profile Proof Guide</h1>
-    <p class="kicker">Verify control of any public profile page by adding your AnchorID to your bio.</p>
+    <p class="kicker">Verify control of any public page by adding your AnchorID to your bio.</p>
+    <p class="small" style="margin-top: 8px; color: #ff9800;">Works with any public page — not just social media. Includes GitHub repos, project docs, forums, and more.</p>
     <hr />
   </header>
 
   <main class="wrap">
     <div class="callout">
-      <p><strong>What is this?</strong> Public profile proof lets you verify control of <strong>any publicly accessible profile page</strong> by adding your AnchorID resolver URL to your bio/description.</p>
-      <p><strong>Important:</strong> This is an <strong>account-control</strong> proof. It demonstrates you control an account at a moment in time, not legal identity.</p>
+      <p><strong>What is this?</strong> Public profile proof lets you verify control of <strong>ANY publicly accessible page</strong> by adding your AnchorID resolver URL. Works with social media profiles, forum accounts, GitHub repositories, project documentation, personal sites, and any public page with editable content.</p>
+      <p><strong>Important:</strong> This is an <strong>edit-access</strong> proof. It demonstrates you can edit a specific public page at a moment in time, not legal identity.</p>
     </div>
 
     <div class="callout" style="background: #fff8e6; border-left-color: #ff9800;">
-      <p><strong>About the name:</strong> Despite being called "social proof," this method works with <strong>any public HTTPS profile page</strong> — not just social media. It applies to forums, community sites, personal websites with public bios, or any platform where you can edit a publicly visible profile field. The name is historical; think of it as "public profile verification."</p>
+      <p><strong>About the name:</strong> Despite being called "social proof," this method works with <strong>any public HTTPS page</strong> — not just social media. It applies to GitHub repositories, project documentation, forums, community sites, personal websites, or any public page where you can add text. The name is historical; think of it as "public page verification."</p>
     </div>
 
     <hr />
 
     <h2>Supported Platforms</h2>
 
-    <p><strong>This works with any public profile accessible via HTTPS without authentication.</strong></p>
+    <p><strong>This works with ANY publicly accessible HTTPS page, not just social media.</strong></p>
 
     <p>Examples include:</p>
 
     <ul>
+      <li><strong>GitHub repositories</strong> - Any public repo README, docs, or CONTRIBUTORS.md</li>
+      <li><strong>Project documentation</strong> - Public docs sites, wikis, project pages</li>
       <li><strong>Mastodon / Fediverse</strong> - ActivityPub instances</li>
       <li><strong>Forums</strong> - Discourse, phpBB, custom forums</li>
       <li><strong>Community platforms</strong> - Reddit, Hacker News, Stack Overflow</li>
       <li><strong>Profile pages</strong> - Personal sites with public bios</li>
-      <li><strong>Any public HTTPS profile</strong> with editable bio/description</li>
+      <li><strong>Any public HTTPS page</strong> with editable content</li>
     </ul>
 
     <div class="callout warning">
@@ -372,19 +375,50 @@
 
     <hr />
 
+    <h2>Repository Attribution</h2>
+
+    <p>Unlike the <a href="/proofs/github">GitHub profile proof</a> (which verifies your GitHub identity), public profile proof can verify you have <strong>edit access to ANY public repository</strong>.</p>
+
+    <p>This is useful for:</p>
+    <ul>
+      <li><strong>Proving contribution to specific projects</strong> - Show you have write access to a repository</li>
+      <li><strong>Attributing work on repositories you don't own</strong> - Link your identity to projects you contribute to</li>
+      <li><strong>Linking project documentation to your identity</strong> - Claim ownership of specific docs or wikis</li>
+      <li><strong>Multi-repository attribution</strong> - Verify access to multiple projects without needing separate GitHub profile proof</li>
+    </ul>
+
+    <p><strong>Just add your AnchorID to any public README, docs file, or CONTRIBUTORS.md</strong></p>
+
+    <p><strong>Example URLs:</strong></p>
+    <pre><code>https://github.com/username/projectname
+https://github.com/org/repo/blob/main/README.md
+https://github.com/org/repo/blob/main/docs/contributors.md
+https://raw.githubusercontent.com/user/repo/main/README.md</code></pre>
+
+    <p>AnchorID will fetch the public page and verify your resolver URL appears in the content.</p>
+
+    <hr />
+
     <h2>Setup Instructions</h2>
 
-    <h3>1. Add AnchorID to your profile bio</h3>
+    <h3>1. Add AnchorID to any public page</h3>
 
-    <p>Edit your profile and add your resolver URL anywhere in your bio or description:</p>
+    <p>Edit any public page you have access to and add your resolver URL anywhere in the content:</p>
 
     <pre><code>https://anchorid.net/resolve/&lt;your-uuid&gt;</code></pre>
 
-    <p><strong>Example bio:</strong></p>
+    <p><strong>Example for profile bio:</strong></p>
     <pre><code>Software developer interested in open source.
 Canonical identity: https://anchorid.net/resolve/4ff7ed97-b78f-4ae6-9011-5af714ee241c</code></pre>
 
-    <p>The URL just needs to appear somewhere in your profile text. AnchorID will search the entire page for it.</p>
+    <p><strong>Example for repository README:</strong></p>
+    <pre><code># My Project
+
+This project is maintained by [Your Name].
+
+Canonical identity: https://anchorid.net/resolve/4ff7ed97-b78f-4ae6-9011-5af714ee241c</code></pre>
+
+    <p>The URL just needs to appear somewhere in the page content. AnchorID will search the entire page for it.</p>
 
     <h3>2. Create the claim in AnchorID</h3>
 
@@ -394,17 +428,17 @@ Canonical identity: https://anchorid.net/resolve/4ff7ed97-b78f-4ae6-9011-5af714e
       <li>Scroll to "Identity Claims" section</li>
       <li>Click "Add New Claim"</li>
       <li>Choose <strong>Public Profile</strong> proof type</li>
-      <li>Enter your profile URL or Fediverse handle</li>
+      <li>Enter the page URL (profile URL, repo URL, Fediverse handle, etc.)</li>
       <li>Click "Add Claim"</li>
     </ol>
 
     <h3>3. Verify the claim</h3>
 
-    <p>After adding your AnchorID to your bio, click the "Verify" button next to your claim.</p>
+    <p>After adding your AnchorID to the public page, click the "Verify" button next to your claim.</p>
 
     <p>AnchorID will:</p>
     <ol>
-      <li>Fetch your public profile page</li>
+      <li>Fetch the public page</li>
       <li>Search for your resolver URL</li>
       <li>Mark the claim as <strong>verified</strong> if found ✅</li>
     </ol>
@@ -482,6 +516,8 @@ https://news.ycombinator.com/user?id=username</code></pre>
     <p>Use this proof type to verify control of:</p>
 
     <ul>
+      <li><strong>Repository attribution</strong> - Prove you can edit specific GitHub repos or projects</li>
+      <li><strong>Project contributions</strong> - Link your work on open source projects to your identity</li>
       <li><strong>Social media accounts</strong> - Mastodon, Fediverse, Bluesky</li>
       <li><strong>Community platforms</strong> - Forums, Stack Overflow, Hacker News</li>
       <li><strong>Professional networks</strong> - LinkedIn, AngelList, or industry-specific platforms</li>
@@ -521,7 +557,9 @@ https://news.ycombinator.com/user?id=username</code></pre>
 
     <hr />
 
-    <h2>Example: Mastodon Setup</h2>
+    <h2>Examples</h2>
+
+    <h3>Example 1: Mastodon Setup</h3>
 
     <ol>
       <li>Log in to your Mastodon instance</li>
@@ -533,6 +571,27 @@ https://news.ycombinator.com/user?id=username</code></pre>
     </ol>
 
     <p>Your Mastodon profile is now linked to your AnchorID! ✅</p>
+
+    <h3>Example 2: GitHub Repository</h3>
+
+    <ol>
+      <li>Open a public repository you have write access to</li>
+      <li>Edit the README.md (or create CONTRIBUTORS.md, docs/about.md, etc.)</li>
+      <li>Add anywhere in the file:<br>
+        <code>Canonical identity: https://anchorid.net/resolve/&lt;your-uuid&gt;</code></li>
+      <li>Commit and push changes</li>
+      <li>In AnchorID, add claim with the repo URL:<br>
+        <code>https://github.com/username/projectname</code><br>
+        or direct file URL:<br>
+        <code>https://github.com/org/repo/blob/main/README.md</code></li>
+      <li>Click "Verify"</li>
+    </ol>
+
+    <p>Your contribution to this repository is now verifiable via your AnchorID! ✅</p>
+
+    <div class="callout">
+      <p><strong>Tip:</strong> You can verify multiple repositories by adding separate claims for each one. This is useful for proving you contribute to multiple open source projects or maintaining attribution across different codebases.</p>
+    </div>
 
   </main>
 
