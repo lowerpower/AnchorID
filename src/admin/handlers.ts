@@ -1179,10 +1179,21 @@ ${claims.length === 0 ? `<div class="card" style="margin:14px 0">
           ${c.failReason ? `<div style="margin-top:8px;color:#721c24;font-size:12px">${formatErrorHtml(c.failReason)}</div>` : ""}
           ${c.lastCheckedAt ? `<div style="margin-top:6px;font-size:11px;color:#777">Last checked: ${escapeHtml(c.lastCheckedAt)}</div>` : ""}
         </div>
-        <button type="button" class="verify-btn" data-uuid="${escapeHtml(uuid)}" data-claim-id="${escapeHtml(c.id)}"
-          style="padding:6px 12px;font-size:12px;margin-left:10px;white-space:nowrap">
-          Verify
-        </button>
+        <div style="display:flex;flex-direction:column;gap:6px;margin-left:10px">
+          <button type="button" class="verify-btn" data-uuid="${escapeHtml(uuid)}" data-claim-id="${escapeHtml(c.id)}"
+            style="padding:6px 12px;font-size:12px;white-space:nowrap">
+            Verify
+          </button>
+          <button type="button" class="delete-claim-btn"
+            data-uuid="${escapeHtml(uuid)}"
+            data-claim-id="${escapeHtml(c.id)}"
+            data-claim-type="${escapeHtml(typeDisplayName)}"
+            data-claim-url="${escapeHtml(c.url)}"
+            data-claim-status="${escapeHtml(c.status)}"
+            style="padding:6px 12px;font-size:12px;white-space:nowrap;background:#fff;color:#856404;border:1px solid #ddd">
+            Delete
+          </button>
+        </div>
       </div>
     </div>`;
   }).join("")}
@@ -1225,6 +1236,33 @@ ${claims.length === 0 ? `<div class="card" style="margin:14px 0">
     </form>
   </div>
 </details>
+
+<!-- Delete Claim Confirmation Modal -->
+<div id="deleteClaimModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:10000;justify-content:center;align-items:center">
+  <div style="background:#fff;border-radius:12px;padding:24px;max-width:500px;width:90%;box-shadow:0 4px 20px rgba(0,0,0,0.15)">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <h3 style="margin:0;font-size:18px;font-weight:600;color:#721c24">Delete this claim?</h3>
+      <button id="closeDeleteModal" style="background:none;border:none;font-size:24px;cursor:pointer;color:#999;line-height:1">&times;</button>
+    </div>
+
+    <div id="deleteModalClaimInfo" style="background:#f8f9fa;padding:14px;border-radius:6px;border:1px solid #e0e0e0;margin-bottom:16px;font-size:13px">
+      <!-- Claim details will be inserted here -->
+    </div>
+
+    <div style="background:#fff3cd;border:1px solid #ffc107;color:#856404;padding:12px;border-radius:6px;margin-bottom:20px;font-size:13px">
+      <strong>⚠️ Warning:</strong> This will permanently remove this claim from the profile. This action cannot be undone.
+    </div>
+
+    <div style="display:flex;gap:12px;justify-content:flex-end">
+      <button id="cancelDeleteBtn" style="padding:10px 20px;background:#fff;color:#333;border:1px solid #ddd;border-radius:6px;cursor:pointer;font-size:14px;font-weight:500">
+        Cancel
+      </button>
+      <button id="confirmDeleteBtn" style="padding:10px 20px;background:#dc3545;color:#fff;border:1px solid #dc3545;border-radius:6px;cursor:pointer;font-size:14px;font-weight:500">
+        Delete Claim
+      </button>
+    </div>
+  </div>
+</div>
 
 <script>
 (function() {
@@ -1324,6 +1362,93 @@ ${claims.length === 0 ? `<div class="card" style="margin:14px 0">
         this.disabled = false;
       }
     });
+  });
+
+  // Delete claim buttons with two-step confirmation
+  const deleteModal = document.getElementById("deleteClaimModal");
+  const deleteModalClaimInfo = document.getElementById("deleteModalClaimInfo");
+  const confirmDeleteBtn = document.getElementById("confirmDeleteBtn");
+  const cancelDeleteBtn = document.getElementById("cancelDeleteBtn");
+  const closeModalBtn = document.getElementById("closeDeleteModal");
+  let pendingDeleteUuid = null;
+  let pendingDeleteClaimId = null;
+
+  document.querySelectorAll(".delete-claim-btn").forEach(btn => {
+    btn.addEventListener("click", function() {
+      const uuid = this.getAttribute("data-uuid");
+      const claimId = this.getAttribute("data-claim-id");
+      const claimType = this.getAttribute("data-claim-type");
+      const claimUrl = this.getAttribute("data-claim-url");
+      const claimStatus = this.getAttribute("data-claim-status");
+
+      pendingDeleteUuid = uuid;
+      pendingDeleteClaimId = claimId;
+
+      // Populate modal with claim details
+      deleteModalClaimInfo.innerHTML = \`
+        <div style="margin-bottom:12px"><strong>Claim Type:</strong> \${claimType}</div>
+        <div style="margin-bottom:12px"><strong>URL:</strong> <code style="font-size:13px;word-break:break-all">\${claimUrl}</code></div>
+        <div style="margin-bottom:12px"><strong>Status:</strong> \${claimStatus}</div>
+      \`;
+
+      // Show modal
+      deleteModal.style.display = "flex";
+    });
+  });
+
+  // Cancel deletion
+  function closeDeleteModal() {
+    deleteModal.style.display = "none";
+    pendingDeleteUuid = null;
+    pendingDeleteClaimId = null;
+  }
+
+  cancelDeleteBtn.addEventListener("click", closeDeleteModal);
+  closeModalBtn.addEventListener("click", closeDeleteModal);
+
+  // Close modal on outside click
+  deleteModal.addEventListener("click", function(e) {
+    if (e.target === deleteModal) {
+      closeDeleteModal();
+    }
+  });
+
+  // Confirm deletion
+  confirmDeleteBtn.addEventListener("click", async function() {
+    if (!pendingDeleteUuid || !pendingDeleteClaimId) return;
+
+    confirmDeleteBtn.textContent = "Deleting...";
+    confirmDeleteBtn.disabled = true;
+
+    try {
+      const res = await fetch("/claim/delete", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer " + adminToken
+        },
+        body: JSON.stringify({ uuid: pendingDeleteUuid, claimId: pendingDeleteClaimId })
+      });
+
+      if (res.ok) {
+        closeDeleteModal();
+        // Show success message and reload
+        const successMsg = document.createElement("div");
+        successMsg.style.cssText = "position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#155724;color:#fff;padding:12px 24px;border-radius:6px;z-index:10001";
+        successMsg.textContent = "✓ Claim deleted successfully";
+        document.body.appendChild(successMsg);
+        setTimeout(() => location.reload(), 1500);
+      } else {
+        const text = await res.text();
+        alert("Failed to delete claim: " + text);
+        confirmDeleteBtn.textContent = "Delete Claim";
+        confirmDeleteBtn.disabled = false;
+      }
+    } catch (err) {
+      alert("Network error: " + err.message);
+      confirmDeleteBtn.textContent = "Delete Claim";
+      confirmDeleteBtn.disabled = false;
+    }
   });
 })();
 </script>
