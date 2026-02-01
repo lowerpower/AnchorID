@@ -528,10 +528,21 @@ export default {
     <a href="/login" class="secondary">Edit Existing</a>
   </div>
 
+  <p style="margin-top: 24px; font-size: 14px;">
+    See an example: <a href="/resolve/4ff7ed97-b78f-4ae6-9011-5af714ee241c">Mike Johnson (Founder)</a>
+  </p>
+
   <p style="margin-top: 32px; color: #555; font-size: 14px;">
     Already have a UUID? Try: <code>/resolve/&lt;uuid&gt;</code><br>
     <a href="/faq" style="color: #555;">Skeptical? Read the FAQ.</a>
   </p>
+
+  <footer style="margin-top: 64px; border-top: 1px solid #eee; padding-top: 16px; font-size: 13px; color: #777;">
+    <p>
+      Built for longevity. MIT Licensed.
+      Running on the Edge via Cloudflare Workers.
+    </p>
+  </footer>
 </body>
 </html>`,
         {
