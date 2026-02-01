@@ -129,8 +129,8 @@
       "@type": "WebPage",
       "@id": "https://anchorid.net/proofs/social#webpage",
       "url": "https://anchorid.net/proofs/social",
-      "name": "Public Profile Proof Guide",
-      "description": "Verify control of any public profile page by adding your AnchorID to your bio. Works with social media, forums, community sites, and any HTTPS profile.",
+      "name": "Social Profile Proof Guide",
+      "description": "Prove you control a social profile by adding your AnchorID to your bio. Works with Mastodon, forums, and any public profile page.",
       "isPartOf": {
         "@id": "https://anchorid.net/#website"
       },
@@ -159,7 +159,7 @@
           {
             "@type": "ListItem",
             "position": 3,
-            "name": "Public Profile Proof Guide",
+            "name": "Social Profile Proof Guide",
             "item": "https://anchorid.net/proofs/social"
           }
         ]
@@ -169,7 +169,7 @@
       "@type": "HowTo",
       "@id": "https://anchorid.net/proofs/social#howto",
       "name": "How to Create a Public Profile Proof for AnchorID",
-      "description": "Prove you control any public profile page by adding your AnchorID to your bio or description. Works with social media (Mastodon, Fediverse), forums, community platforms, and any publicly accessible HTTPS profile page.",
+      "description": "Prove you control any public profile page or repository by adding your AnchorID to visible text. Works with social media (Mastodon, Fediverse), forums, community platforms, GitHub repositories, and any publicly accessible HTTPS page with editable content.",
       "author": {
         "@id": "https://blog.mycal.net/about/#mycal"
       },
@@ -186,8 +186,8 @@
       "step": [
         {
           "@type": "HowToStep",
-          "name": "Add AnchorID to your profile bio",
-          "text": "Edit your profile on any public platform (Mastodon, forum, community site) and add your resolver URL to your bio or description: https://anchorid.net/resolve/<your-uuid>. The URL just needs to appear somewhere in your publicly visible profile text.",
+          "name": "Add AnchorID to any public page",
+          "text": "Edit any public page you control (profile bio, forum signature, GitHub repository README, project documentation) and add your resolver URL: https://anchorid.net/resolve/<your-uuid>. The URL just needs to appear somewhere in the publicly visible content.",
           "url": "https://anchorid.net/proofs/social#setup"
         },
         {
@@ -199,7 +199,7 @@
         {
           "@type": "HowToStep",
           "name": "Create claim in AnchorID",
-          "text": "Log in to AnchorID at /login, scroll to 'Identity Claims' section, click 'Add New Claim', choose 'Public Profile' proof type, and enter your profile URL or Fediverse handle (e.g., @user@instance.social).",
+          "text": "Log in to AnchorID at /login, scroll to 'Identity Claims' section, click 'Add New Claim', choose 'Social Profile' proof type, and enter your profile URL or Fediverse handle (e.g., @user@instance.social).",
           "url": "https://anchorid.net/proofs/social#setup"
         },
         {
@@ -212,7 +212,7 @@
       "tool": [
         {
           "@type": "HowToTool",
-          "name": "Public profile on any platform with editable bio/description"
+          "name": "Any public page with editable content (profile, repository, documentation, etc.)"
         }
       ],
       "supply": [
@@ -226,7 +226,7 @@
       "@type": "TechArticle",
       "@id": "https://anchorid.net/proofs/social#article",
       "headline": "Public Profile Proof Guide",
-      "description": "Complete guide to proving profile control through AnchorID verification. Works with any publicly accessible HTTPS profile page including social media, forums, and community platforms. Includes Fediverse WebFinger support and SSRF protection.",
+      "description": "Complete guide to proving control of any public page through AnchorID verification. Works with any publicly accessible HTTPS page including social media, forums, community platforms, GitHub repositories, and project documentation. Includes Fediverse WebFinger support and SSRF protection.",
       "author": {
         "@id": "https://blog.mycal.net/about/#mycal"
       },
@@ -237,20 +237,23 @@
       "dateModified": "2026-01-25",
       "inLanguage": "en",
       "about": [
-        "Public profile verification",
+        "Public page verification",
         "Social media identity",
         "Fediverse profiles",
         "Community platforms",
+        "GitHub repositories",
+        "Project attribution",
         "Account control proof"
       ],
       "teaches": [
-        "Social/public profile proof works with ANY publicly accessible HTTPS profile page, not just social media",
-        "Supported platforms include Mastodon/Fediverse, forums, Reddit, Hacker News, Stack Overflow, and any site with public bios",
+        "Social/public profile proof works with ANY publicly accessible HTTPS page, not just social media - including GitHub repositories, project documentation, and any editable public content",
+        "Supported platforms include Mastodon/Fediverse, forums, Reddit, Hacker News, Stack Overflow, GitHub repositories (any public repo README, not just profile), and any site with public editable content",
+        "Use cases: social profiles, forum accounts, repository attribution (proves you can edit a specific repo), project documentation, and any public page you control",
         "Fediverse handles (@user@instance.social) are automatically converted to profile URLs using WebFinger",
-        "The verification process: AnchorID fetches the public profile HTML and searches for the resolver URL anywhere on the page",
+        "The verification process: AnchorID fetches the public page HTML and searches for the resolver URL anywhere on the page",
         "Security: SSRF protection blocks localhost, private IPs (192.168.x.x, 10.x.x.x), cloud metadata endpoints (169.254.169.254), and non-HTTPS URLs",
-        "Social proof provides moderate signal strength - proves account control at a moment in time, not domain ownership",
-        "No authentication or OAuth is used - only public profile page fetching",
+        "Social/public proof provides moderate signal strength - proves page/account control at a moment in time, not infrastructure ownership",
+        "No authentication or OAuth is used - only public page fetching",
         "Privacy: AnchorID only sees public HTML during verification, never private messages, credentials, or follower lists"
       ]
     },
@@ -263,7 +266,7 @@
           "name": "Does social proof only work with social media?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "No. Despite the name 'social proof', this method works with ANY publicly accessible HTTPS profile page. It supports social media (Mastodon, Fediverse), forums (Discourse, phpBB), community platforms (Reddit, Hacker News, Stack Overflow), and any website with a public bio or description field. The only requirements are: must be HTTPS, must be publicly accessible without login, and must display your bio/description containing your AnchorID URL."
+            "text": "No. Despite the name 'social proof', this method works with ANY publicly accessible HTTPS page. It supports social media (Mastodon, Fediverse), forums (Discourse, phpBB), community platforms (Reddit, Hacker News, Stack Overflow), GitHub repositories (any public repo README or documentation, not just the profile README), project homepages, and any website with publicly editable content. The only requirements are: must be HTTPS, must be publicly accessible without login, and must display your AnchorID URL somewhere in the page content."
           }
         },
         {
@@ -296,7 +299,7 @@
       "@type": "DefinedTerm",
       "@id": "https://anchorid.net/proofs/social#public-profile-proof",
       "name": "Public Profile Proof",
-      "description": "A verification method that works with any publicly accessible HTTPS profile page, not limited to social media. Proves account control by verifying that a profile bio/description contains the user's AnchorID resolver URL. Unlike domain-based proofs (website, DNS), public profile proof only demonstrates temporary account control, not infrastructure ownership. Supports Fediverse WebFinger handles, forums, community platforms, and any site with editable public bios.",
+      "description": "A verification method that works with any publicly accessible HTTPS page, not limited to social media profiles. Proves control by verifying that a public page contains the user's AnchorID resolver URL. Works with social profiles, forum accounts, GitHub repositories (any public repo README or docs), project documentation, and any editable public content. Unlike domain-based proofs (website, DNS), public profile proof only demonstrates temporary page/account control, not infrastructure ownership. Useful for repository attribution (proves you can edit a specific repo even if you're not the owner), project contributions, and distributed identity across platforms. Supports Fediverse WebFinger handles for ActivityPub platforms.",
       "inDefinedTermSet": "https://anchorid.net/proofs/social"
     },
     {
