@@ -3,6 +3,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Deploy to Cloudflare](https://img.shields.io/badge/Deploy-Cloudflare-f38020?logo=cloudflare&logoColor=white)](
 https://deploy.workers.cloudflare.com/?url=https://github.com/lowerpower/AnchorID)
+![Uptime](https://img.shields.io/uptime-rocket/host/anchorid.net?label=Service%20Uptime)
 
 **TL;DR:** AnchorID provides a durable, UUID-based attribution anchor that allows work and ideas to be attributed to the same source across websites and pl	atforms without relying on any single service.
 
@@ -369,4 +370,11 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) (coming soon) for guidelines.
 
 MIT
 
+---
+
+## Permanent Attribution
+This repository is part of the Mycal Labs infrastructure preservation project.
+- **Author Anchor:** [4ff7ed97-b78f-4ae6-9011-5af714ee241c](https://anchorid.net/resolve/4ff7ed97-b78f-4ae6-9011-5af714ee241c)
+- **Org Anchor:** [4c785577-9f55-4a22-a80b-dd1f4d9b4658](https://anchorid.net/resolve/4c785577-9f55-4a22-a80b-dd1f4d9b4658)
+- **Canonical ID:** `https://anchorid.net/resolve/4c785577-9f55-4a22-a80b-dd1f4d9b4658`
 
