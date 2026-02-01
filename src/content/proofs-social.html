@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <title>Social Profile Proof Guide | AnchorID</title>
+  <meta name="description" content="Prove you control a social profile by adding your AnchorID to your bio. Works with Mastodon, forums, and any public profile page." />
+
+  <link rel="canonical" href="https://anchorid.net/proofs/social" />
+
+  <style>
+    :root {
+      --bg: #ffffff;
+      --fg: #111111;
+      --muted: #555555;
+      --rule: #e7e7e7;
+      --codebg: #f6f6f6;
+      --link: #0b57d0;
+      --maxw: 860px;
+    }
+    html, body { background: var(--bg); color: var(--fg); margin: 0; padding: 0; }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; line-height: 1.55; }
+    .wrap { max-width: var(--maxw); margin: 0 auto; padding: 32px 20px; }
+    a { color: var(--link); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    h1 { font-size: 2rem; margin: 0 0 10px 0; letter-spacing: -0.02em; }
+    h2 { font-size: 1.35rem; margin: 20px 0 10px 0; letter-spacing: -0.01em; }
+    h3 { font-size: 1.1rem; margin: 18px 0 8px 0; }
+    .kicker { color: var(--muted); margin: 0 0 18px 0; }
+    .small { font-size: 0.95rem; color: var(--muted); }
+    hr { border: 0; border-top: 1px solid var(--rule); margin: 24px 0; }
+    p { margin: 10px 0; }
+    ul, ol { margin: 10px 0 10px 20px; }
+    li { margin: 6px 0; }
+    code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+    code { background: var(--codebg); padding: 2px 6px; border-radius: 4px; }
+    pre { background: var(--codebg); padding: 14px; border: 1px solid var(--rule); border-radius: 10px; overflow: auto; }
+    pre code { background: none; padding: 0; }
+    .callout { border-left: 3px solid var(--rule); padding: 10px 14px; background: #fafafa; border-radius: 10px; margin: 16px 0; }
+    .warning { border-left-color: #ff9800; background: #fff8e6; }
+    footer { border-top: 1px solid var(--rule); }
+    header.wrap { padding-bottom: 6px; }
+    main.wrap { padding-top: 6px; }
+    header.wrap hr { margin: 6px 0; }
+    nav.topnav { font-size: 14px; margin-bottom: 24px; }
+    nav.topnav span { color: #111; font-weight: 500; }
+    nav.topnav a, nav.topnav span { margin-right: 16px; }
+  </style>
+</head>
+
+<body>
+  <header class="wrap">
+    <nav class="topnav">
+      <a href="/">Home</a>
+      <a href="/about">About</a>
+      <a href="/guide">Guide</a>
+      <a href="/proofs">Proofs</a>
+      <a href="/faq">FAQ</a>
+      <a href="/privacy">Privacy</a>
+    </nav>
+    <h1>Social Profile Proof Guide</h1>
+    <p class="kicker">Prove you control a social profile by adding your AnchorID to your bio.</p>
+    <hr />
+  </header>
+
+  <main class="wrap">
+    <div class="callout">
+      <p><strong>What is this?</strong> Social profile proof lets you prove you control a social media account, forum profile, or any public profile page by adding your AnchorID resolver URL to your bio/description.</p>
+      <p><strong>Important:</strong> This is an <strong>account-control</strong> proof. It demonstrates you control an account at a moment in time, not legal identity.</p>
+    </div>
+
+    <hr />
+
+    <h2>Supported Platforms</h2>
+
+    <p>Social proof works with any public profile accessible via HTTPS without authentication:</p>
+
+    <ul>
+      <li><strong>Mastodon / Fediverse</strong> - ActivityPub instances</li>
+      <li><strong>Forums</strong> - Discourse, phpBB, custom forums</li>
+      <li><strong>Community platforms</strong> - Reddit, Hacker News, Stack Overflow</li>
+      <li><strong>Profile pages</strong> - Personal sites with public bios</li>
+      <li><strong>Any public HTTPS profile</strong> with editable bio/description</li>
+    </ul>
+
+    <div class="callout warning">
+      <p><strong>Security:</strong> AnchorID blocks access to:</p>
+      <ul>
+        <li>Localhost and private IP ranges (127.0.0.0/8, 192.168.0.0/16, 10.0.0.0/8)</li>
+        <li>Cloud metadata endpoints (169.254.169.254)</li>
+        <li>Non-HTTPS URLs</li>
+      </ul>
+      <p>This prevents SSRF (Server-Side Request Forgery) attacks.</p>
+    </div>
+
+    <hr />
+
+    <h2>Setup Instructions</h2>
+
+    <h3>1. Add AnchorID to your profile bio</h3>
+
+    <p>Edit your profile and add your resolver URL anywhere in your bio or description:</p>
+
+    <pre><code>https://anchorid.net/resolve/&lt;your-uuid&gt;</code></pre>
+
+    <p><strong>Example bio:</strong></p>
+    <pre><code>Software developer interested in open source.
+Canonical identity: https://anchorid.net/resolve/4ff7ed97-b78f-4ae6-9011-5af714ee241c</code></pre>
+
+    <p>The URL just needs to appear somewhere in your profile text. AnchorID will search the entire page for it.</p>
+
+    <h3>2. Create the claim in AnchorID</h3>
+
+    <p>Go to <a href="/login">/login</a> and authenticate, then:</p>
+
+    <ol>
+      <li>Scroll to "Identity Claims" section</li>
+      <li>Click "Add New Claim"</li>
+      <li>Choose <strong>Social Profile</strong> proof type</li>
+      <li>Enter your profile URL or Fediverse handle</li>
+      <li>Click "Add Claim"</li>
+    </ol>
+
+    <h3>3. Verify the claim</h3>
+
+    <p>After adding your AnchorID to your bio, click the "Verify" button next to your claim.</p>
+
+    <p>AnchorID will:</p>
+    <ol>
+      <li>Fetch your public profile page</li>
+      <li>Search for your resolver URL</li>
+      <li>Mark the claim as <strong>verified</strong> if found ✅</li>
+    </ol>
+
+    <hr />
+
+    <h2>Input Formats</h2>
+
+    <h3>Mastodon / Fediverse Handles</h3>
+
+    <p>You can use WebFinger-style handles or full URLs:</p>
+
+    <pre><code>@mycal@noauthority.social          → https://noauthority.social/@mycal
+mycal@noauthority.social           → https://noauthority.social/@mycal
+https://noauthority.social/@mycal  → (used as-is)</code></pre>
+
+    <p>AnchorID automatically converts handles to profile URLs.</p>
+
+    <h3>Full URLs</h3>
+
+    <p>For other platforms, use the full profile URL:</p>
+
+    <pre><code>https://forum.example.com/users/username
+https://reddit.com/u/username
+https://news.ycombinator.com/user?id=username</code></pre>
+
+    <p><strong>Requirements:</strong></p>
+    <ul>
+      <li>Must be HTTPS (not HTTP)</li>
+      <li>Must be publicly accessible without login</li>
+      <li>Must contain your bio/description with your AnchorID URL</li>
+    </ul>
+
+    <hr />
+
+    <h2>Troubleshooting</h2>
+
+    <h3>"Failed to fetch profile page"</h3>
+    <ul>
+      <li>Confirm the URL is publicly accessible without authentication</li>
+      <li>Check that the URL uses HTTPS (not HTTP)</li>
+      <li>Verify the page loads in an incognito/private browser window</li>
+      <li>Some platforms may block automated requests - try again later</li>
+    </ul>
+
+    <h3>"Profile fetched but resolver URL not found"</h3>
+    <ul>
+      <li>Confirm you added the complete resolver URL to your bio</li>
+      <li>Check for typos in the UUID</li>
+      <li>Make sure the bio/description section is publicly visible</li>
+      <li>Try refreshing your profile to ensure changes are saved</li>
+    </ul>
+
+    <h3>"URL blocked for security reasons"</h3>
+    <p>This means the URL points to:</p>
+    <ul>
+      <li>Localhost or private network (127.0.0.1, 192.168.x.x, 10.x.x.x)</li>
+      <li>Cloud metadata endpoint (169.254.169.254)</li>
+      <li>Non-HTTPS URL</li>
+    </ul>
+    <p>AnchorID only allows public HTTPS URLs for security.</p>
+
+    <h3>Fediverse handle not recognized</h3>
+    <p>Make sure the handle format is correct:</p>
+    <ul>
+      <li>✅ Correct: <code>@user@instance.social</code> or <code>user@instance.social</code></li>
+      <li>❌ Incorrect: <code>@user</code> (missing instance)</li>
+      <li>❌ Incorrect: <code>instance.social/@user</code> (use full URL or @user@instance format)</li>
+    </ul>
+
+    <hr />
+
+    <h2>What social proof is good for</h2>
+
+    <ul>
+      <li><strong>Community identity</strong> - Link your AnchorID to forum accounts</li>
+      <li><strong>Social presence</strong> - Connect Mastodon/Fediverse profiles</li>
+      <li><strong>Distributed identity</strong> - Multiple profiles across platforms</li>
+      <li><strong>Attribution signals</strong> - Help others find your canonical identity</li>
+    </ul>
+
+    <div class="callout">
+      <p><strong>Proof strength:</strong> Social profile proof is a <strong>moderate signal</strong>. It proves you control an account but not domain ownership.</p>
+      <p>For stronger signals, combine with:</p>
+      <ul>
+        <li><a href="/proofs/website">Website proof</a> (domain control)</li>
+        <li><a href="/proofs/dns">DNS proof</a> (domain control)</li>
+      </ul>
+    </div>
+
+    <hr />
+
+    <h2>Privacy Considerations</h2>
+
+    <p><strong>What AnchorID sees:</strong></p>
+    <ul>
+      <li>The public HTML of your profile page (only during verification)</li>
+      <li>Your profile URL (stored in claims record)</li>
+    </ul>
+
+    <p><strong>What AnchorID does NOT see:</strong></p>
+    <ul>
+      <li>Private messages or posts</li>
+      <li>Account credentials</li>
+      <li>OAuth tokens or session data</li>
+      <li>Follower lists or private information</li>
+    </ul>
+
+    <p>AnchorID only fetches the public profile page to verify your resolver URL appears in the bio. No authentication is used.</p>
+
+    <hr />
+
+    <h2>Example: Mastodon Setup</h2>
+
+    <ol>
+      <li>Log in to your Mastodon instance</li>
+      <li>Go to Preferences → Profile → Bio</li>
+      <li>Add: <code>https://anchorid.net/resolve/&lt;your-uuid&gt;</code></li>
+      <li>Save changes</li>
+      <li>In AnchorID, add claim with: <code>@username@instance.social</code></li>
+      <li>Click "Verify"</li>
+    </ol>
+
+    <p>Your Mastodon profile is now linked to your AnchorID! ✅</p>
+
+  </main>
+
+  <footer class="wrap">
+    <hr />
+    <p class="small">
+      <a href="/proofs">← Back to all proofs</a> ·
+      <a href="/guide">Placement guide</a> ·
+      <a href="/faq">FAQ</a>
+    </p>
+  </footer>
+
+</body>
+</html>

@@ -682,6 +682,21 @@ export default {
       });
     }
 
+    if (path === "/proofs/social" || path === "/proofs/social/") {
+      const html = await env.ANCHOR_KV.get("page:proofs-social");
+      if (!html) {
+        return new Response("Social proof guide not found", { status: 404 });
+      }
+      return new Response(html, {
+        headers: {
+          "content-type": "text/html; charset=utf-8",
+          "cache-control":
+            "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400",
+          ...securityHeaders(),
+        },
+      });
+    }
+
     // About page
     if (path === "/about" || path === "/about/") {
       const html = await env.ANCHOR_KV.get("page:about");
