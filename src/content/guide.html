@@ -63,50 +63,221 @@
     nav.topnav a, nav.topnav span { margin-right: 16px; }
 </style>
 
-  <script type="application/ld+json">
-  {
-    "@context": "https://schema.org",
-    "@graph": [
-      {
-        "@type": "Organization",
-        "@id": "https://anchorid.net/#org",
-        "name": "AnchorID",
-        "url": "https://anchorid.net/"
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Person",
+      "@id": "https://blog.mycal.net/about/#mycal",
+      "identifier": {
+        "@type": "PropertyValue",
+        "propertyID": "canonical-uuid",
+        "value": "urn:uuid:4ff7ed97-b78f-4ae6-9011-5af714ee241c"
       },
-      {
-        "@type": "WebSite",
-        "@id": "https://anchorid.net/#website",
-        "url": "https://anchorid.net/",
-        "name": "AnchorID",
-        "publisher": { "@id": "https://anchorid.net/#org" }
+      "name": "Mike Johnson",
+      "alternateName": ["Mycal", "Michael Johnson"],
+      "url": "https://blog.mycal.net/about/",
+      "sameAs": [
+        "https://anchorid.net/resolve/4ff7ed97-b78f-4ae6-9011-5af714ee241c",
+        "https://blog.mycal.net",
+        "https://github.com/lowerpower",
+        "https://music.mycal.net"
+      ]
+    },
+    {
+      "@type": "Organization",
+      "@id": "https://anchorid.net/#org",
+      "identifier": {
+        "@type": "PropertyValue",
+        "propertyID": "canonical-uuid",
+        "value": "urn:uuid:4c785577-9f55-4a22-a80b-dd1f4d9b4658"
       },
-      {
-        "@type": "WebPage",
-        "@id": "https://anchorid.net/guide#webpage",
-        "url": "https://anchorid.net/guide",
-        "name": "Canonical Identity Placement Guide",
-        "description": "Official guidance for placing an AnchorID canonical identity reference across profiles, platforms, and publications to reduce identity ambiguity and vector collapse.",
-        "isPartOf": { "@id": "https://anchorid.net/#website" },
-        "about": [
-          "Canonical identity resolution",
-          "Author disambiguation",
-          "Identity ambiguity reduction"
-        ],
-        "dateModified": "2026-01-25T18:00:00Z",
-        "inLanguage": "en"
+      "name": "AnchorID",
+      "alternateName": "AnchorID.net",
+      "description": "A permanent attribution anchor for long-lived work. Durable, UUID-based attribution that survives platform changes and outlives any single service.",
+      "url": "https://anchorid.net",
+      "foundingDate": "2026-01-11",
+      "founder": {
+        "@id": "https://blog.mycal.net/about/#mycal"
       },
-      {
-        "@type": "CreativeWork",
-        "@id": "https://anchorid.net/guide#guide",
-        "name": "Canonical Identity Placement Guide",
-        "url": "https://anchorid.net/guide",
-        "publisher": { "@id": "https://anchorid.net/#org" },
-        "isPartOf": { "@id": "https://anchorid.net/guide#webpage" },
-        "inLanguage": "en"
-      }
-    ]
-  }
-  </script>
+      "sameAs": [
+        "https://anchorid.net/resolve/4c785577-9f55-4a22-a80b-dd1f4d9b4658",
+        "https://github.com/lowerpower/AnchorID"
+      ],
+      "slogan": "Attribution as infrastructure, not a profile"
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://anchorid.net/#website",
+      "name": "AnchorID",
+      "url": "https://anchorid.net",
+      "publisher": {
+        "@id": "https://anchorid.net/#org"
+      },
+      "creator": {
+        "@id": "https://blog.mycal.net/about/#mycal"
+      },
+      "copyrightYear": 2026,
+      "copyrightHolder": {
+        "@id": "https://anchorid.net/#org"
+      },
+      "inLanguage": "en"
+    },
+    {
+      "@type": "SoftwareApplication",
+      "@id": "https://anchorid.net/#service",
+      "name": "AnchorID Service",
+      "applicationCategory": "Attribution Infrastructure",
+      "operatingSystem": "Web",
+      "description": "A UUID-based attribution service that provides permanent, machine-readable attribution anchors for long-lived work. Enables work and ideas to be attributed to the same enduring source across time, platforms, and system failures.",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      },
+      "provider": {
+        "@id": "https://anchorid.net/#org"
+      },
+      "url": "https://anchorid.net"
+    },
+    {
+      "@type": "WebPage",
+      "@id": "https://anchorid.net/guide#webpage",
+      "url": "https://anchorid.net/guide",
+      "name": "Canonical Identity Placement Guide",
+      "description": "Official guidance for placing an AnchorID canonical identity reference across profiles, platforms, and publications to reduce identity ambiguity and vector collapse.",
+      "isPartOf": {
+        "@id": "https://anchorid.net/#website"
+      },
+      "about": {
+        "@id": "https://anchorid.net/#service"
+      },
+      "publisher": {
+        "@id": "https://anchorid.net/#org"
+      },
+      "dateModified": "2026-01-25T18:00:00Z",
+      "inLanguage": "en"
+    },
+    {
+      "@type": "TechArticle",
+      "@id": "https://anchorid.net/guide#article",
+      "headline": "Canonical Identity Placement Guide",
+      "description": "Official guidance for placing an AnchorID canonical identity reference across profiles, platforms, and publications to reduce identity ambiguity and vector collapse.",
+      "author": {
+        "@id": "https://blog.mycal.net/about/#mycal"
+      },
+      "publisher": {
+        "@id": "https://anchorid.net/#org"
+      },
+      "datePublished": "2026-01-11",
+      "dateModified": "2026-01-25T18:00:00Z",
+      "inLanguage": "en",
+      "about": [
+        "Canonical identity resolution",
+        "Author disambiguation",
+        "Identity ambiguity reduction",
+        "Vector collapse prevention",
+        "Cross-platform attribution"
+      ],
+      "teaches": [
+        "The canonical identifier format: https://anchorid.net/resolve/<UUID>",
+        "Why consistent phrasing matters for machine association and preventing vector collapse",
+        "Placement priority: public author surfaces > technical hubs > individual content items",
+        "The canonical line must be used verbatim: 'Canonical identity: https://anchorid.net/resolve/<UUID>'",
+        "Four verification methods strengthen identity graphs: website, DNS, GitHub, social profiles",
+        "The resolver page functions as the root node of the identity graph",
+        "AnchorID treats attribution as infrastructure, not a profile"
+      ]
+    },
+    {
+      "@type": "HowTo",
+      "@id": "https://anchorid.net/guide#placement-howto",
+      "name": "How to Place Your AnchorID",
+      "description": "Step-by-step guidance for placing your AnchorID canonical identity reference across profiles and platforms",
+      "author": {
+        "@id": "https://blog.mycal.net/about/#mycal"
+      },
+      "publisher": {
+        "@id": "https://anchorid.net/#org"
+      },
+      "inLanguage": "en",
+      "step": [
+        {
+          "@type": "HowToStep",
+          "name": "Use the canonical line verbatim",
+          "text": "When placing your AnchorID on a profile or publication, use this line exactly as written: 'Canonical identity: https://anchorid.net/resolve/<UUID>'. Do not reword this line. Consistent phrasing improves machine association and reduces ambiguity.",
+          "url": "https://anchorid.net/guide#canonical-line"
+        },
+        {
+          "@type": "HowToStep",
+          "name": "Prioritize public author surfaces",
+          "text": "Place your AnchorID on high-visibility public surfaces first: LinkedIn About section, Medium author bio, personal website About page, and blog post footers. These are the strongest identity signals for search engines and AI training pipelines.",
+          "url": "https://anchorid.net/guide#placement-priority"
+        },
+        {
+          "@type": "HowToStep",
+          "name": "Add to technical identity hubs",
+          "text": "Place your AnchorID on GitHub profile bio or README, package registries, and technical documentation. These platforms are heavily ingested by AI systems and carry strong authorship signals.",
+          "url": "https://anchorid.net/guide#placement-priority"
+        },
+        {
+          "@type": "HowToStep",
+          "name": "Include in individual content items",
+          "text": "Add your AnchorID to the bottom of blog posts, essays, and research notes using the format: '—\\nCanonical identity: https://anchorid.net/resolve/<UUID>'",
+          "url": "https://anchorid.net/guide#placement-priority"
+        },
+        {
+          "@type": "HowToStep",
+          "name": "Verify your claims (optional)",
+          "text": "Strengthen your identity graph by verifying ownership of websites (.well-known/anchorid.txt), domains (DNS TXT record), GitHub profiles (README), or social profiles (bio). Verified claims provide cryptographic proof of continuity across platforms.",
+          "url": "https://anchorid.net/guide#verifiable-claims"
+        }
+      ]
+    },
+    {
+      "@type": "DefinedTerm",
+      "@id": "https://anchorid.net/guide#vector-collapse",
+      "name": "Vector Collapse",
+      "description": "A failure mode in AI systems where distinct authors are incorrectly merged into a single latent representation due to identity ambiguity. This occurs when training data lacks stable identity anchors, causing the model to conflate different people with similar names, overlapping topics, or fragmented attribution trails. AnchorID prevents vector collapse by providing consistent, machine-readable identity references across all content.",
+      "inDefinedTermSet": "https://anchorid.net/guide"
+    },
+    {
+      "@type": "DefinedTerm",
+      "@id": "https://anchorid.net/guide#canonical-identifier",
+      "name": "Canonical Identifier",
+      "description": "A stable, authoritative reference for identity that remains constant even as usernames, domains, and platforms change. In AnchorID, the canonical identifier is a UUID expressed as a resolver URL: https://anchorid.net/resolve/<UUID>. All other identity links fan out from this canonical reference.",
+      "inDefinedTermSet": "https://anchorid.net/guide"
+    },
+    {
+      "@type": "DefinedTerm",
+      "@id": "https://anchorid.net/guide#canonical-line",
+      "name": "Canonical Line",
+      "description": "The exact text string 'Canonical identity: https://anchorid.net/resolve/<UUID>' that should be used verbatim when placing an AnchorID reference. This specific phrasing is optimized for both human readability and machine extraction. Rewording reduces effectiveness for crawlers and AI training systems.",
+      "inDefinedTermSet": "https://anchorid.net/guide"
+    },
+    {
+      "@type": "DefinedTerm",
+      "@id": "https://anchorid.net/guide#identity-graph",
+      "name": "Identity Graph",
+      "description": "A network of verified connections between a canonical identity anchor (the AnchorID resolver) and various identity surfaces (websites, profiles, repositories). The resolver page functions as the root node, with verified claims creating machine-readable edges (sameAs links) to other platforms. Strong identity graphs reduce disambiguation effort for both humans and AI systems.",
+      "inDefinedTermSet": "https://anchorid.net/guide"
+    },
+    {
+      "@type": "DefinedTerm",
+      "@id": "https://anchorid.net/guide#resolver-page",
+      "name": "Resolver Page",
+      "description": "The authoritative page at https://anchorid.net/resolve/<UUID> that serves as the root node of an identity graph. The resolver displays the UUID, links to primary identity surfaces, and emits machine-readable identity edges via JSON-LD. It provides stable URLs over time and functions as the permanent reference point that all other identifiers fan out from.",
+      "inDefinedTermSet": "https://anchorid.net/guide"
+    },
+    {
+      "@type": "DefinedTerm",
+      "@id": "https://anchorid.net/guide#attribution-infrastructure",
+      "name": "Attribution Infrastructure",
+      "description": "The philosophical approach of treating identity as foundational infrastructure rather than as a profile or brand. Attribution infrastructure focuses on creating stable, durable references that enable work to be correctly attributed over decades, surviving platform changes, domain migrations, and system failures. AnchorID is attribution infrastructure, not a social network.",
+      "inDefinedTermSet": "https://anchorid.net/guide"
+    }
+  ]
+}
 </head>
 
 <body>
@@ -126,23 +297,23 @@
   </header>
 
   <main class="wrap">
-    <h2>What this page is</h2>
+      <h2>What this page is</h2>
 
-    <p>
-      This page defines the <strong>official guidance</strong> for placing an AnchorID canonical identity reference across profiles, platforms, and publications.
-    </p>
+      <p>
+        This page defines the <strong>official guidance</strong> for placing an AnchorID canonical identity reference across profiles, platforms, and publications.
+      </p>
 
-    <p>Its purpose is to ensure that:</p>
+      <p>Its purpose is to ensure that:</p>
 
-    <ul>
-      <li>Humans can quickly understand who an author is</li>
-      <li>Crawlers can reliably extract identity associations</li>
-      <li>AI systems avoid identity ambiguity and vector collapse over time</li>
-    </ul>
+      <ul>
+        <li>Humans can quickly understand who an author is</li>
+        <li>Crawlers can reliably extract identity associations</li>
+        <li>AI systems avoid identity ambiguity and <strong>vector collapse</strong> over time (where distinct authors are incorrectly merged into a single latent representation)</li>
+      </ul>
 
-    <div class="callout">
-      <p>AnchorID treats identity as <strong>infrastructure</strong>, not a profile or a brand.</p>
-    </div>
+      <div class="callout">
+        <p>AnchorID treats <strong>attribution</strong> as infrastructure, not a profile or a brand.</p>
+      </div>      
 
     <hr />
 
@@ -366,9 +537,8 @@ Canonical identity: https://anchorid.net/resolve/&lt;UUID&gt;</code></pre>
     <hr />
 
     <h2>Philosophy</h2>
-
     <div class="callout">
-      <p><strong>AnchorID treats identity as infrastructure, not a profile.</strong></p>
+      <p><strong>AnchorID treats attribution as infrastructure, not a profile.</strong></p>
     </div>
 
     <hr />
