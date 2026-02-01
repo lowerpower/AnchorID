@@ -187,7 +187,7 @@
         {
           "@type": "HowToStep",
           "name": "Add AnchorID to any public page",
-          "text": "Edit any public page you control (profile bio, forum signature, GitHub repository README, project documentation) and add your resolver URL: https://anchorid.net/resolve/<your-uuid>. The URL just needs to appear somewhere in the publicly visible content.",
+          "text": "Edit any public page you control (profile bio, forum signature, GitHub repository README, project documentation) and add your resolver URL: https://anchorid.net/resolve/<your-uuid>. For space-constrained environments, you can use just the UUID: <your-uuid>. Either format will verify successfully.",
           "url": "https://anchorid.net/proofs/social#setup"
         },
         {
@@ -248,9 +248,11 @@
       "teaches": [
         "Social/public profile proof works with ANY publicly accessible HTTPS page, not just social media - including GitHub repositories, project documentation, and any editable public content",
         "Supported platforms include Mastodon/Fediverse, forums, Reddit, Hacker News, Stack Overflow, GitHub repositories (any public repo README, not just profile), and any site with public editable content",
+        "Flexible verification: matches either the full resolver URL (https://anchorid.net/resolve/<UUID>) OR just the UUID itself for space-constrained environments",
+        "UUID-only option enables verification in character-limited spaces: Twitter bios, forum signatures, git commit messages, code comments, and any context where the full URL doesn't fit",
         "Use cases: social profiles, forum accounts, repository attribution (proves you can edit a specific repo), project documentation, and any public page you control",
         "Fediverse handles (@user@instance.social) are automatically converted to profile URLs using WebFinger",
-        "The verification process: AnchorID fetches the public page HTML and searches for the resolver URL anywhere on the page",
+        "The verification process: AnchorID fetches the public page HTML and searches for either the resolver URL or the UUID pattern anywhere on the page",
         "Security: SSRF protection blocks localhost, private IPs (192.168.x.x, 10.x.x.x), cloud metadata endpoints (169.254.169.254), and non-HTTPS URLs",
         "Social/public proof provides moderate signal strength - proves page/account control at a moment in time, not infrastructure ownership",
         "No authentication or OAuth is used - only public page fetching",
@@ -266,7 +268,15 @@
           "name": "Does social proof only work with social media?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "No. Despite the name 'social proof', this method works with ANY publicly accessible HTTPS page. It supports social media (Mastodon, Fediverse), forums (Discourse, phpBB), community platforms (Reddit, Hacker News, Stack Overflow), GitHub repositories (any public repo README or documentation, not just the profile README), project homepages, and any website with publicly editable content. The only requirements are: must be HTTPS, must be publicly accessible without login, and must display your AnchorID URL somewhere in the page content."
+            "text": "No. Despite the name 'social proof', this method works with ANY publicly accessible HTTPS page. It supports social media (Mastodon, Fediverse), forums (Discourse, phpBB), community platforms (Reddit, Hacker News, Stack Overflow), GitHub repositories (any public repo README or documentation, not just the profile README), project homepages, and any website with publicly editable content. The only requirements are: must be HTTPS, must be publicly accessible without login, and must display your AnchorID URL or UUID somewhere in the page content."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Can I use just the UUID instead of the full resolver URL?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes! For space-constrained environments (Twitter bios, forum signatures, character-limited fields), you can use just the UUID: '4ff7ed97-b78f-4ae6-9011-5af714ee241c' instead of the full URL 'https://anchorid.net/resolve/4ff7ed97-b78f-4ae6-9011-5af714ee241c'. AnchorID will match either format. The UUID is the anchor - the URL is just a human-friendly wrapper. This makes verification possible in contexts where full URLs don't fit: git commit messages, code comments, metadata fields, and any character-limited space."
           }
         },
         {
@@ -299,7 +309,7 @@
       "@type": "DefinedTerm",
       "@id": "https://anchorid.net/proofs/social#public-profile-proof",
       "name": "Public Profile Proof",
-      "description": "A verification method that works with any publicly accessible HTTPS page, not limited to social media profiles. Proves control by verifying that a public page contains the user's AnchorID resolver URL. Works with social profiles, forum accounts, GitHub repositories (any public repo README or docs), project documentation, and any editable public content. Unlike domain-based proofs (website, DNS), public profile proof only demonstrates temporary page/account control, not infrastructure ownership. Useful for repository attribution (proves you can edit a specific repo even if you're not the owner), project contributions, and distributed identity across platforms. Supports Fediverse WebFinger handles for ActivityPub platforms.",
+      "description": "A verification method that works with any publicly accessible HTTPS page, not limited to social media profiles. Proves control by verifying that a public page contains either the user's AnchorID resolver URL (https://anchorid.net/resolve/<UUID>) or just the UUID itself. The UUID-only option enables verification in space-constrained environments like Twitter bios, forum signatures, git commit messages, and code comments. Works with social profiles, forum accounts, GitHub repositories (any public repo README or docs), project documentation, and any editable public content. Unlike domain-based proofs (website, DNS), public profile proof only demonstrates temporary page/account control, not infrastructure ownership. Useful for repository attribution (proves you can edit a specific repo even if you're not the owner), project contributions, and distributed identity across platforms. Supports Fediverse WebFinger handles for ActivityPub platforms.",
       "inDefinedTermSet": "https://anchorid.net/proofs/social"
     },
     {
