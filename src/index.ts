@@ -2000,6 +2000,13 @@ ${claims.length === 0 ? `<div style="background:#f6f6f6;padding:14px;border-radi
       ? "background:#f8d7da;color:#721c24;padding:3px 8px;border-radius:4px;font-size:12px"
       : "background:#fff3cd;color:#856404;padding:3px 8px;border-radius:4px;font-size:12px";
 
+    // Map claim type to display name
+    const typeDisplayName = c.type === "website" ? "WEBSITE"
+      : c.type === "github" ? "GITHUB"
+      : c.type === "dns" ? "DNS"
+      : c.type === "social" ? "PUBLIC PROFILE"
+      : escapeHtml(c.type).toUpperCase();
+
     let proofDetails = "";
     if (c.type === "dns" && c.proof.kind === "dns_txt") {
       const qname = escapeHtml((c.proof as any).qname || "");
@@ -2026,7 +2033,7 @@ ${claims.length === 0 ? `<div style="background:#f6f6f6;padding:14px;border-radi
       <div style="display:flex;justify-content:space-between;align-items:start">
         <div style="flex:1">
           <div style="font-weight:500;margin-bottom:4px">
-            ${escapeHtml(c.type).toUpperCase()}
+            ${typeDisplayName}
             <span style="${statusStyle}">${escapeHtml(c.status)}</span>
           </div>
           <code style="font-size:13px;word-break:break-all">${escapeHtml(c.url)}</code>
