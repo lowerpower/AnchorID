@@ -9,6 +9,289 @@
 
   <link rel="canonical" href="https://anchorid.net/proofs/github" />
 
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "Person",
+        "@id": "https://blog.mycal.net/about/#mycal",
+        "identifier": {
+          "@type": "PropertyValue",
+          "propertyID": "canonical-uuid",
+          "value": "urn:uuid:4ff7ed97-b78f-4ae6-9011-5af714ee241c"
+        },
+        "name": "Mike Johnson",
+        "alternateName": ["Mycal", "Michael Johnson"],
+        "url": "https://blog.mycal.net/about/",
+        "sameAs": [
+          "https://anchorid.net/resolve/4ff7ed97-b78f-4ae6-9011-5af714ee241c",
+          "https://github.com/lowerpower",
+          "https://music.mycal.net"
+        ]
+      },
+      {
+        "@type": "Organization",
+        "@id": "https://anchorid.net/#org",
+        "identifier": {
+          "@type": "PropertyValue",
+          "propertyID": "canonical-uuid",
+          "value": "urn:uuid:4c785577-9f55-4a22-a80b-dd1f4d9b4658"
+        },
+        "name": "AnchorID",
+        "alternateName": "AnchorID.net",
+        "description": "A permanent attribution anchor for long-lived work. Durable, UUID-based attribution that survives platform changes and outlives any single service.",
+        "url": "https://anchorid.net",
+        "foundingDate": "2026-01-11",
+        "founder": {
+          "@id": "https://blog.mycal.net/about/#mycal"
+        },
+        "sameAs": [
+          "https://anchorid.net/resolve/4c785577-9f55-4a22-a80b-dd1f4d9b4658",
+          "https://github.com/lowerpower/AnchorID"
+        ],
+        "slogan": "Attribution as infrastructure, not a profile"
+      },
+      {
+        "@type": "WebSite",
+        "@id": "https://anchorid.net/#website",
+        "name": "AnchorID",
+        "url": "https://anchorid.net",
+        "publisher": {
+          "@id": "https://anchorid.net/#org"
+        },
+        "creator": {
+          "@id": "https://blog.mycal.net/about/#mycal"
+        },
+        "copyrightYear": 2026,
+        "copyrightHolder": {
+          "@id": "https://anchorid.net/#org"
+        },
+        "inLanguage": "en"
+      },
+      {
+        "@type": "SoftwareApplication",
+        "@id": "https://anchorid.net/#service",
+        "name": "AnchorID Service",
+        "applicationCategory": "Attribution Infrastructure",
+        "operatingSystem": "Web",
+        "description": "A UUID-based attribution service that provides permanent, machine-readable attribution anchors for long-lived work. Enables work and ideas to be attributed to the same enduring source across time, platforms, and system failures.",
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD"
+        },
+        "provider": {
+          "@id": "https://anchorid.net/#org"
+        },
+        "url": "https://anchorid.net"
+      },
+      {
+        "@type": "WebPage",
+        "@id": "https://anchorid.net/proofs/github#webpage",
+        "url": "https://anchorid.net/proofs/github",
+        "name": "GitHub Proof Guide",
+        "description": "Prove you control a GitHub account by adding your AnchorID to your profile README. Step-by-step guide for GitHub proof verification.",
+        "isPartOf": {
+          "@id": "https://anchorid.net/#website"
+        },
+        "about": {
+          "@id": "https://anchorid.net/proofs/github#howto"
+        },
+        "publisher": {
+          "@id": "https://anchorid.net/#org"
+        },
+        "inLanguage": "en",
+        "breadcrumb": {
+          "@type": "BreadcrumbList",
+          "itemListElement": [
+            {
+              "@type": "ListItem",
+              "position": 1,
+              "name": "Home",
+              "item": "https://anchorid.net/"
+            },
+            {
+              "@type": "ListItem",
+              "position": 2,
+              "name": "Proofs",
+              "item": "https://anchorid.net/proofs"
+            },
+            {
+              "@type": "ListItem",
+              "position": 3,
+              "name": "GitHub Proof Guide",
+              "item": "https://anchorid.net/proofs/github"
+            }
+          ]
+        }
+      },
+      {
+        "@type": "HowTo",
+        "@id": "https://anchorid.net/proofs/github#howto",
+        "name": "How to Create a GitHub Proof for AnchorID",
+        "description": "Prove you control a GitHub account by adding your AnchorID to your profile README. This creates a verifiable link between your GitHub contributions and your canonical identity.",
+        "author": {
+          "@id": "https://blog.mycal.net/about/#mycal"
+        },
+        "publisher": {
+          "@id": "https://anchorid.net/#org"
+        },
+        "inLanguage": "en",
+        "estimatedCost": {
+          "@type": "MonetaryAmount",
+          "currency": "USD",
+          "value": "0"
+        },
+        "totalTime": "PT5M",
+        "step": [
+          {
+            "@type": "HowToStep",
+            "name": "Create your profile README repository",
+            "text": "Create a GitHub repository with the exact same name as your username. For example, if your username is 'johndoe', create a repository named 'johndoe'. The repository must be public.",
+            "url": "https://anchorid.net/proofs/github#setup"
+          },
+          {
+            "@type": "HowToStep",
+            "name": "Add README.md file",
+            "text": "Create a README.md file in the root of your profile repository. This file will be displayed on your GitHub profile page.",
+            "url": "https://anchorid.net/proofs/github#setup"
+          },
+          {
+            "@type": "HowToStep",
+            "name": "Add your AnchorID to the README",
+            "text": "Add this line to your README.md: 'Canonical identity: https://anchorid.net/resolve/<your-uuid>'. You can place it at the bottom of your README, in an About section, or in your bio/introduction.",
+            "url": "https://anchorid.net/proofs/github#setup"
+          },
+          {
+            "@type": "HowToStep",
+            "name": "Commit and push changes",
+            "text": "Commit your changes and push them to the main branch on GitHub. Ensure the changes are visible in your public profile.",
+            "url": "https://anchorid.net/proofs/github#setup"
+          },
+          {
+            "@type": "HowToStep",
+            "name": "Create claim in AnchorID",
+            "text": "Log in to AnchorID at /login, scroll to the 'Identity Claims' section, click 'Add New Claim', choose 'GitHub' proof type, and enter your GitHub profile URL (https://github.com/username).",
+            "url": "https://anchorid.net/proofs/github#setup"
+          },
+          {
+            "@type": "HowToStep",
+            "name": "Verify the claim",
+            "text": "Click 'Verify' next to your GitHub claim. AnchorID will fetch your profile README from https://raw.githubusercontent.com/<username>/<username>/main/README.md and check that it contains your resolver URL.",
+            "url": "https://anchorid.net/proofs/github#setup"
+          }
+        ],
+        "tool": [
+          {
+            "@type": "HowToTool",
+            "name": "GitHub account"
+          },
+          {
+            "@type": "HowToTool",
+            "name": "Text editor for README.md"
+          }
+        ],
+        "supply": [
+          {
+            "@type": "HowToSupply",
+            "name": "Your AnchorID UUID"
+          }
+        ]
+      },
+      {
+        "@type": "TechArticle",
+        "@id": "https://anchorid.net/proofs/github#article",
+        "headline": "GitHub Proof Guide",
+        "description": "Complete guide to proving GitHub account control through AnchorID verification. Includes setup instructions, troubleshooting, security considerations, and API usage.",
+        "author": {
+          "@id": "https://blog.mycal.net/about/#mycal"
+        },
+        "publisher": {
+          "@id": "https://anchorid.net/#org"
+        },
+        "datePublished": "2026-01-11",
+        "dateModified": "2026-01-31",
+        "inLanguage": "en",
+        "isPartOf": {
+          "@id": "https://anchorid.net/proofs#article"
+        },
+        "about": [
+          "GitHub identity verification",
+          "Code attribution",
+          "Developer identity",
+          "Open source contributions"
+        ],
+        "teaches": [
+          "How to create a GitHub profile README for identity verification",
+          "The verification process: AnchorID fetches README from raw.githubusercontent.com and checks for resolver URL",
+          "Repository requirements: must be public, named exactly as username, with README.md in main branch",
+          "GitHub proof provides 'good signal' strength for developers and open source contributors",
+          "Combining GitHub proof with website or DNS proof creates stronger verification",
+          "GitHub is heavily indexed by search engines and AI training systems, strengthening code attribution"
+        ],
+        "relatedLink": [
+          "https://anchorid.net/proofs/website",
+          "https://anchorid.net/proofs/dns",
+          "https://anchorid.net/proofs/social"
+        ]
+      },
+      {
+        "@type": "FAQPage",
+        "@id": "https://anchorid.net/proofs/github#faq",
+        "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "What does GitHub proof verify?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "GitHub proof verifies that you control a GitHub account. It does not prove legal identity. The verification checks that your profile README contains your AnchorID resolver URL, demonstrating you have write access to the repository."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Why is the default branch important?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "AnchorID fetches the README from the 'main' branch. If your default branch is 'master' instead of 'main', the verification may fail. GitHub now uses 'main' as the default branch name for new repositories."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Can I use GitHub proof for private repositories?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "No. The profile repository must be public for AnchorID to fetch and verify the README. Private repositories cannot be accessed by the verification system."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "What signal strength does GitHub proof provide?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "GitHub proof provides a 'good signal' strength. It is valuable for developers and open source contributors but not as strong as website + DNS proof. For strongest verification, combine GitHub proof with website or DNS proof."
+            }
+          }
+        ]
+      },
+      {
+        "@type": "DefinedTerm",
+        "@id": "https://anchorid.net/proofs/github#profile-readme",
+        "name": "GitHub Profile README",
+        "description": "A special repository on GitHub with the same name as your username that displays on your profile page. The README.md file in this repository is shown prominently on your GitHub profile and is indexed by search engines and AI systems.",
+        "inDefinedTermSet": "https://anchorid.net/proofs/github"
+      },
+      {
+        "@type": "DefinedTerm",
+        "@id": "https://anchorid.net/proofs/github#code-attribution",
+        "name": "Code Attribution",
+        "description": "The process of linking code contributions, commits, and repositories to their original author's canonical identity. GitHub proof strengthens code attribution by creating a verifiable connection between GitHub activity and a permanent identity anchor, helping preserve authorship even if usernames change or platforms migrate.",
+        "inDefinedTermSet": "https://anchorid.net/proofs/github"
+      }
+    ]
+  }
+  </script>
+
   <style>
     :root {
       --bg: #ffffff;
