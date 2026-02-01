@@ -46,6 +46,296 @@
     nav.topnav span { color: #111; font-weight: 500; }
     nav.topnav a, nav.topnav span { margin-right: 16px; }
   </style>
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Person",
+      "@id": "https://blog.mycal.net/about/#mycal",
+      "identifier": {
+        "@type": "PropertyValue",
+        "propertyID": "canonical-uuid",
+        "value": "urn:uuid:4ff7ed97-b78f-4ae6-9011-5af714ee241c"
+      },
+      "name": "Mike Johnson",
+      "alternateName": ["Mycal", "Michael Johnson"],
+      "url": "https://blog.mycal.net/about/",
+      "sameAs": [
+        "https://anchorid.net/resolve/4ff7ed97-b78f-4ae6-9011-5af714ee241c",
+        "https://github.com/lowerpower",
+        "https://music.mycal.net"
+      ]
+    },
+    {
+      "@type": "Organization",
+      "@id": "https://anchorid.net/#org",
+      "identifier": {
+        "@type": "PropertyValue",
+        "propertyID": "canonical-uuid",
+        "value": "urn:uuid:4c785577-9f55-4a22-a80b-dd1f4d9b4658"
+      },
+      "name": "AnchorID",
+      "alternateName": "AnchorID.net",
+      "description": "A permanent attribution anchor for long-lived work. Durable, UUID-based attribution that survives platform changes and outlives any single service.",
+      "url": "https://anchorid.net",
+      "foundingDate": "2026-01-11",
+      "founder": {
+        "@id": "https://blog.mycal.net/about/#mycal"
+      },
+      "sameAs": [
+        "https://anchorid.net/resolve/4c785577-9f55-4a22-a80b-dd1f4d9b4658",
+        "https://github.com/lowerpower/AnchorID"
+      ],
+      "slogan": "Attribution as infrastructure, not a profile"
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://anchorid.net/#website",
+      "name": "AnchorID",
+      "url": "https://anchorid.net",
+      "publisher": {
+        "@id": "https://anchorid.net/#org"
+      },
+      "creator": {
+        "@id": "https://blog.mycal.net/about/#mycal"
+      },
+      "copyrightYear": 2026,
+      "copyrightHolder": {
+        "@id": "https://anchorid.net/#org"
+      },
+      "inLanguage": "en"
+    },
+    {
+      "@type": "SoftwareApplication",
+      "@id": "https://anchorid.net/#service",
+      "name": "AnchorID Service",
+      "applicationCategory": "Attribution Infrastructure",
+      "operatingSystem": "Web",
+      "description": "A UUID-based attribution service that provides permanent, machine-readable attribution anchors for long-lived work. Enables work and ideas to be attributed to the same enduring source across time, platforms, and system failures.",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      },
+      "provider": {
+        "@id": "https://anchorid.net/#org"
+      },
+      "url": "https://anchorid.net"
+    },
+    {
+      "@type": "WebPage",
+      "@id": "https://anchorid.net/proofs/dns#webpage",
+      "url": "https://anchorid.net/proofs/dns",
+      "name": "DNS Proof Guide",
+      "description": "Prove you control a domain by publishing a DNS TXT record. Step-by-step guide for DNS proof verification.",
+      "isPartOf": {
+        "@id": "https://anchorid.net/#website"
+      },
+      "about": {
+        "@id": "https://anchorid.net/proofs/dns#howto"
+      },
+      "publisher": {
+        "@id": "https://anchorid.net/#org"
+      },
+      "inLanguage": "en",
+      "breadcrumb": {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          {
+            "@type": "ListItem",
+            "position": 1,
+            "name": "Home",
+            "item": "https://anchorid.net/"
+          },
+          {
+            "@type": "ListItem",
+            "position": 2,
+            "name": "Proofs",
+            "item": "https://anchorid.net/proofs"
+          },
+          {
+            "@type": "ListItem",
+            "position": 3,
+            "name": "DNS Proof Guide",
+            "item": "https://anchorid.net/proofs/dns"
+          }
+        ]
+      }
+    },
+    {
+      "@type": "HowTo",
+      "@id": "https://anchorid.net/proofs/dns#howto",
+      "name": "How to Create a DNS Proof for AnchorID",
+      "description": "Prove you control a domain by publishing a DNS TXT record at _anchorid subdomain or domain apex. DNS proof provides strong signal for domain ownership and is most powerful when combined with website proof.",
+      "author": {
+        "@id": "https://blog.mycal.net/about/#mycal"
+      },
+      "publisher": {
+        "@id": "https://anchorid.net/#org"
+      },
+      "inLanguage": "en",
+      "estimatedCost": {
+        "@type": "MonetaryAmount",
+        "currency": "USD",
+        "value": "0"
+      },
+      "totalTime": "PT5M",
+      "step": [
+        {
+          "@type": "HowToStep",
+          "name": "Access your DNS provider",
+          "text": "Log in to your domain registrar or DNS hosting provider (e.g., Cloudflare, Route 53, Namecheap, etc.) where you manage DNS records for your domain.",
+          "url": "https://anchorid.net/proofs/dns#setup"
+        },
+        {
+          "@type": "HowToStep",
+          "name": "Create a TXT record at _anchorid subdomain",
+          "text": "Add a new TXT record with Name/Host: '_anchorid', Type: 'TXT', Value: 'anchorid=urn:uuid:<your-uuid>'. This creates a record at _anchorid.example.com",
+          "url": "https://anchorid.net/proofs/dns#setup"
+        },
+        {
+          "@type": "HowToStep",
+          "name": "Save and publish DNS changes",
+          "text": "Save the DNS record in your provider's interface and ensure changes are published/committed.",
+          "url": "https://anchorid.net/proofs/dns#setup"
+        },
+        {
+          "@type": "HowToStep",
+          "name": "Wait for DNS propagation",
+          "text": "Allow time for DNS changes to propagate globally (typically 1 minute to 1 hour depending on TTL and provider). You can verify using: dig +short TXT _anchorid.example.com",
+          "url": "https://anchorid.net/proofs/dns#troubleshooting"
+        },
+        {
+          "@type": "HowToStep",
+          "name": "Create claim in AnchorID",
+          "text": "Log in to AnchorID at /login, scroll to 'Identity Claims' section, click 'Add New Claim', choose 'DNS' proof type, and enter your domain (example.com).",
+          "url": "https://anchorid.net/proofs/dns#setup"
+        },
+        {
+          "@type": "HowToStep",
+          "name": "Verify the claim",
+          "text": "Click 'Verify' next to your DNS claim. AnchorID will query _anchorid.example.com TXT record and confirm it contains your UUID.",
+          "url": "https://anchorid.net/proofs/dns#setup"
+        }
+      ],
+      "tool": [
+        {
+          "@type": "HowToTool",
+          "name": "DNS provider control panel or domain registrar"
+        },
+        {
+          "@type": "HowToTool",
+          "name": "Command line tools (dig or nslookup) for verification"
+        }
+      ],
+      "supply": [
+        {
+          "@type": "HowToSupply",
+          "name": "Your AnchorID UUID"
+        },
+        {
+          "@type": "HowToSupply",
+          "name": "Domain name you control"
+        }
+      ]
+    },
+    {
+      "@type": "TechArticle",
+      "@id": "https://anchorid.net/proofs/dns#article",
+      "headline": "DNS Proof Guide",
+      "description": "Complete guide to proving domain control through DNS TXT records for AnchorID verification. Includes setup instructions for both _anchorid subdomain and apex methods, troubleshooting with dig/nslookup, and best practices.",
+      "author": {
+        "@id": "https://blog.mycal.net/about/#mycal"
+      },
+      "publisher": {
+        "@id": "https://anchorid.net/#org"
+      },
+      "datePublished": "2026-01-11",
+      "dateModified": "2026-01-25",
+      "inLanguage": "en",
+      "about": [
+        "DNS TXT records",
+        "Domain ownership verification",
+        "Domain control proof",
+        "DNS configuration"
+      ],
+      "teaches": [
+        "How to prove domain control by publishing DNS TXT records at _anchorid subdomain",
+        "DNS proof provides 'strong signal' strength for domain ownership",
+        "Recommended format: TXT record at _anchorid.example.com with value 'anchorid=urn:uuid:<UUID>'",
+        "Alternative apex method: TXT record at @ (domain root) if _anchorid subdomain not supported",
+        "The verification process: AnchorID queries DNS for _anchorid.example.com TXT record and checks for UUID",
+        "DNS + Website proof creates the strongest ownership signal (both infrastructure control methods)",
+        "Self-verification using dig or nslookup before triggering AnchorID verification",
+        "DNS propagation can take 1 minute to 1 hour depending on TTL settings"
+      ]
+    },
+    {
+      "@type": "FAQPage",
+      "@id": "https://anchorid.net/proofs/dns#faq",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "What does DNS proof verify?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "DNS proof verifies that you control a domain at the DNS level. It does not prove legal identity. The verification checks that you can create DNS TXT records for the domain, demonstrating you have access to the domain's DNS configuration (either through the registrar or DNS hosting provider)."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Why use _anchorid subdomain instead of apex?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "The _anchorid subdomain method is preferred because domain apex (@) often already contains important TXT records for SPF, DKIM, DMARC, and site verification. Using _anchorid keeps the AnchorID proof separate and avoids conflicts. However, if your DNS provider cannot create _anchorid records, the apex method works as a fallback."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How can I verify my DNS record before using AnchorID?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Use command line tools to verify your DNS record is visible: 'dig +short TXT _anchorid.example.com' or 'nslookup -type=TXT _anchorid.example.com'. You should see output containing your UUID. If you don't see it, AnchorID won't be able to verify it either. This self-check helps identify propagation delays or configuration errors."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "What signal strength does DNS proof provide?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "DNS proof provides a 'strong signal' strength. It's particularly valuable for organizations, software projects tied to domains, and personal domains. For the strongest verification signal, combine DNS proof with website proof (/.well-known/anchorid.txt). Together they demonstrate control at both the DNS layer and the web server layer."
+          }
+        }
+      ]
+    },
+    {
+      "@type": "DefinedTerm",
+      "@id": "https://anchorid.net/proofs/dns#dns-txt-record",
+      "name": "DNS TXT Record",
+      "description": "A type of DNS record that holds text information for sources outside your domain. TXT records are commonly used for domain verification (proving ownership), email security (SPF, DKIM, DMARC), and site authentication. AnchorID uses TXT records to verify domain control, following the same pattern as services like Google Search Console and Let's Encrypt.",
+      "inDefinedTermSet": "https://anchorid.net/proofs/dns"
+    },
+    {
+      "@type": "DefinedTerm",
+      "@id": "https://anchorid.net/proofs/dns#domain-control",
+      "name": "Domain Control Proof",
+      "description": "Verification method that demonstrates the ability to modify DNS records for a domain. Requires access to either the domain registrar or DNS hosting provider's control panel. Stronger than website-only proof because it demonstrates infrastructure-level control, not just web server file access. DNS control is difficult to spoof and provides high confidence in domain ownership.",
+      "inDefinedTermSet": "https://anchorid.net/proofs/dns"
+    },
+    {
+      "@type": "DefinedTerm",
+      "@id": "https://anchorid.net/proofs/dns#dns-propagation",
+      "name": "DNS Propagation",
+      "description": "The process by which DNS changes spread across the global network of DNS servers. When you create or modify a DNS record, it takes time for all DNS servers worldwide to receive and cache the update. Propagation time depends on TTL (Time To Live) settings and typically ranges from 1 minute to 1 hour, though it can occasionally take longer. You can verify propagation using dig or nslookup commands.",
+      "inDefinedTermSet": "https://anchorid.net/proofs/dns"
+    }
+  ]
+}
+</script>
+
+
 </head>
 
 <body>

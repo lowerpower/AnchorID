@@ -499,7 +499,18 @@ export async function verifyClaim(
     const { ok, status, text } = await fetchText(claim.proof.url);
 
     if (!ok) return { status: "failed", failReason: `fetch_failed:${status}` };
+
+    // First check for full resolver URL
     if (text.includes(claim.proof.mustContain)) return { status: "verified" };
+
+    // For social/public profile proofs, also accept UUID-only (space-constrained environments)
+    if (claim.proof.kind === "profile_page") {
+      // Extract UUID from resolver URL (format: https://anchorid.net/resolve/UUID)
+      const uuidMatch = claim.proof.mustContain.match(/([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})/i);
+      if (uuidMatch && text.toLowerCase().includes(uuidMatch[1].toLowerCase())) {
+        return { status: "verified" };
+      }
+    }
 
     return { status: "failed", failReason: "proof_not_found" };
   }

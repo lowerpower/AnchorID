@@ -93,8 +93,46 @@ After adding your AnchorID to the public page, click the "Verify" button next to
 
 AnchorID will:
 1. Fetch the public page
-2. Search for your resolver URL
+2. Search for your resolver URL **OR** just your UUID
 3. Mark the claim as **verified** if found ✅
+
+---
+
+## Space-Constrained Environments
+
+For platforms with strict character limits (like social media bios or short profile fields), you can use **just the UUID** instead of the full resolver URL:
+
+**Full URL (recommended):**
+```
+https://anchorid.net/resolve/4ff7ed97-b78f-4ae6-9011-5af714ee241c
+```
+
+**UUID only (space-constrained):**
+```
+4ff7ed97-b78f-4ae6-9011-5af714ee241c
+```
+
+**Examples:**
+
+**Twitter bio (limited space):**
+```
+Software developer | Open source contributor
+Identity: 4ff7ed97-b78f-4ae6-9011-5af714ee241c
+```
+
+**Forum signature (limited space):**
+```
+AnchorID: 4ff7ed97-b78f-4ae6-9011-5af714ee241c
+```
+
+**GitHub bio (160 chars):**
+```
+Developer working on distributed systems. 4ff7ed97-b78f-4ae6-9011-5af714ee241c
+```
+
+AnchorID verification will find **either** the full resolver URL or just the UUID. The UUID must match the exact format (8-4-4-4-12 hex digits).
+
+**Note:** While the UUID-only format saves space, the full URL is more human-readable and immediately identifies the verification service. Use UUID-only only when character limits require it.
 
 ---
 
@@ -167,6 +205,18 @@ Make sure the handle format is correct:
 - ✅ Correct: `@user@instance.social` or `user@instance.social`
 - ❌ Incorrect: `@user` (missing instance)
 - ❌ Incorrect: `instance.social/@user` (use full URL or @user@instance format)
+
+### Can I use just the UUID instead of the full URL?
+
+**Yes!** For space-constrained environments (Twitter bios, forum signatures, etc.), you can use just your UUID:
+
+```
+4ff7ed97-b78f-4ae6-9011-5af714ee241c
+```
+
+AnchorID verification will find **either** the full resolver URL or just the UUID in your profile content.
+
+**Note:** The full URL (`https://anchorid.net/resolve/your-uuid`) is recommended when space permits, as it's more human-readable and immediately identifies the verification service. Use UUID-only only when character limits require it.
 
 ---
 

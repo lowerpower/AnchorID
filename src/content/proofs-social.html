@@ -442,9 +442,38 @@ Canonical identity: https://anchorid.net/resolve/4ff7ed97-b78f-4ae6-9011-5af714e
     <p>AnchorID will:</p>
     <ol>
       <li>Fetch the public page</li>
-      <li>Search for your resolver URL</li>
+      <li>Search for your resolver URL <strong>OR</strong> just your UUID</li>
       <li>Mark the claim as <strong>verified</strong> if found ✅</li>
     </ol>
+
+    <hr />
+
+    <h2>Space-Constrained Environments</h2>
+
+    <p>For platforms with strict character limits (like social media bios or short profile fields), you can use <strong>just the UUID</strong> instead of the full resolver URL:</p>
+
+    <div class="callout">
+      <p><strong>Full URL (recommended):</strong></p>
+      <pre><code>https://anchorid.net/resolve/4ff7ed97-b78f-4ae6-9011-5af714ee241c</code></pre>
+      <p style="margin-top:12px"><strong>UUID only (space-constrained):</strong></p>
+      <pre><code>4ff7ed97-b78f-4ae6-9011-5af714ee241c</code></pre>
+    </div>
+
+    <p><strong>Examples:</strong></p>
+
+    <p><strong>Twitter bio (limited space):</strong></p>
+    <pre><code>Software developer | Open source contributor
+Identity: 4ff7ed97-b78f-4ae6-9011-5af714ee241c</code></pre>
+
+    <p><strong>Forum signature (limited space):</strong></p>
+    <pre><code>AnchorID: 4ff7ed97-b78f-4ae6-9011-5af714ee241c</code></pre>
+
+    <p><strong>GitHub bio (160 chars):</strong></p>
+    <pre><code>Developer working on distributed systems. 4ff7ed97-b78f-4ae6-9011-5af714ee241c</code></pre>
+
+    <p>AnchorID verification will find <strong>either</strong> the full resolver URL or just the UUID. The UUID must match the exact format (8-4-4-4-12 hex digits).</p>
+
+    <p><strong>Note:</strong> While the UUID-only format saves space, the full URL is more human-readable and immediately identifies the verification service. Use UUID-only only when character limits require it.</p>
 
     <hr />
 
@@ -511,6 +540,12 @@ https://news.ycombinator.com/user?id=username</code></pre>
       <li>❌ Incorrect: <code>@user</code> (missing instance)</li>
       <li>❌ Incorrect: <code>instance.social/@user</code> (use full URL or @user@instance format)</li>
     </ul>
+
+    <h3>Can I use just the UUID instead of the full URL?</h3>
+    <p><strong>Yes!</strong> For space-constrained environments (Twitter bios, forum signatures, etc.), you can use just your UUID:</p>
+    <pre><code>4ff7ed97-b78f-4ae6-9011-5af714ee241c</code></pre>
+    <p>AnchorID verification will find <strong>either</strong> the full resolver URL or just the UUID in your profile content.</p>
+    <p><strong>Note:</strong> The full URL (<code>https://anchorid.net/resolve/your-uuid</code>) is recommended when space permits, as it's more human-readable and immediately identifies the verification service. Use UUID-only only when character limits require it.</p>
 
     <hr />
 
