@@ -631,6 +631,23 @@ export default {
       });
     }
 
+    // .well-known/anchorid.txt - Website proof for anchorid.net
+    // Demonstrates website proof linking the AnchorID organization to its founder
+    if (path === "/.well-known/anchorid.txt") {
+      return new Response(
+        `https://anchorid.net/resolve/4c785577-9f55-4a22-a80b-dd1f4d9b4658
+https://anchorid.net/resolve/4ff7ed97-b78f-4ae6-9011-5af714ee241c
+`,
+        {
+          headers: {
+            "content-type": "text/plain; charset=utf-8",
+            "cache-control":
+              "public, max-age=86400, s-maxage=604800",
+          },
+        }
+      );
+    }
+
     // Proofs page
     if (path === "/proofs" || path === "/proofs/") {
       const html = await env.ANCHOR_KV.get("page:proofs");
