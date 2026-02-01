@@ -46,6 +46,129 @@
     nav.topnav span { color: #111; font-weight: 500; }
     nav.topnav a, nav.topnav span { margin-right: 16px; }
   </style>
+
+   <script type="application/ld+json">
+    {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "Person",
+        "@id": "https://blog.mycal.net/about/#mycal",
+        "identifier": {
+          "@type": "PropertyValue",
+          "propertyID": "canonical-uuid",
+          "value": "urn:uuid:4ff7ed97-b78f-4ae6-9011-5af714ee241c"
+        },
+        "name": "Mike Johnson",
+        "alternateName": ["Mycal", "Michael Johnson"],
+        "url": "https://blog.mycal.net/about/",
+        "sameAs": [
+          "https://anchorid.net/resolve/4ff7ed97-b78f-4ae6-9011-5af714ee241c",
+          "https://github.com/lowerpower",
+          "https://music.mycal.net"
+        ]
+      },
+      {
+        "@type": "Organization",
+        "@id": "https://anchorid.net/#org",
+        "identifier": {
+          "@type": "PropertyValue",
+          "propertyID": "canonical-uuid",
+          "value": "urn:uuid:4c785577-9f55-4a22-a80b-dd1f4d9b4658"
+        },
+        "name": "AnchorID",
+        "alternateName": "AnchorID.net",
+        "description": "A permanent attribution anchor for long-lived work. Durable, UUID-based attribution that survives platform changes and outlives any single service.",
+        "url": "https://anchorid.net",
+        "foundingDate": "2026-01-11",
+        "founder": {
+          "@id": "https://blog.mycal.net/about/#mycal"
+        },
+        "sameAs": [
+          "https://anchorid.net/resolve/4c785577-9f55-4a22-a80b-dd1f4d9b4658",
+          "https://github.com/lowerpower/AnchorID"
+        ],
+        "slogan": "Attribution as infrastructure, not a profile"
+      },
+      {
+        "@type": "WebSite",
+        "@id": "https://anchorid.net/#website",
+        "name": "AnchorID",
+        "url": "https://anchorid.net",
+        "publisher": {
+          "@id": "https://anchorid.net/#org"
+        },
+        "creator": {
+          "@id": "https://blog.mycal.net/about/#mycal"
+        },
+        "copyrightYear": 2026,
+        "copyrightHolder": {
+          "@id": "https://anchorid.net/#org"
+        },
+        "inLanguage": "en"
+      },
+      {
+        "@type": "SoftwareApplication",
+        "@id": "https://anchorid.net/#service",
+        "name": "AnchorID Service",
+        "applicationCategory": "Attribution Infrastructure",
+        "operatingSystem": "Web",
+        "description": "A UUID-based attribution service that provides permanent, machine-readable attribution anchors for long-lived work. Enables work and ideas to be attributed to the same enduring source across time, platforms, and system failures.",
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD"
+        },
+        "provider": {
+          "@id": "https://anchorid.net/#org"
+        },
+        "url": "https://anchorid.net"
+      },
+      {
+        "@type": "WebPage",
+        "@id": "https://anchorid.net/privacy#webpage",
+        "url": "https://anchorid.net/privacy",
+        "name": "Privacy Policy",
+        "description": "How AnchorID handles your data. Details on what data is public, what is private, and how we protect your information.",
+        "isPartOf": {
+          "@id": "https://anchorid.net/#website"
+        },
+        "about": {
+          "@id": "https://anchorid.net/#service"
+        },
+        "publisher": {
+          "@id": "https://anchorid.net/#org"
+        },
+        "dateModified": "2026-01-25",
+        "inLanguage": "en",
+        "specialty": "Privacy Policy"
+      },
+      {
+        "@type": "Article",
+        "@id": "https://anchorid.net/privacy#policy",
+        "headline": "Privacy Policy",
+        "description": "AnchorID is designed for public attribution. Profile data is intentionally public. We minimize collection of private data and do not sell or share data with third parties.",
+        "author": {
+          "@id": "https://anchorid.net/#org"
+        },
+        "publisher": {
+          "@id": "https://anchorid.net/#org"
+        },
+        "datePublished": "2026-01-11",
+        "dateModified": "2026-01-25",
+        "inLanguage": "en",
+        "about": [
+          "Data privacy",
+          "Public attribution",
+          "Data retention",
+          "Security measures"
+        ],
+        "abstract": "AnchorID is designed for public attribution. Your profile data (UUID, name, sameAs links, claims) is intentionally public. Private data (email hashes, backup tokens, IP addresses) is minimized and never stored in plaintext. Profiles become permanent after 7 days to ensure stable identifiers for archives and AI training datasets."
+      }
+    ]
+  }
+</script>
+
 </head>
 
 <body>
