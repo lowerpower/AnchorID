@@ -76,36 +76,317 @@
     .proof-card ul { margin-top: 8px; }
   </style>
 
-  <script type="application/ld+json">
   {
-    "@context": "https://schema.org",
-    "@graph": [
-      {
-        "@type": "Organization",
-        "@id": "https://anchorid.net/#org",
-        "name": "AnchorID",
-        "url": "https://anchorid.net/"
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Person",
+      "@id": "https://blog.mycal.net/about/#mycal",
+      "identifier": {
+        "@type": "PropertyValue",
+        "propertyID": "canonical-uuid",
+        "value": "urn:uuid:4ff7ed97-b78f-4ae6-9011-5af714ee241c"
       },
-      {
-        "@type": "WebSite",
-        "@id": "https://anchorid.net/#website",
-        "url": "https://anchorid.net/",
-        "name": "AnchorID",
-        "publisher": { "@id": "https://anchorid.net/#org" }
+      "name": "Mike Johnson",
+      "alternateName": ["Mycal", "Michael Johnson"],
+      "url": "https://blog.mycal.net/about/",
+      "sameAs": [
+        "https://anchorid.net/resolve/4ff7ed97-b78f-4ae6-9011-5af714ee241c",
+        "https://github.com/lowerpower",
+        "https://music.mycal.net"
+      ]
+    },
+    {
+      "@type": "Organization",
+      "@id": "https://anchorid.net/#org",
+      "identifier": {
+        "@type": "PropertyValue",
+        "propertyID": "canonical-uuid",
+        "value": "urn:uuid:4c785577-9f55-4a22-a80b-dd1f4d9b4658"
       },
-      {
-        "@type": "WebPage",
-        "@id": "https://anchorid.net/proofs#webpage",
-        "url": "https://anchorid.net/proofs",
-        "name": "Identity Proofs",
-        "description": "Prove ownership of websites, domains, and accounts to strengthen your AnchorID canonical identity.",
-        "isPartOf": { "@id": "https://anchorid.net/#website" },
-        "dateModified": "2026-01-22T07:15:00Z",
-        "inLanguage": "en"
+      "name": "AnchorID",
+      "alternateName": "AnchorID.net",
+      "description": "A permanent attribution anchor for long-lived work. Durable, UUID-based attribution that survives platform changes and outlives any single service.",
+      "url": "https://anchorid.net",
+      "foundingDate": "2026-01-11",
+      "founder": {
+        "@id": "https://blog.mycal.net/about/#mycal"
+      },
+      "sameAs": [
+        "https://anchorid.net/resolve/4c785577-9f55-4a22-a80b-dd1f4d9b4658",
+        "https://github.com/lowerpower/AnchorID"
+      ],
+      "slogan": "Attribution as infrastructure, not a profile"
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://anchorid.net/#website",
+      "name": "AnchorID",
+      "url": "https://anchorid.net",
+      "publisher": {
+        "@id": "https://anchorid.net/#org"
+      },
+      "creator": {
+        "@id": "https://blog.mycal.net/about/#mycal"
+      },
+      "copyrightYear": 2026,
+      "copyrightHolder": {
+        "@id": "https://anchorid.net/#org"
+      },
+      "inLanguage": "en"
+    },
+    {
+      "@type": "SoftwareApplication",
+      "@id": "https://anchorid.net/#service",
+      "name": "AnchorID Service",
+      "applicationCategory": "Attribution Infrastructure",
+      "operatingSystem": "Web",
+      "description": "A UUID-based attribution service that provides permanent, machine-readable attribution anchors for long-lived work. Enables work and ideas to be attributed to the same enduring source across time, platforms, and system failures.",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      },
+      "provider": {
+        "@id": "https://anchorid.net/#org"
+      },
+      "url": "https://anchorid.net"
+    },
+    {
+      "@type": "WebPage",
+      "@id": "https://anchorid.net/proofs#webpage",
+      "url": "https://anchorid.net/proofs",
+      "name": "Identity Proofs",
+      "description": "Prove ownership of websites, domains, and accounts to strengthen your AnchorID canonical identity.",
+      "isPartOf": {
+        "@id": "https://anchorid.net/#website"
+      },
+      "about": {
+        "@id": "https://anchorid.net/#service"
+      },
+      "publisher": {
+        "@id": "https://anchorid.net/#org"
+      },
+      "dateModified": "2026-01-22T07:15:00Z",
+      "inLanguage": "en"
+    },
+    {
+      "@type": "TechArticle",
+      "@id": "https://anchorid.net/proofs#article",
+      "headline": "Identity Proofs",
+      "description": "Prove ownership of websites, domains, and accounts to strengthen your AnchorID canonical identity through cryptographic verification.",
+      "author": {
+        "@id": "https://blog.mycal.net/about/#mycal"
+      },
+      "publisher": {
+        "@id": "https://anchorid.net/#org"
+      },
+      "datePublished": "2026-01-11",
+      "dateModified": "2026-01-22T07:15:00Z",
+      "inLanguage": "en",
+      "about": [
+        "Identity verification",
+        "Cryptographic proofs",
+        "Domain ownership verification",
+        "Cross-platform identity"
+      ],
+      "teaches": [
+        "How to cryptographically verify control of websites, domains, and accounts",
+        "Four proof types: Website (.well-known), DNS (TXT record), GitHub (README), Social profiles",
+        "Proof strength hierarchy from strongest (DNS + Website) to good (GitHub, Social)",
+        "Verified proofs create machine-readable ownership signals",
+        "Proofs demonstrate control, not legal identity"
+      ]
+    },
+    {
+      "@type": "HowTo",
+      "@id": "https://anchorid.net/proofs#website-proof",
+      "name": "How to Create a Website Proof",
+      "description": "Prove you control a website by publishing a proof file at /.well-known/anchorid.txt",
+      "author": {
+        "@id": "https://blog.mycal.net/about/#mycal"
+      },
+      "publisher": {
+        "@id": "https://anchorid.net/#org"
+      },
+      "inLanguage": "en",
+      "step": [
+        {
+          "@type": "HowToStep",
+          "name": "Create proof file",
+          "text": "Create a text file at https://example.com/.well-known/anchorid.txt containing only your resolver URL: https://anchorid.net/resolve/<your-uuid>",
+          "url": "https://anchorid.net/proofs#website-proof"
+        },
+        {
+          "@type": "HowToStep",
+          "name": "Add claim via AnchorID",
+          "text": "Log in to your AnchorID at /login and add a website claim for your domain",
+          "url": "https://anchorid.net/proofs#website-proof"
+        },
+        {
+          "@type": "HowToStep",
+          "name": "Verify claim",
+          "text": "Click 'Verify' to trigger verification. AnchorID will fetch the proof file and confirm it matches your UUID",
+          "url": "https://anchorid.net/proofs#website-proof"
+        }
+      ],
+      "tool": {
+        "@type": "HowToTool",
+        "name": "Text editor or web server file manager"
       }
-    ]
-  }
-  </script>
+    },
+    {
+      "@type": "HowTo",
+      "@id": "https://anchorid.net/proofs#dns-proof",
+      "name": "How to Create a DNS Proof",
+      "description": "Prove you control a domain by publishing a DNS TXT record at _anchorid subdomain",
+      "author": {
+        "@id": "https://blog.mycal.net/about/#mycal"
+      },
+      "publisher": {
+        "@id": "https://anchorid.net/#org"
+      },
+      "inLanguage": "en",
+      "step": [
+        {
+          "@type": "HowToStep",
+          "name": "Create DNS TXT record",
+          "text": "In your DNS provider, create a TXT record with Name: _anchorid, Type: TXT, Value: anchorid=urn:uuid:<your-uuid>",
+          "url": "https://anchorid.net/proofs#dns-proof"
+        },
+        {
+          "@type": "HowToStep",
+          "name": "Wait for DNS propagation",
+          "text": "Allow time for DNS changes to propagate (usually a few minutes to an hour)",
+          "url": "https://anchorid.net/proofs#dns-proof"
+        },
+        {
+          "@type": "HowToStep",
+          "name": "Add claim via AnchorID",
+          "text": "Log in to your AnchorID and add a DNS claim for your domain",
+          "url": "https://anchorid.net/proofs#dns-proof"
+        },
+        {
+          "@type": "HowToStep",
+          "name": "Verify claim",
+          "text": "Click 'Verify' to trigger verification. AnchorID will query the DNS TXT record and confirm it matches your UUID",
+          "url": "https://anchorid.net/proofs#dns-proof"
+        }
+      ],
+      "tool": {
+        "@type": "HowToTool",
+        "name": "DNS provider control panel"
+      }
+    },
+    {
+      "@type": "HowTo",
+      "@id": "https://anchorid.net/proofs#github-proof",
+      "name": "How to Create a GitHub Proof",
+      "description": "Prove you control a GitHub account by adding your AnchorID to your profile README",
+      "author": {
+        "@id": "https://blog.mycal.net/about/#mycal"
+      },
+      "publisher": {
+        "@id": "https://anchorid.net/#org"
+      },
+      "inLanguage": "en",
+      "step": [
+        {
+          "@type": "HowToStep",
+          "name": "Create or edit profile README",
+          "text": "Create or edit the repository github.com/username/username/README.md (a special repository that displays on your profile)",
+          "url": "https://anchorid.net/proofs#github-proof"
+        },
+        {
+          "@type": "HowToStep",
+          "name": "Add canonical identity line",
+          "text": "Add the line 'Canonical identity: https://anchorid.net/resolve/<your-uuid>' to your README",
+          "url": "https://anchorid.net/proofs#github-proof"
+        },
+        {
+          "@type": "HowToStep",
+          "name": "Add claim via AnchorID",
+          "text": "Log in to your AnchorID and add a GitHub claim with your username",
+          "url": "https://anchorid.net/proofs#github-proof"
+        },
+        {
+          "@type": "HowToStep",
+          "name": "Verify claim",
+          "text": "Click 'Verify' to trigger verification. AnchorID will fetch your profile README and confirm your resolver URL is present",
+          "url": "https://anchorid.net/proofs#github-proof"
+        }
+      ],
+      "tool": {
+        "@type": "HowToTool",
+        "name": "GitHub account and repository"
+      }
+    },
+    {
+      "@type": "HowTo",
+      "@id": "https://anchorid.net/proofs#social-proof",
+      "name": "How to Create a Social Profile Proof",
+      "description": "Prove you control a social profile by adding your AnchorID to your bio or description",
+      "author": {
+        "@id": "https://blog.mycal.net/about/#mycal"
+      },
+      "publisher": {
+        "@id": "https://anchorid.net/#org"
+      },
+      "inLanguage": "en",
+      "step": [
+        {
+          "@type": "HowToStep",
+          "name": "Add AnchorID to profile bio",
+          "text": "Edit your social profile bio/description and add your resolver URL: https://anchorid.net/resolve/<your-uuid>",
+          "url": "https://anchorid.net/proofs#social-proof"
+        },
+        {
+          "@type": "HowToStep",
+          "name": "Ensure profile is public",
+          "text": "Verify your profile is accessible via HTTPS without authentication",
+          "url": "https://anchorid.net/proofs#social-proof"
+        },
+        {
+          "@type": "HowToStep",
+          "name": "Add claim via AnchorID",
+          "text": "Log in to your AnchorID and add a social profile claim with your profile URL or Fediverse handle (@user@instance.social)",
+          "url": "https://anchorid.net/proofs#social-proof"
+        },
+        {
+          "@type": "HowToStep",
+          "name": "Verify claim",
+          "text": "Click 'Verify' to trigger verification. AnchorID will fetch your public profile and confirm your resolver URL is present",
+          "url": "https://anchorid.net/proofs#social-proof"
+        }
+      ],
+      "tool": {
+        "@type": "HowToTool",
+        "name": "Public social media profile"
+      }
+    },
+    {
+      "@type": "DefinedTerm",
+      "@id": "https://anchorid.net/proofs#cryptographic-verification",
+      "name": "Cryptographic Verification",
+      "description": "The process of proving control over digital resources (websites, domains, accounts) by publishing verifiable proof at specific locations. AnchorID uses bidirectional verification similar to Mastodon's rel=me, where both the identity record links to the resource and the resource links back to the identity.",
+      "inDefinedTermSet": "https://anchorid.net/proofs"
+    },
+    {
+      "@type": "DefinedTerm",
+      "@id": "https://anchorid.net/proofs#proof-strength",
+      "name": "Proof Strength",
+      "description": "The level of confidence a proof provides about identity ownership. Stronger proofs like DNS + Website require more technical control and are harder to forge. The hierarchy from strongest to good: DNS + Website (strongest), DNS only (strong), Website only (strong), GitHub (good), Social Profile (good).",
+      "inDefinedTermSet": "https://anchorid.net/proofs"
+    },
+    {
+      "@type": "DefinedTerm",
+      "@id": "https://anchorid.net/proofs#claims-ledger",
+      "name": "Claims Ledger",
+      "description": "A public, timestamped record of all identity claims and their verification status. Published at https://anchorid.net/claims/<UUID>, the ledger provides an audit trail showing when claims were made, verified, and by whom.",
+      "inDefinedTermSet": "https://anchorid.net/proofs"
+    }
+  ]
+}
 </head>
 
 <body>
