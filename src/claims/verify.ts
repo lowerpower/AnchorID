@@ -146,24 +146,30 @@ export function validateProfileUrl(urlString: string): { ok: boolean; error?: st
   return { ok: true, url };
 }
 
-export function claimIdForSocial(url: string): string {
+export function claimIdForPublic(url: string): string {
   try {
     const u = new URL(url);
     // Use hostname + pathname for ID to handle different profiles on same instance
     const path = u.pathname.replace(/\/$/, '');  // Remove trailing slash
-    return `social:${u.hostname.toLowerCase()}${path}`;
+    return `public:${u.hostname.toLowerCase()}${path}`;
   } catch {
-    return `social:${url}`;
+    return `public:${url}`;
   }
 }
 
-export function buildSocialProof(inputUrl: string, resolverUrl: string): ClaimProof {
+// Backward compatibility: keep old name as alias
+export const claimIdForSocial = claimIdForPublic;
+
+export function buildPublicProof(inputUrl: string, resolverUrl: string): ClaimProof {
   return {
     kind: "profile_page",
     url: inputUrl,
     mustContain: resolverUrl,
   };
 }
+
+// Backward compatibility: keep old name as alias
+export const buildSocialProof = buildPublicProof;
 
 async function fetchText(url: string): Promise<{ ok: boolean; status: number; text: string }> {
   const r = await fetch(url, {

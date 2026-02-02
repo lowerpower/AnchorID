@@ -21,11 +21,11 @@ import {
   claimIdForWebsite,
   claimIdForGitHub,
   claimIdForDns,
-  claimIdForSocial,
+  claimIdForPublic,
   buildWellKnownProof,
   buildGitHubReadmeProof,
   buildDnsProof,
-  buildSocialProof,
+  buildPublicProof,
   parseFediverseHandle,
   validateProfileUrl,
   verifyClaim,
@@ -202,11 +202,12 @@ export async function handlePostClaim(request: Request,   env: Env): Promise<Res
 
   const uuid = String(payload.uuid || "").trim();
   const type = String(payload.type || "").trim();
-  // normalize FIRST, before building ids or proofs (except for social, which needs special handling)
-  const url = type === "social" ? String(payload.url || "").trim() : normalizeIdentityUrl(String(payload.url || ""));
+  // normalize FIRST, before building ids or proofs (except for public/social, which needs special handling)
+  const url = (type === "public" || type === "social") ? String(payload.url || "").trim() : normalizeIdentityUrl(String(payload.url || ""));
 
   if (!isUuid(uuid)) return new Response("Bad UUID", { status: 400 });
-  if (type !== "website" && type !== "github" && type !== "dns" && type !== "social") return new Response("Bad type", { status: 400 });
+  // Accept both "public" (new) and "social" (backward compatibility)
+  if (type !== "website" && type !== "github" && type !== "dns" && type !== "public" && type !== "social") return new Response("Bad type", { status: 400 });
 
   const resolverUrl = resolverUrlFor(uuid);
   const now = nowIso();
@@ -275,7 +276,7 @@ export async function handlePostClaim(request: Request,   env: Env): Promise<Res
       createdAt: now,
       updatedAt: now,
     };
-  } else if (type === "social") {
+  } else if (type === "public" || type === "social") {
     // Parse @user@instance format or accept full URL
     let profileUrl = url;
 
@@ -294,12 +295,12 @@ export async function handlePostClaim(request: Request,   env: Env): Promise<Res
       return new Response(`Invalid URL: ${validation.error}`, { status: 400 });
     }
 
-    const id = claimIdForSocial(profileUrl);
-    const proof = buildSocialProof(profileUrl, resolverUrl);
+    const id = claimIdForPublic(profileUrl);
+    const proof = buildPublicProof(profileUrl, resolverUrl);
 
     claim = {
       id,
-      type: "social",
+      type: "public",  // Always create new claims with "public" type
       url: profileUrl,
       status: "self_asserted",
       proof,

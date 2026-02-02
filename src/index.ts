@@ -2106,7 +2106,7 @@ ${claims.length === 0 ? `<div style="background:#f6f6f6;padding:14px;border-radi
     const typeDisplayName = c.type === "website" ? "WEBSITE"
       : c.type === "github" ? "GITHUB"
       : c.type === "dns" ? "DNS"
-      : c.type === "social" ? "PUBLIC PROFILE"
+      : (c.type === "public" || c.type === "social") ? "PUBLIC PROFILE"  // Accept both new and old names
       : escapeHtml(c.type).toUpperCase();
 
     let proofDetails = "";
@@ -2173,7 +2173,7 @@ ${claims.length === 0 ? `<div style="background:#f6f6f6;padding:14px;border-radi
         <option value="website">Website (.well-known/anchorid.txt)</option>
         <option value="github">GitHub (profile README)</option>
         <option value="dns">DNS (TXT record)</option>
-        <option value="social">Public Profile (any public bio)</option>
+        <option value="public">Public Profile (any public bio)</option>
       </select>
 
       <label style="display:block;margin-bottom:8px;font-weight:500" id="urlLabel">URL or Domain</label>
@@ -2254,7 +2254,7 @@ ${claims.length === 0 ? `<div style="background:#f6f6f6;padding:14px;border-radi
       urlLabel.textContent = "Domain";
       urlInput.placeholder = "example.com or _anchorid.example.com";
       dnsHint.style.display = "block";
-    } else if (type === "social") {
+    } else if (type === "public") {
       urlLabel.textContent = "Profile URL or @handle";
       urlInput.placeholder = "@user@mastodon.social or https://bsky.app/profile/user.bsky.social";
       dnsHint.style.display = "none";

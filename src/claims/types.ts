@@ -24,7 +24,7 @@ export type ClaimProof =
 
 export type Claim = {
   id: string;
-  type: "website" | "github" | "dns" | "social";
+  type: "website" | "github" | "dns" | "public";
   url: string;
   status: ClaimStatus;
   proof: ClaimProof;

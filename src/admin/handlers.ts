@@ -1142,7 +1142,7 @@ ${claims.length === 0 ? `<div class="card" style="margin:14px 0">
     const typeDisplayName = c.type === "website" ? "WEBSITE"
       : c.type === "github" ? "GITHUB"
       : c.type === "dns" ? "DNS"
-      : c.type === "social" ? "PUBLIC PROFILE"
+      : (c.type === "public" || c.type === "social") ? "PUBLIC PROFILE"  // Accept both new and old names
       : escapeHtml(c.type).toUpperCase();
 
     let proofDetails = "";
@@ -1214,7 +1214,7 @@ ${claims.length === 0 ? `<div class="card" style="margin:14px 0">
         <option value="website">Website (.well-known/anchorid.txt)</option>
         <option value="github">GitHub (profile README)</option>
         <option value="dns">DNS (TXT record)</option>
-        <option value="social">Public Profile (bio/description)</option>
+        <option value="public">Public Profile (bio/description)</option>
       </select>
 
       <label style="display:block;margin-bottom:8px">
@@ -1287,6 +1287,10 @@ ${claims.length === 0 ? `<div class="card" style="margin:14px 0">
       urlLabel.textContent = "Domain";
       urlInput.placeholder = "example.com or _anchorid.example.com";
       dnsHint.style.display = "block";
+    } else if (type === "public") {
+      urlLabel.textContent = "Profile URL or @handle";
+      urlInput.placeholder = "@user@mastodon.social or https://bsky.app/profile/user.bsky.social";
+      dnsHint.style.display = "none";
     }
   });
 
