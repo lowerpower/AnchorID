@@ -331,7 +331,7 @@ export async function handlePostClaimVerify(
   if (!payload) return new Response("Bad JSON", { status: 400 });
 
   const uuid = String(payload.uuid || "").trim();
-  const id = String(payload.id || "").trim();
+  const id = String(payload.claimId || payload.id || "").trim();
   const bypassCache = Boolean(payload.bypassCache || payload.recheckNow);
 
   if (!isUuid(uuid)) return new Response("Bad UUID", { status: 400 });
