@@ -715,7 +715,7 @@ https://anchorid.net/resolve/4ff7ed97-b78f-4ae6-9011-5af714ee241c
     if (path === "/proofs/social" || path === "/proofs/social/") {
       const html = await env.ANCHOR_KV.get("page:proofs-social");
       if (!html) {
-        return new Response("Social proof guide not found", { status: 404 });
+        return new Response("Public profile proof guide not found", { status: 404 });
       }
       return new Response(html, {
         headers: {
