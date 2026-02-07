@@ -206,6 +206,7 @@ export async function handlePostClaim(request: Request,   env: Env): Promise<Res
   const url = (type === "public" || type === "social") ? String(payload.url || "").trim() : normalizeIdentityUrl(String(payload.url || ""));
 
   if (!isUuid(uuid)) return new Response("Bad UUID", { status: 400 });
+  if (url.length > 2048) return new Response("URL too long", { status: 400 });
   // Accept both "public" (new) and "social" (backward compatibility)
   if (type !== "website" && type !== "github" && type !== "dns" && type !== "public" && type !== "social") return new Response("Bad type", { status: 400 });
 

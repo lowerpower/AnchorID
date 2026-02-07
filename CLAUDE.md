@@ -262,7 +262,7 @@ Four claim types:
 - **Website**: Proof at `https://domain/.well-known/anchorid.txt` containing resolver URL
 - **GitHub**: Profile README containing resolver URL
 - **DNS**: TXT record at `_anchorid.domain.com` containing resolver URL
-- **Social**: Profile page bio/description containing resolver URL (Mastodon, etc.)
+- **Public**: Profile page bio/description containing resolver URL (Mastodon, etc.)
 
 Claim states: `self_asserted` → `verified` or `failed`
 
@@ -272,7 +272,7 @@ Claim states: `self_asserted` → `verified` or `failed`
 - Users can trigger verification for any of their claims
 - Session token authentication ensures users can only manage their own claims
 
-**Social profile claims:**
+**Public profile claims:**
 - Supports Fediverse/Mastodon: `@user@instance.social` or full URL
 - Supports forums and any public HTTPS profile
 - SSRF protection blocks localhost, private IPs, cloud metadata endpoints
@@ -366,7 +366,7 @@ Admins can delete profiles that are less than 7 days old. From `/admin/edit/<uui
 
 See `todo.md` for the MVP checklist. Core functionality complete:
 - ✅ Identity resolution
-- ✅ Claims verification (website, GitHub, DNS, social profiles)
+- ✅ Claims verification (website, GitHub, DNS, public profiles)
 - ✅ Email magic link flow with domain-based routing (Brevo, mycal.net, Resend)
 - ✅ Backup token recovery
 - ✅ Admin UI (with email addition and profile deletion)
