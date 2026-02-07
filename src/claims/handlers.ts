@@ -112,7 +112,7 @@ export async function handleGetClaimsHtml(
         </div>
         <div class="url"><a href="${esc(c.url)}" rel="me noopener" target="_blank">${esc(c.url)}</a></div>
         <div class="meta">
-          <span>${esc(c.type)}</span>
+          <span>${esc(c.type === "social" ? "public" : c.type)}</span>
           ${c.verifiedAt ? `<span>Verified: <code>${esc(c.verifiedAt)}</code></span>` : ""}
           ${c.lastCheckedAt ? `<span>Checked: <code>${esc(c.lastCheckedAt)}</code></span>` : ""}
         </div>

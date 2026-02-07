@@ -153,7 +153,7 @@ export function getErrorInfo(failReason: string): ErrorInfo {
   if (failReason === "unknown_claim_type") {
     return {
       message: "Unsupported claim type",
-      hint: "This claim type is not supported. Use 'website', 'github', or 'dns'.",
+      hint: "This claim type is not supported. Use 'website', 'github', 'dns', or 'public'.",
     };
   }
 

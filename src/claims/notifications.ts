@@ -34,14 +34,15 @@ export async function sendClaimVerifiedEmail(
 ): Promise<void> {
   if (!hasEmailConfig(env)) return;
 
-  const claimTypeLabel = claim.type.toUpperCase();
+  const normalizedType = claim.type === "social" ? "public" : claim.type;
+  const claimTypeLabel = normalizedType.toUpperCase();
   const subject = `✓ ${claimTypeLabel} Claim Verified - AnchorID`;
 
   const message = [
     `Good news! Your ${claimTypeLabel} identity claim has been verified.`,
     "",
     `Claim: ${claim.url}`,
-    `Type: ${claim.type}`,
+    `Type: ${normalizedType}`,
     `Verified: ${claim.verifiedAt || "just now"}`,
     "",
     "This claim is now included in your public sameAs links and strengthens your identity.",
@@ -72,7 +73,8 @@ export async function sendClaimFailedEmail(
 ): Promise<void> {
   if (!hasEmailConfig(env)) return;
 
-  const claimTypeLabel = claim.type.toUpperCase();
+  const normalizedType = claim.type === "social" ? "public" : claim.type;
+  const claimTypeLabel = normalizedType.toUpperCase();
   const subject = `✗ ${claimTypeLabel} Claim Verification Failed - AnchorID`;
 
   // Get user-friendly error message
@@ -82,7 +84,7 @@ export async function sendClaimFailedEmail(
     `Your ${claimTypeLabel} identity claim verification failed.`,
     "",
     `Claim: ${claim.url}`,
-    `Type: ${claim.type}`,
+    `Type: ${normalizedType}`,
     `Last checked: ${claim.lastCheckedAt || "just now"}`,
     "",
     `Error: ${errorInfo.message}`,

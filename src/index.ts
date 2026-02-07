@@ -462,7 +462,7 @@ export default {
           "Website verification via .well-known/anchorid.txt",
           "DNS verification via TXT records",
           "GitHub profile verification",
-          "Social profile verification",
+          "Public profile verification",
           "Cryptographic proof of platform control",
           "Public claims ledger",
           "Email-based magic link authentication"
@@ -543,6 +543,7 @@ export default {
       Built for longevity. MIT Licensed.
       Running on the Edge via Cloudflare Workers.
     </p>
+    <p><a href="https://github.com/lowerpower/anchorid" style="color:#999">GitHub</a></p>
   </footer>
 </body>
 </html>`,
