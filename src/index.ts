@@ -640,6 +640,7 @@ async function handleSignup(request: Request, env: Env): Promise<Response> {
   await Promise.all([
     env.ANCHOR_KV.put(`profile:${uuid}`, JSON.stringify(profile)),
     env.ANCHOR_KV.put(`email:${emailHash}`, uuid),
+    env.ANCHOR_KV.put(`email:unhashed:${uuid}`, email, { expirationTtl: 604800 }), // 7 days for admin spam detection
     env.ANCHOR_KV.put(`login:${editToken}`, JSON.stringify({ uuid, emailHash, isSetup: true }), { expirationTtl: ttl }),
     env.ANCHOR_KV.put(`signup:${uuid}`, backupToken, { expirationTtl: 300 }), // 5 min to show backup token
   ]);

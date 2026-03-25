@@ -133,6 +133,7 @@ npx wrangler kv key put --remote --binding ANCHOR_KV "page:privacy" --path ./src
 | `profile:<uuid>` | Person JSON-LD | Permanent |
 | `claims:<uuid>` | Claims array | Permanent |
 | `email:<sha256>` | UUID lookup by email hash | Permanent |
+| `email:unhashed:<uuid>` | Plaintext email for admin spam detection | 7 days |
 | `login:<token>` | Magic link session `{uuid, emailHash?, isSetup?, backupAccess?}` | 15 min |
 | `signup:<uuid>` | Backup token (plaintext, one-time display) | 5 min |
 | `created:<uuid>` | Backup token for admin flow | 60 sec |

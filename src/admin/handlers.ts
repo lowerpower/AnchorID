@@ -348,32 +348,177 @@ export async function handleAdminLogoutPost(req: Request, env: Env): Promise<Res
   });
 }
 
+// ------------------ Helper functions for admin list view ------------------
+
+/**
+ * Obfuscates an email for display: m***l@example.com
+ */
+function formatEmailForDisplay(email: string | null): string {
+  if (!email) return "(expired)";
+
+  const [local, domain] = email.split("@");
+  if (!local || !domain || local.length < 2) return "(invalid)";
+
+  const obfuscated = local[0] + "***" + local[local.length - 1];
+  return `${obfuscated}@${domain}`;
+}
+
+/**
+ * Extracts YYYY-MM-DD from ISO timestamp
+ */
+function formatDate(isoDate: string | undefined): string {
+  if (!isoDate) return "—";
+  return isoDate.split("T")[0];
+}
+
+/**
+ * Formats relative time from ISO timestamp
+ */
+function formatTimeAgo(isoTimestamp: string): string {
+  const now = Date.now();
+  const then = new Date(isoTimestamp).getTime();
+  const diffMs = now - then;
+  const diffSec = Math.floor(diffMs / 1000);
+  const diffMin = Math.floor(diffSec / 60);
+  const diffHour = Math.floor(diffMin / 60);
+  const diffDay = Math.floor(diffHour / 24);
+
+  if (diffSec < 60) return "just now";
+  if (diffMin < 60) return `${diffMin}m ago`;
+  if (diffHour < 24) return `${diffHour}h ago`;
+  if (diffDay < 30) return `${diffDay}d ago`;
+  return `${Math.floor(diffDay / 30)}mo ago`;
+}
+
+/**
+ * Formats the most recent audit entry for display
+ */
+function formatAuditSummary(audit: any[] | null): string {
+  if (!audit || audit.length === 0) return "(no activity)";
+
+  const recent = audit[0];
+  const actionIcons: Record<string, string> = {
+    create: "🆕",
+    update: "✏️",
+    rotate_token: "🔄",
+  };
+
+  const icon = actionIcons[recent.action] || "📝";
+  const timeAgo = formatTimeAgo(recent.timestamp);
+  const method = recent.method || "unknown";
+
+  return `${timeAgo}: ${icon} ${recent.action} via ${method}`;
+}
+
 export async function handleAdminHome(req: Request, env: Env): Promise<Response> {
   const denied = requireAdminCookie(req, env);
   if (denied) return denied;
 
   const csrf = csrfInput(req);
 
+  // 1. List all profile UUIDs
   const list = await env.ANCHOR_KV.list({ prefix: "profile:", limit: 200 });
   const uuids = list.keys
     .map((k) => k.name.slice("profile:".length))
-    .filter(Boolean)
-    .sort();
+    .filter(Boolean);
 
-  const items = uuids
-    .map((u) => `<li><a href="/admin/edit/${escapeHtml(u)}">${escapeHtml(u)}</a></li>`)
-    .join("");
-
-  const html = `<!doctype html>
+  if (uuids.length === 0) {
+    const html = `<!doctype html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>AnchorID Admin</title></head>
-<body style="font-family:system-ui;max-width:720px;margin:40px auto;padding:0 16px;line-height:1.45">
+<body style="font-family:system-ui;max-width:1200px;margin:40px auto;padding:0 16px;line-height:1.45">
 <h1>AnchorID Admin</h1>
 
 <p><a href="/admin/new">Create new profile</a></p>
 
-<h2>Profiles</h2>
-<ul>${items || "<li>(none)</li>"}</ul>
+<p>(no profiles)</p>
+
+<form method="post" action="/admin/logout" style="margin-top:24px">
+  ${csrf}
+  <button type="submit">Logout</button>
+</form>
+</body></html>`;
+
+    return htmlResponseWithCsrf(html, req);
+  }
+
+  // 2. Load all profiles, emails, and audit logs in parallel
+  const allData = await Promise.all(
+    uuids.map(async (uuid) => {
+      const [profile, email, audit] = await Promise.all([
+        env.ANCHOR_KV.get(`profile:${uuid}`, { type: "json" }) as Promise<any | null>,
+        env.ANCHOR_KV.get(`email:unhashed:${uuid}`),
+        env.ANCHOR_KV.get(`audit:${uuid}`, { type: "json" }) as Promise<any[] | null>,
+      ]);
+      return { uuid, profile, email, audit };
+    })
+  );
+
+  // 3. Sort by dateModified descending (most recently modified first)
+  allData.sort((a, b) => {
+    const aDate = a.profile?.dateModified || a.profile?.dateCreated || "";
+    const bDate = b.profile?.dateModified || b.profile?.dateCreated || "";
+    return bDate.localeCompare(aDate);
+  });
+
+  // 4. Build table rows
+  const rows = allData
+    .map((data) => {
+      const { uuid, profile, email, audit } = data;
+      const uuidShort = uuid.slice(0, 8);
+      const type = profile?.["@type"] === "Organization" ? "🏢 Org" : "👤 Person";
+      const name = profile?.name ? escapeHtml(profile.name) : "(unnamed)";
+      const emailDisplay = formatEmailForDisplay(email);
+      const created = formatDate(profile?.dateCreated);
+      const modified = formatDate(profile?.dateModified);
+      const activity = formatAuditSummary(audit);
+
+      return `<tr>
+  <td><a href="/admin/edit/${escapeHtml(uuid)}">${escapeHtml(uuidShort)}</a></td>
+  <td>${type}</td>
+  <td>${name}</td>
+  <td style="font-family:monospace;font-size:0.9em">${escapeHtml(emailDisplay)}</td>
+  <td>${created}</td>
+  <td>${modified}</td>
+  <td style="font-size:0.9em">${escapeHtml(activity)}</td>
+</tr>`;
+    })
+    .join("");
+
+  const html = `<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AnchorID Admin</title>
+<style>
+  body { font-family:system-ui; max-width:1200px; margin:40px auto; padding:0 16px; line-height:1.45; }
+  table { width:100%; border-collapse:collapse; margin:20px 0; }
+  th { text-align:left; padding:8px; border-bottom:2px solid #ddd; background:#f5f5f5; font-weight:600; }
+  td { padding:8px; border-bottom:1px solid #eee; }
+  tr:hover { background:#f9f9f9; }
+  a { color:#0066cc; text-decoration:none; }
+  a:hover { text-decoration:underline; }
+</style>
+</head>
+<body>
+<h1>AnchorID Admin</h1>
+
+<p><a href="/admin/new">Create new profile</a> | <strong>${allData.length}</strong> profile${allData.length === 1 ? "" : "s"}</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>UUID</th>
+      <th>Type</th>
+      <th>Name</th>
+      <th>Email</th>
+      <th>Created</th>
+      <th>Modified</th>
+      <th>Recent Activity</th>
+    </tr>
+  </thead>
+  <tbody>
+${rows}
+  </tbody>
+</table>
 
 <form method="post" action="/admin/logout" style="margin-top:24px">
   ${csrf}
@@ -560,6 +705,7 @@ export async function handleAdminNewPost(req: Request, env: Env): Promise<Respon
   await Promise.all([
     env.ANCHOR_KV.put(`profile:${uuid}`, JSON.stringify(profileWithMeta)),
     env.ANCHOR_KV.put(`email:${emailHash}`, uuid),
+    env.ANCHOR_KV.put(`email:unhashed:${uuid}`, email, { expirationTtl: 604800 }), // 7 days for admin spam detection
     env.ANCHOR_KV.put(`created:${uuid}`, backupToken, { expirationTtl: 60 }),
   ]);
 
@@ -728,6 +874,9 @@ export async function handleAdminEditGet(req: Request, env: Env, uuid: string): 
   const emailHash = stored?._emailHash || null;
   const backupTokenHash = stored?._backupTokenHash || null;
 
+  // Load unhashed email if available (7-day window)
+  const unhashedEmail = await env.ANCHOR_KV.get(`email:unhashed:${uuid}`);
+
   // Entity-specific fields
   const founder = isOrg ? extractUuids((canonical as any).founder) : [];
   const foundingDate = isOrg ? ((canonical as any).foundingDate || "") : "";
@@ -804,6 +953,11 @@ ${error ? `<div class="alert alert-error">${escapeHtml(errorMessages[error] || e
   <div class="card access-card">
     <label>Email Access <span class="badge access">Configured</span></label>
     <div class="hint" style="margin-top:0">
+      ${unhashedEmail ? `
+        Email: <strong>${escapeHtml(unhashedEmail)}</strong>
+        <span style="color:#666;font-size:11px">(visible for 7 days)</span>
+        <br>
+      ` : ""}
       Hash: <code style="font-size:11px">${escapeHtml(emailHash.slice(0, 16))}...</code>
       <br>Magic link login is enabled.
     </div>

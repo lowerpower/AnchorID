@@ -136,9 +136,17 @@ Rate limits are enforced in KV with automatic TTL expiration.
 **Threat**: Attacker determines which emails have AnchorID accounts.
 
 **Mitigations**:
-- Email addresses are stored as SHA-256 hashes, not plaintext
+- Email addresses are stored as SHA-256 hashes, not plaintext in profiles
 - Login endpoint returns the same response for existing and non-existing emails
 - Rate limiting prevents bulk enumeration
+
+**Temporary Email Storage**:
+- For spam detection purposes, plaintext emails are stored for 7 days after profile creation
+- This is KV TTL-based (auto-expires, no cleanup required)
+- Email is only visible in admin interface (cookie-authenticated)
+- Email display is obfuscated in admin list view (`m***l@example.com`)
+- Full email visible only in admin edit page
+- After 7 days, only the SHA-256 hash remains
 
 **Residual Risk**: Timing attacks might reveal information. The response should be constant-time, but this is not formally verified.
 
