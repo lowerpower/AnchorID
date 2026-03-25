@@ -1,5 +1,18 @@
-
-
+/**
+ * AnchorID - Permanent Attribution Anchor Service
+ *
+ * Copyright (c) 2025-2026 Mike Johnson (Mycal) / AnchorID
+ *
+ * Author:       https://anchorid.net/resolve/4ff7ed97-b78f-4ae6-9011-5af714ee241c
+ * Organization: https://anchorid.net/resolve/4c785577-9f55-4a22-a80b-dd1f4d9b4658
+ * Repository:   https://github.com/lowerpower/anchorid
+ *
+ * SPDX-License-Identifier: MIT
+ * See LICENSE file for full terms.
+ *
+ * AnchorID provides UUID-based permanent attribution anchors for the AI era.
+ * Part of the Mycal Labs infrastructure preservation project.
+ */
 
 import {
   handleAdminLoginPage,
@@ -13,6 +26,8 @@ import {
   handleAdminSavePost,
   handleAdminRotateToken,
   handleAdminDebugKv,
+  handleAdminDelete,
+  handleAdminBackup,
 } from "./admin/handlers";
 
 
@@ -21,6 +36,7 @@ import {
   handleGetClaimsHtml,
   handlePostClaim,
   handlePostClaimVerify,
+  handlePostClaimDelete,
 } from "./claims/handlers";
 
 import { loadClaims } from "./claims/store";
@@ -42,9 +58,13 @@ export interface Env {
   ANCHOR_ADMIN_COOKIE?: string;
 
   // Email providers (at least one required for magic links)
-  MAIL_SEND_SECRET?: string;  // mycal.net relay (preferred)
-  RESEND_API_KEY?: string;    // Resend API (fallback)
-  EMAIL_FROM?: string;        // Sender address (required for Resend)
+  MAIL_SEND_SECRET?: string;       // mycal-style mailer secret
+  MYCAL_MAIL_ENDPOINT?: string;    // mycal-style mailer endpoint URL (required if using MAIL_SEND_SECRET)
+  RESEND_API_KEY?: string;         // Resend API (fallback)
+  EMAIL_FROM?: string;             // Sender address (required for Resend)
+  BREVO_API_KEY?: string;          // Brevo API key
+  BREVO_FROM?: string;             // Sender email for Brevo
+  BREVO_DOMAINS?: string;          // Comma-separated domains (e.g., "outlook.com,hotmail.com")
 
   // TTL + limits
   LOGIN_TTL_SECONDS?: string;    // default 900
@@ -52,9 +72,22 @@ export interface Env {
   UPDATE_RL_PER_HOUR?: string;   // default 20 (per UUID)
 
   // Per-IP rate limits
+  IP_RESOLVE_RL_PER_HOUR?: string; // default 300 (per IP for /resolve/<uuid> endpoint)
+  IP_CLAIMS_RL_PER_HOUR?: string;  // default 300 (per IP for /claims/<uuid> endpoint)
   IP_LOGIN_RL_PER_HOUR?: string;   // default 10 (per IP for login attempts)
   IP_EDIT_RL_PER_HOUR?: string;    // default 30 (per IP for edit page loads)
   IP_UPDATE_RL_PER_HOUR?: string;  // default 60 (per IP for update submissions)
+  IP_CLAIM_RL_PER_HOUR?: string;   // default 30 (per IP for claim creation)
+  IP_VERIFY_RL_PER_HOUR?: string;  // default 20 (per IP for claim verification)
+  IP_ADMIN_LOGIN_RL_PER_HOUR?: string; // default 5 (per IP for admin login)
+
+  // Per-UUID rate limits for claims
+  CLAIM_RL_PER_HOUR?: string;      // default 10 (per UUID for claim creation)
+  VERIFY_RL_PER_HOUR?: string;     // default 20 (per UUID for claim verification)
+
+  // Optional: Enable claim verification notifications
+  // If enabled, stores email in plaintext (as _email in profile) for notifications
+  ENABLE_CLAIM_NOTIFICATIONS?: string; // "true" to enable
 }
 
 const FOUNDER_UUID = "4ff7ed97-b78f-4ae6-9011-5af714ee241c";
@@ -160,16 +193,115 @@ function uuidV4(): string {
   return crypto.randomUUID();
 }
 
+// Request size validation
+const MAX_JSON_SIZE = 50 * 1024; // 50KB - generous for profile data
+const MAX_URL_LENGTH = 2048; // Standard max URL length
+
+function checkUrlLength(url: URL): Response | null {
+  if (url.href.length > MAX_URL_LENGTH) {
+    return new Response("URL too long", {
+      status: 414,
+      headers: { "content-type": "text/plain", ...securityHeaders() }
+    });
+  }
+  return null;
+}
+
+async function checkRequestSize(request: Request, maxSize: number = MAX_JSON_SIZE): Promise<Response | null> {
+  const contentLength = request.headers.get("content-length");
+
+  // If content-length header is present and exceeds limit, reject immediately
+  if (contentLength) {
+    const size = parseInt(contentLength, 10);
+    if (!isNaN(size) && size > maxSize) {
+      return new Response("Request body too large", {
+        status: 413,
+        headers: { "content-type": "text/plain", ...securityHeaders() }
+      });
+    }
+  }
+
+  return null;
+}
+
+// Health check endpoint
+async function handleHealthCheck(env: Env): Promise<Response> {
+  const checks: Record<string, { status: string; message?: string; latencyMs?: number }> = {};
+  let overallHealthy = true;
+
+  // Check KV connectivity
+  try {
+    const startKv = Date.now();
+    // Try a simple read operation - use a known key or test key
+    const testResult = await env.ANCHOR_KV.get("health:check");
+    const kvLatency = Date.now() - startKv;
+
+    checks.kv = {
+      status: "healthy",
+      message: "KV storage is accessible",
+      latencyMs: kvLatency,
+    };
+  } catch (e: any) {
+    checks.kv = {
+      status: "unhealthy",
+      message: `KV error: ${e.message || "unknown"}`,
+    };
+    overallHealthy = false;
+  }
+
+  const response = {
+    status: overallHealthy ? "healthy" : "unhealthy",
+    timestamp: new Date().toISOString(),
+    checks,
+    version: "1.0",
+  };
+
+  return new Response(JSON.stringify(response, null, 2), {
+    status: overallHealthy ? 200 : 503,
+    headers: {
+      "content-type": "application/json; charset=utf-8",
+      "cache-control": "no-cache, no-store, must-revalidate",
+      ...securityHeaders(),
+    },
+  });
+}
+
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
     const path = url.pathname;
 
+    // Check URL length early
+    const urlLengthError = checkUrlLength(url);
+    if (urlLengthError) return urlLengthError;
+
+    // Check request size for POST/PUT requests with body
+    if (request.method === "POST" || request.method === "PUT") {
+      const contentType = request.headers.get("content-type") || "";
+      if (contentType.includes("application/json") ||
+          contentType.includes("application/x-www-form-urlencoded") ||
+          contentType.includes("multipart/form-data")) {
+        const sizeError = await checkRequestSize(request);
+        if (sizeError) return sizeError;
+      }
+    }
+
+    // Health check endpoint (public, no auth required)
+    if ((path === "/_health" || path === "/health") && request.method === "GET") {
+      return handleHealthCheck(env);
+    }
 
     // Admin routes
     if (path === "/admin/login" && request.method === "GET") return handleAdminLoginPage(request, env);
-    if (path === "/admin/login" && request.method === "POST") return handleAdminLoginPost(request, env);
+    if (path === "/admin/login" && request.method === "POST") {
+      // Per-IP rate limit for admin login to prevent brute force
+      const ipLimit = parseInt(env.IP_ADMIN_LOGIN_RL_PER_HOUR || "5", 10);
+      const ipRateLimited = await checkIpRateLimit(request, env, "ip:admin_login", ipLimit);
+      if (ipRateLimited) return ipRateLimited;
+
+      return handleAdminLoginPost(request, env);
+    }
     if (path === "/admin/logout" && request.method === "POST") return handleAdminLogoutPost(request, env);
 
     if (path === "/admin" && request.method === "GET") return handleAdminHome(request, env);
@@ -193,6 +325,10 @@ export default {
     const mRotate = path.match(/^\/admin\/rotate-token\/([0-9a-f-]{36})$/i);
     if (mRotate && request.method === "POST") return handleAdminRotateToken(request, env, mRotate[1].toLowerCase());
 
+    const mDelete = path.match(/^\/admin\/delete\/([0-9a-f-]{36})$/i);
+    if (mDelete && request.method === "POST") return handleAdminDelete(request, env, mDelete[1].toLowerCase());
+
+    if (path === "/admin/backup" && request.method === "GET") return handleAdminBackup(request, env);
 
     // Homepage
     if (path === "/" || path === "/index.html") {
@@ -203,6 +339,166 @@ export default {
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>AnchorID</title>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "Person",
+        "@id": "https://blog.mycal.net/about/#mycal",
+        "identifier": {
+          "@type": "PropertyValue",
+          "propertyID": "canonical-uuid",
+          "value": "urn:uuid:4ff7ed97-b78f-4ae6-9011-5af714ee241c"
+        },
+        "name": "Mike Johnson",
+        "alternateName": ["Mycal", "Michael Johnson"],
+        "url": "https://blog.mycal.net/about/",
+        "sameAs": [
+          "https://anchorid.net/resolve/4ff7ed97-b78f-4ae6-9011-5af714ee241c",
+          "https://github.com/lowerpower",
+          "https://music.mycal.net"
+        ]
+      },
+      {
+        "@type": "Organization",
+        "@id": "https://anchorid.net/#org",
+        "identifier": {
+          "@type": "PropertyValue",
+          "propertyID": "canonical-uuid",
+          "value": "urn:uuid:4c785577-9f55-4a22-a80b-dd1f4d9b4658"
+        },
+        "name": "AnchorID",
+        "alternateName": "AnchorID.net",
+        "description": "A permanent attribution anchor for long-lived work. Durable, UUID-based attribution that survives platform changes and outlives any single service.",
+        "url": "https://anchorid.net",
+        "foundingDate": "2026-01-11",
+        "founder": {
+          "@id": "https://blog.mycal.net/about/#mycal"
+        },
+        "sameAs": [
+          "https://anchorid.net/resolve/4c785577-9f55-4a22-a80b-dd1f4d9b4658",
+          "https://github.com/lowerpower/AnchorID"
+        ],
+        "slogan": "Attribution as infrastructure, not a profile"
+      },
+      {
+        "@type": "WebSite",
+        "@id": "https://anchorid.net/#website",
+        "name": "AnchorID",
+        "url": "https://anchorid.net",
+        "publisher": {
+          "@id": "https://anchorid.net/#org"
+        },
+        "creator": {
+          "@id": "https://blog.mycal.net/about/#mycal"
+        },
+        "copyrightYear": 2026,
+        "copyrightHolder": {
+          "@id": "https://anchorid.net/#org"
+        },
+        "inLanguage": "en"
+      },
+      {
+        "@type": "SoftwareApplication",
+        "@id": "https://anchorid.net/#service",
+        "name": "AnchorID Service",
+        "applicationCategory": "Attribution Infrastructure",
+        "operatingSystem": "Web",
+        "description": "A UUID-based attribution service that provides permanent, machine-readable attribution anchors for long-lived work. Enables work and ideas to be attributed to the same enduring source across time, platforms, and system failures.",
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD"
+        },
+        "provider": {
+          "@id": "https://anchorid.net/#org"
+        },
+        "url": "https://anchorid.net",
+        "potentialAction": [
+          {
+            "@type": "CreateAction",
+            "name": "Create AnchorID",
+            "description": "Create a permanent UUID-based attribution anchor",
+            "target": {
+              "@type": "EntryPoint",
+              "urlTemplate": "https://anchorid.net/create",
+              "actionPlatform": [
+                "http://schema.org/DesktopWebPlatform",
+                "http://schema.org/MobileWebPlatform"
+              ]
+            }
+          },
+          {
+            "@type": "SearchAction",
+            "name": "Resolve AnchorID",
+            "description": "Look up an identity by UUID",
+            "target": {
+              "@type": "EntryPoint",
+              "urlTemplate": "https://anchorid.net/resolve/{uuid}",
+              "actionPlatform": [
+                "http://schema.org/DesktopWebPlatform",
+                "http://schema.org/MobileWebPlatform"
+              ]
+            }
+          },
+          {
+            "@type": "UpdateAction",
+            "name": "Edit Existing AnchorID",
+            "description": "Update an existing AnchorID profile",
+            "target": {
+              "@type": "EntryPoint",
+              "urlTemplate": "https://anchorid.net/login",
+              "actionPlatform": [
+                "http://schema.org/DesktopWebPlatform",
+                "http://schema.org/MobileWebPlatform"
+              ]
+            }
+          }
+        ],
+        "featureList": [
+          "UUID-based permanent identifiers",
+          "Machine-readable JSON-LD identity records",
+          "Website verification via .well-known/anchorid.txt",
+          "DNS verification via TXT records",
+          "GitHub profile verification",
+          "Public profile verification",
+          "Cryptographic proof of platform control",
+          "Public claims ledger",
+          "Email-based magic link authentication"
+        ]
+      },
+      {
+        "@type": "WebPage",
+        "@id": "https://anchorid.net/#homepage",
+        "name": "AnchorID - Permanent Attribution Anchor",
+        "description": "A permanent attribution anchor for long-lived work. Durable, UUID-based attribution that survives platform changes and outlives any single service.",
+        "url": "https://anchorid.net/",
+        "isPartOf": {
+          "@id": "https://anchorid.net/#website"
+        },
+        "about": {
+          "@id": "https://anchorid.net/#service"
+        },
+        "mainEntity": {
+          "@id": "https://anchorid.net/#service"
+        },
+        "publisher": {
+          "@id": "https://anchorid.net/#org"
+        },
+        "significantLink": [
+          "https://anchorid.net/create",
+          "https://anchorid.net/login",
+          "https://anchorid.net/about",
+          "https://anchorid.net/guide",
+          "https://anchorid.net/proofs",
+          "https://anchorid.net/faq",
+          "https://anchorid.net/privacy"
+        ]
+      }
+    ]
+  }
+  </script>
   <style>
     body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; max-width: 720px; margin: 40px auto; padding: 0 16px; line-height: 1.45; }
     a { color: #1a73e8; }
@@ -220,29 +516,41 @@ export default {
     <span>Home</span>
     <a href="/about">About</a>
     <a href="/guide">Guide</a>
+    <a href="/proofs">Proofs</a>
     <a href="/faq">FAQ</a>
     <a href="/privacy">Privacy</a>
   </nav>
 
   <h1>AnchorID</h1>
-  <p>Canonical UUID identity anchors and resolvers. Create a permanent, decentralized identity anchor that you control.</p>
+  <p>A permanent attribution anchor for long-lived work. Durable, UUID-based attribution that survives platform changes and outlives any single service.</p>
 
   <div class="actions">
     <a href="/create" class="primary">Create Your AnchorID</a>
     <a href="/login" class="secondary">Edit Existing</a>
   </div>
 
+  <p style="margin-top: 24px; font-size: 14px;">
+    See an example: <a href="/resolve/4ff7ed97-b78f-4ae6-9011-5af714ee241c">Mike Johnson (Founder)</a>
+  </p>
+
   <p style="margin-top: 32px; color: #555; font-size: 14px;">
     Already have a UUID? Try: <code>/resolve/&lt;uuid&gt;</code><br>
     <a href="/faq" style="color: #555;">Skeptical? Read the FAQ.</a>
   </p>
+
+  <footer style="margin-top: 64px; border-top: 1px solid #eee; padding-top: 16px; font-size: 13px; color: #777;">
+    <p>
+      Built for longevity. MIT Licensed.
+      Running on the Edge via Cloudflare Workers.
+    </p>
+    <p><a href="https://github.com/lowerpower/anchorid" style="color:#999">GitHub</a></p>
+  </footer>
 </body>
 </html>`,
         {
           headers: {
             "content-type": "text/html; charset=utf-8",
-            "x-content-type-options": "nosniff",
-            "referrer-policy": "no-referrer",
+            ...securityHeaders(),
           },
         }
       );
@@ -259,6 +567,7 @@ export default {
           "content-type": "text/html; charset=utf-8",
           "cache-control":
             "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400",
+          ...securityHeaders(),
         },
       });
     }
@@ -274,6 +583,146 @@ export default {
           "content-type": "text/html; charset=utf-8",
           "cache-control":
             "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400",
+          ...securityHeaders(),
+        },
+      });
+    }
+
+    // Sitemap
+    if (path === "/sitemap.xml") {
+      const xml = await env.ANCHOR_KV.get("page:sitemap");
+      if (!xml) {
+        return new Response("Sitemap not found", { status: 404 });
+      }
+      return new Response(xml, {
+        headers: {
+          "content-type": "application/xml; charset=utf-8",
+          "cache-control":
+            "public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800",
+        },
+      });
+    }
+
+    // Robots.txt
+    if (path === "/robots.txt") {
+      const txt = await env.ANCHOR_KV.get("page:robots");
+      if (!txt) {
+        return new Response("robots.txt not found", { status: 404 });
+      }
+      return new Response(txt, {
+        headers: {
+          "content-type": "text/plain; charset=utf-8",
+          "cache-control":
+            "public, max-age=86400, s-maxage=604800",
+        },
+      });
+    }
+
+    // Humans.txt
+    if (path === "/humans.txt") {
+      const txt = await env.ANCHOR_KV.get("page:humans");
+      if (!txt) {
+        return new Response("humans.txt not found", { status: 404 });
+      }
+      return new Response(txt, {
+        headers: {
+          "content-type": "text/plain; charset=utf-8",
+          "cache-control":
+            "public, max-age=86400, s-maxage=604800",
+        },
+      });
+    }
+
+    // .well-known/anchorid.txt - Website proof for anchorid.net
+    // Demonstrates website proof linking the AnchorID organization to its founder
+    if (path === "/.well-known/anchorid.txt") {
+      return new Response(
+        `https://anchorid.net/resolve/4c785577-9f55-4a22-a80b-dd1f4d9b4658
+https://anchorid.net/resolve/4ff7ed97-b78f-4ae6-9011-5af714ee241c
+`,
+        {
+          headers: {
+            "content-type": "text/plain; charset=utf-8",
+            "cache-control":
+              "public, max-age=86400, s-maxage=604800",
+          },
+        }
+      );
+    }
+
+    // Proofs page
+    if (path === "/proofs" || path === "/proofs/") {
+      const html = await env.ANCHOR_KV.get("page:proofs");
+      if (!html) {
+        return new Response("Proofs not found", { status: 404 });
+      }
+      return new Response(html, {
+        headers: {
+          "content-type": "text/html; charset=utf-8",
+          "cache-control":
+            "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400",
+          ...securityHeaders(),
+        },
+      });
+    }
+
+    // Proofs detail pages
+    if (path === "/proofs/website" || path === "/proofs/website/") {
+      const html = await env.ANCHOR_KV.get("page:proofs-website");
+      if (!html) {
+        return new Response("Website proof guide not found", { status: 404 });
+      }
+      return new Response(html, {
+        headers: {
+          "content-type": "text/html; charset=utf-8",
+          "cache-control":
+            "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400",
+          ...securityHeaders(),
+        },
+      });
+    }
+
+    if (path === "/proofs/dns" || path === "/proofs/dns/") {
+      const html = await env.ANCHOR_KV.get("page:proofs-dns");
+      if (!html) {
+        return new Response("DNS proof guide not found", { status: 404 });
+      }
+      return new Response(html, {
+        headers: {
+          "content-type": "text/html; charset=utf-8",
+          "cache-control":
+            "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400",
+          ...securityHeaders(),
+        },
+      });
+    }
+
+    if (path === "/proofs/github" || path === "/proofs/github/") {
+      const html = await env.ANCHOR_KV.get("page:proofs-github");
+      if (!html) {
+        return new Response("GitHub proof guide not found", { status: 404 });
+      }
+      return new Response(html, {
+        headers: {
+          "content-type": "text/html; charset=utf-8",
+          "cache-control":
+            "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400",
+          ...securityHeaders(),
+        },
+      });
+    }
+
+    if (path === "/proofs/social" || path === "/proofs/social/") {
+      const html = await env.ANCHOR_KV.get("page:proofs-social");
+      if (!html) {
+        return new Response("Public profile proof guide not found", { status: 404 });
+      }
+      return new Response(html, {
+        headers: {
+          "content-type": "text/html; charset=utf-8",
+          "cache-control":
+            "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400",
+          ...securityHeaders(),
         },
       });
     }
@@ -289,6 +738,7 @@ export default {
           "content-type": "text/html; charset=utf-8",
           "cache-control":
             "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400",
+          ...securityHeaders(),
         },
       });
     }
@@ -304,20 +754,26 @@ export default {
           "content-type": "text/html; charset=utf-8",
           "cache-control":
             "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400",
+          ...securityHeaders(),
         },
       });
     }
 
-    // /create redirects to /signup (semantic alias)
-    if (path === "/create" || path === "/create/") {
+    // /signup redirects to /create (semantic alias)
+    if (path === "/signup" || path === "/signup/") {
       return new Response(null, {
-        status: 302,
-        headers: { "location": "/signup" },
+        status: 301,
+        headers: { "location": "/create" },
       });
     }
 
 	// Public claims list
 	if (path.startsWith("/claims/") && (request.method === "GET" || request.method === "HEAD")) {
+		// Per-IP rate limit for public claims endpoint
+		const ipLimit = parseInt(env.IP_CLAIMS_RL_PER_HOUR || "300", 10);
+		const ipRateLimited = await checkIpRateLimit(request, env, "ip:claims", ipLimit);
+		if (ipRateLimited) return ipRateLimited;
+
   		const uuid = path.slice("/claims/".length);
 
   		// If browser asks for HTML, serve the human page (GET only)
@@ -337,34 +793,201 @@ export default {
 
 
 
-	// Token-gated: add/update claim
+	// Token-gated: add/update claim (admin or user for own profile)
 	if (path === "/claim" && request.method === "POST") {
-  		// your existing auth guard here
-  		const denied = requireAdmin(request, env);
-  		if (denied) return denied;
-	    
-        return handlePostClaim(request, env as any);
+		// Per-IP rate limit (checked first to prevent abuse)
+		const ipLimit = parseInt(env.IP_CLAIM_RL_PER_HOUR || "30", 10);
+		const ipRateLimited = await checkIpRateLimit(request, env, "ip:claim", ipLimit);
+		if (ipRateLimited) return ipRateLimited;
+
+		// Parse body to get UUID
+		const bodyText = await request.text();
+		const payload: any = JSON.parse(bodyText);
+		const targetUuid = String(payload.uuid || "").trim().toLowerCase();
+
+		// Check admin auth first
+		const adminDenied = requireAdmin(request, env);
+		if (!adminDenied) {
+			// Admin has access to all profiles (skip per-UUID rate limit for admins)
+			return handlePostClaim(new Request(request.url, {
+				method: request.method,
+				headers: request.headers,
+				body: bodyText,
+			}), env as any);
+		}
+
+		// Not admin - check if user session for own profile
+		const authHeader = request.headers.get("authorization") || "";
+		const sessionToken = authHeader.replace(/^Bearer\s+/i, "").trim();
+
+		if (sessionToken) {
+			const session = (await env.ANCHOR_KV.get(`login:${sessionToken}`, { type: "json" })) as any | null;
+			if (session?.uuid && String(session.uuid).toLowerCase() === targetUuid) {
+				// User authenticated for their own profile - check per-UUID rate limit
+				const maxPerHour = parseInt(env.CLAIM_RL_PER_HOUR || "10", 10);
+				const rl = await incrWithTtl(env.ANCHOR_KV, `rl:claim:${targetUuid}`, 3600);
+				if (rl > maxPerHour) {
+					return json({ error: "rate_limited", message: "Too many claim operations" }, 429, { "cache-control": "no-store", "retry-after": "3600" });
+				}
+
+				return handlePostClaim(new Request(request.url, {
+					method: request.method,
+					headers: request.headers,
+					body: bodyText,
+				}), env as any);
+			}
+		}
+
+		return new Response("Unauthorized", { status: 401 });
 	}
 
-	// Token-gated: verify claim
+	// Token-gated: verify claim (admin or user for own profile)
 	if (path === "/claim/verify" && request.method === "POST") {
-  		// your existing auth guard here
-  		const denied = requireAdmin(request, env);
-		if (denied) return denied;
+		// Per-IP rate limit (checked first to prevent abuse)
+		const ipLimit = parseInt(env.IP_VERIFY_RL_PER_HOUR || "20", 10);
+		const ipRateLimited = await checkIpRateLimit(request, env, "ip:verify", ipLimit);
+		if (ipRateLimited) return ipRateLimited;
 
-		return handlePostClaimVerify(request, env as any);
+		// Parse body to get UUID
+		const bodyText = await request.text();
+		const payload: any = JSON.parse(bodyText);
+		const targetUuid = String(payload.uuid || "").trim().toLowerCase();
+
+		// Check admin auth first
+		const adminDenied = requireAdmin(request, env);
+		if (!adminDenied) {
+			// Admin has access to all profiles (skip per-UUID rate limit for admins)
+			return handlePostClaimVerify(new Request(request.url, {
+				method: request.method,
+				headers: request.headers,
+				body: bodyText,
+			}), env as any);
+		}
+
+		// Not admin - check if user session for own profile
+		const authHeader = request.headers.get("authorization") || "";
+		const sessionToken = authHeader.replace(/^Bearer\s+/i, "").trim();
+
+		if (sessionToken) {
+			const session = (await env.ANCHOR_KV.get(`login:${sessionToken}`, { type: "json" })) as any | null;
+			if (session?.uuid && String(session.uuid).toLowerCase() === targetUuid) {
+				// User authenticated for their own profile - check per-UUID rate limit
+				const maxPerHour = parseInt(env.VERIFY_RL_PER_HOUR || "20", 10);
+				const rl = await incrWithTtl(env.ANCHOR_KV, `rl:verify:${targetUuid}`, 3600);
+				if (rl > maxPerHour) {
+					return json({ error: "rate_limited", message: "Too many verification attempts" }, 429, { "cache-control": "no-store", "retry-after": "3600" });
+				}
+
+				return handlePostClaimVerify(new Request(request.url, {
+					method: request.method,
+					headers: request.headers,
+					body: bodyText,
+				}), env as any);
+			}
+		}
+
+		return new Response("Unauthorized", { status: 401 });
+	}
+
+	// Token-gated: delete claim (admin or user for own profile)
+	if (path === "/claim/delete" && request.method === "POST") {
+		// Per-IP rate limit (same as claim creation to prevent deletion spam)
+		const ipLimit = parseInt(env.IP_CLAIM_RL_PER_HOUR || "30", 10);
+		const ipRateLimited = await checkIpRateLimit(request, env, "ip:claim", ipLimit);
+		if (ipRateLimited) return ipRateLimited;
+
+		// Parse body to get UUID
+		const bodyText = await request.text();
+		const payload: any = JSON.parse(bodyText);
+		const targetUuid = String(payload.uuid || "").trim().toLowerCase();
+
+		// Track auth method for audit logging
+		let authMethod: "admin" | "session_token" = "session_token";
+
+		// Check admin auth first
+		const adminDenied = requireAdmin(request, env);
+		if (!adminDenied) {
+			authMethod = "admin";
+			// Admin has access to all profiles (skip per-UUID rate limit for admins)
+			const response = await handlePostClaimDelete(new Request(request.url, {
+				method: request.method,
+				headers: request.headers,
+				body: bodyText,
+			}), env as any);
+
+			// Add audit log if deletion was successful
+			if (response.ok) {
+				const result: any = await response.clone().json();
+				await appendAuditLog(
+					env,
+					targetUuid,
+					request,
+					"claim_deleted",
+					authMethod,
+					[],
+					`Deleted ${result.deletedClaim?.type} claim for ${result.deletedClaim?.url}`
+				);
+			}
+
+			return response;
+		}
+
+		// Not admin - check if user session for own profile
+		const authHeader = request.headers.get("authorization") || "";
+		const sessionToken = authHeader.replace(/^Bearer\s+/i, "").trim();
+
+		if (sessionToken) {
+			const session = (await env.ANCHOR_KV.get(`login:${sessionToken}`, { type: "json" })) as any | null;
+			if (session?.uuid && String(session.uuid).toLowerCase() === targetUuid) {
+				// User authenticated for their own profile - use moderate rate limit for deletions
+				const maxPerHour = parseInt(env.CLAIM_RL_PER_HOUR || "10", 10);
+				const rl = await incrWithTtl(env.ANCHOR_KV, `rl:claim:${targetUuid}`, 3600);
+				if (rl > maxPerHour) {
+					return json({ error: "rate_limited", message: "Too many claim operations" }, 429, { "cache-control": "no-store", "retry-after": "3600" });
+				}
+
+				const response = await handlePostClaimDelete(new Request(request.url, {
+					method: request.method,
+					headers: request.headers,
+					body: bodyText,
+				}), env as any);
+
+				// Add audit log if deletion was successful
+				if (response.ok) {
+					const result: any = await response.clone().json();
+					await appendAuditLog(
+						env,
+						targetUuid,
+						request,
+						"claim_deleted",
+						authMethod,
+						[],
+						`Deleted ${result.deletedClaim?.type} claim for ${result.deletedClaim?.url}`
+					);
+				}
+
+				return response;
+			}
+		}
+
+		return new Response("Unauthorized", { status: 401 });
 	}
 
     // Resolver (v1): /resolve/<uuid>
     if (path.startsWith("/resolve/")) {
+      // Per-IP rate limit for public resolver endpoint
+      const ipLimit = parseInt(env.IP_RESOLVE_RL_PER_HOUR || "300", 10);
+      const ipRateLimited = await checkIpRateLimit(request, env, "ip:resolve", ipLimit);
+      if (ipRateLimited) return ipRateLimited;
+
       return handleResolve(request, env);
     }
 
-    // Public signup (self-service identity creation)
-    if (path === "/signup" && request.method === "GET") {
+    // Public create (self-service identity creation)
+    if (path === "/create" && request.method === "GET") {
       return handleSignupPage(request, env);
     }
-    if (path === "/signup" && request.method === "POST") {
+    if (path === "/create" && request.method === "POST") {
       return handleSignup(request, env);
     }
 
@@ -501,19 +1124,39 @@ async function handleSignupPage(request: Request, env: Env): Promise<Response> {
   body { font-family:system-ui; max-width:720px; margin:40px auto; padding:0 16px; line-height:1.45; }
   .card { background:#f6f6f6; padding:14px; border-radius:10px; margin-bottom:14px; }
   .card.required { border: 1px solid #1a73e8; }
+  .card.info { background:#e8f4fd; border:1px solid #b8daff; }
   label { font-weight:600; display:block; margin-bottom:6px; }
   input { width:100%; box-sizing:border-box; padding:10px; border:1px solid #ddd; border-radius:8px; font:inherit; }
-  button { padding:10px 14px; border-radius:10px; border:1px solid #111; background:#111; color:#fff; cursor:pointer; font:inherit; }
-  .hint { color:#555; font-size:13px; margin-top:6px; }
+  input[type="radio"], input[type="checkbox"] { width:auto; }
+  input:focus { outline:2px solid #1a73e8; border-color:#1a73e8; }
+  input.error { border-color:#dc3545; }
+  button { padding:12px 20px; border-radius:10px; border:1px solid #111; background:#111; color:#fff; cursor:pointer; font:inherit; font-weight:500; }
+  button:hover { background:#333; }
+  button:disabled { background:#ccc; border-color:#ccc; cursor:not-allowed; }
+  .hint { color:#555; font-size:13px; margin-top:6px; line-height:1.4; }
   .badge { display:inline-block; font-size:11px; padding:2px 6px; border-radius:999px; background:#1a73e8; color:#fff; margin-left:6px; vertical-align:middle; }
+  .error-msg { color:#dc3545; font-size:13px; margin-top:6px; display:none; }
+  .error-msg.show { display:block; }
   a { color:#1a73e8; }
+  ol { padding-left:20px; margin:8px 0; }
+  ol li { margin-bottom:6px; }
 </style>
 </head>
 <body>
 <h1>Create Your AnchorID</h1>
-<p>AnchorID is a permanent, decentralized identity anchor. Once created, you control it via email magic links.</p>
+<p>AnchorID is a permanent, UUID-based identity anchor. Once created, only you can modify it via email magic links or backup token.</p>
 
-<form method="post" action="/signup">
+<div class="card info">
+  <strong>What happens next:</strong>
+  <ol style="margin:8px 0;padding-left:20px;font-size:14px">
+    <li>We'll send a setup link to your email (expires in 15 minutes)</li>
+    <li>Click the link to verify your email and see your backup recovery token</li>
+    <li>Save the backup token somewhere safe (password manager, secure note)</li>
+    <li>Edit your profile and add verifiable identity claims</li>
+  </ol>
+</div>
+
+<form method="post" action="/create" id="signupForm">
   <input type="hidden" name="_csrf" value="${escapeHtml(csrfToken)}">
 
   <div class="card required">
@@ -526,29 +1169,92 @@ async function handleSignupPage(request: Request, env: Env): Promise<Response> {
         <input type="radio" name="type" value="Organization"> Organization
       </label>
     </div>
-    <div class="hint">Cannot be changed after creation. Choose Organization for companies, nonprofits, or projects.</div>
+    <div class="hint"><strong>Person:</strong> Individual identity (yourself, a pseudonym, etc.)<br>
+    <strong>Organization:</strong> Company, nonprofit, project, or collective<br>
+    ⚠️ This cannot be changed after creation.</div>
   </div>
 
   <div class="card required">
     <label>Email <span class="badge">Required</span></label>
-    <input name="email" type="email" placeholder="you@example.com" required>
-    <div class="hint">We'll send you a link to complete setup. Never shared, stored as hash only.</div>
+    <input name="email" id="emailInput" type="email" placeholder="you@example.com" required>
+    <div class="error-msg" id="emailError"></div>
+    <div class="hint">
+      • You'll receive a setup link at this address<br>
+      • Used for magic link authentication (no passwords!)<br>
+      • Never shared publicly, stored as one-way hash only<br>
+      • Cannot be changed after creation (you can add recovery options)
+    </div>
   </div>
 
   <div class="card">
-    <label>Name (optional)</label>
-    <input name="name" placeholder="e.g., Jane Doe or Acme Corp">
-    <div class="hint">You can change this later.</div>
+    <label>Name (optional but recommended)</label>
+    <input name="name" id="nameInput" placeholder="e.g., Jane Doe or Acme Corp">
+    <div class="hint">Your display name. You can change this anytime later.</div>
   </div>
 
   <div style="margin-top:14px">
-    <button type="submit">Create Identity</button>
+    <button type="submit" id="submitBtn">Create Identity</button>
+    <span id="submitStatus" style="margin-left:10px;font-size:13px;color:#555"></span>
   </div>
 </form>
 
 <p style="margin-top:24px;font-size:13px;color:#555">
   Already have an AnchorID? <a href="/login">Request edit link</a>
 </p>
+
+<script>
+(function() {
+  const form = document.getElementById('signupForm');
+  const emailInput = document.getElementById('emailInput');
+  const emailError = document.getElementById('emailError');
+  const submitBtn = document.getElementById('submitBtn');
+  const submitStatus = document.getElementById('submitStatus');
+
+  // Email validation
+  emailInput.addEventListener('blur', function() {
+    const email = this.value.trim();
+    if (!email) return;
+
+    if (!isValidEmail(email)) {
+      emailInput.classList.add('error');
+      emailError.textContent = 'Please enter a valid email address';
+      emailError.classList.add('show');
+    } else {
+      emailInput.classList.remove('error');
+      emailError.classList.remove('show');
+    }
+  });
+
+  emailInput.addEventListener('input', function() {
+    if (emailError.classList.contains('show')) {
+      emailInput.classList.remove('error');
+      emailError.classList.remove('show');
+    }
+  });
+
+  function isValidEmail(email) {
+    const re = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;
+    return re.test(email);
+  }
+
+  // Form submission
+  form.addEventListener('submit', function(e) {
+    const email = emailInput.value.trim();
+
+    if (!isValidEmail(email)) {
+      e.preventDefault();
+      emailInput.focus();
+      emailInput.classList.add('error');
+      emailError.textContent = 'Please enter a valid email address';
+      emailError.classList.add('show');
+      return;
+    }
+
+    submitBtn.disabled = true;
+    submitStatus.textContent = 'Creating identity...';
+  });
+})();
+</script>
 </body></html>`;
 
   const headers: Record<string, string> = {
@@ -592,7 +1298,7 @@ async function handleSignup(request: Request, env: Env): Promise<Response> {
   const email = rawEmail.toLowerCase();
 
   if (!isValidEmail(email)) {
-    return htmlError("Invalid Email", "Please provide a valid email address.", "/signup");
+    return htmlError("Invalid Email", "Please provide a valid email address.", "/create");
   }
 
   const emailHash = await sha256Hex(email);
@@ -626,11 +1332,16 @@ async function handleSignup(request: Request, env: Env): Promise<Response> {
   );
 
   // Add private fields (not part of public schema)
-  const profile = {
+  const profile: any = {
     ...canonicalProfile,
     _emailHash: emailHash,
     _backupTokenHash: backupTokenHash,
   };
+
+  // Optionally store email for claim verification notifications
+  if (env.ENABLE_CLAIM_NOTIFICATIONS === "true") {
+    profile._email = email;
+  }
 
   // Generate edit token for email
   const editToken = randomTokenUrlSafe(32);
@@ -704,87 +1415,162 @@ async function handleSetupPage(request: Request, env: Env): Promise<Response> {
 
   const html = `<!doctype html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>AnchorID Created</title>
+<title>AnchorID Created Successfully</title>
 <style>
   body { font-family:system-ui; max-width:720px; margin:40px auto; padding:0 16px; line-height:1.45; }
-  .card { background:#f6f6f6; padding:14px; border-radius:10px; margin-bottom:14px; }
-  .success { background:#e6f4ea; border:1px solid #a8dab5; }
-  .warning { background:#fff8e6; border:1px solid #ffe58f; }
-  .token-box { background:#111; color:#0f0; padding:16px; border-radius:8px; font-family:monospace; font-size:14px; word-break:break-all; margin:12px 0; }
-  button { padding:10px 14px; border-radius:10px; border:1px solid #111; background:#111; color:#fff; cursor:pointer; font:inherit; margin-right:8px; }
+  .card { background:#f6f6f6; padding:16px; border-radius:10px; margin-bottom:16px; }
+  .success { background:#e6f4ea; border:2px solid #34a853; }
+  .warning { background:#fff3cd; border:2px solid #ffc107; }
+  .critical { background:#fff5f5; border:2px solid #dc3545; }
+  .step { background:#fff; border:1px solid #e0e0e0; padding:16px; border-radius:8px; margin-bottom:12px; }
+  .step-number { display:inline-block; background:#1a73e8; color:#fff; width:28px; height:28px; border-radius:50%; text-align:center; line-height:28px; font-weight:600; margin-right:10px; }
+  .token-box { background:#111; color:#0f0; padding:16px; border-radius:8px; font-family:monospace; font-size:14px; word-break:break-all; margin:12px 0; user-select:all; }
+  button { padding:10px 16px; border-radius:8px; border:1px solid #111; background:#111; color:#fff; cursor:pointer; font:inherit; margin-right:8px; font-weight:500; }
+  button:hover { background:#333; }
   button.secondary { background:#fff; color:#111; border:1px solid #ddd; }
-  .hint { color:#555; font-size:13px; margin-top:6px; }
-  code { background:#eee; padding:2px 6px; border-radius:4px; font-size:13px; }
-  .type-badge { display:inline-block; background:#1a73e8; color:#fff; font-size:11px; padding:2px 8px; border-radius:999px; margin-left:8px; vertical-align:middle; }
-  a { color:#1a73e8; }
-  a.btn { display:inline-block; padding:12px 20px; border-radius:10px; background:#1a73e8; color:#fff; text-decoration:none; font-weight:500; }
-  a.btn:hover { background:#1557b0; }
+  button.secondary:hover { background:#f0f0f0; }
+  .hint { color:#555; font-size:13px; margin-top:8px; line-height:1.4; }
+  code { background:#eee; padding:2px 6px; border-radius:4px; font-size:13px; font-family:monospace; }
+  .type-badge { display:inline-block; background:#1a73e8; color:#fff; font-size:12px; padding:3px 8px; border-radius:999px; margin-left:8px; vertical-align:middle; }
+  a { color:#1a73e8; text-decoration:none; }
+  a:hover { text-decoration:underline; }
+  a.btn { display:inline-block; padding:14px 24px; border-radius:10px; background:#1a73e8; color:#fff; text-decoration:none; font-weight:600; text-align:center; }
+  a.btn:hover { background:#1557b0; text-decoration:none; }
   .action-box { text-align:center; padding:20px 0; }
+  ul { padding-left:20px; margin:8px 0; }
+  ul li { margin-bottom:8px; }
+  .icon { font-size:20px; margin-right:8px; vertical-align:middle; }
+  h2 { margin-top:0; margin-bottom:12px; font-size:20px; }
+  .saved-indicator { display:inline-block; background:#34a853; color:#fff; padding:4px 10px; border-radius:4px; font-size:12px; margin-left:10px; }
 </style>
 </head>
 <body>
-<h1>Your AnchorID is Ready</h1>
-
 <div class="card success">
-  <strong>Success!</strong> Your ${entityType === "Organization" ? "organization" : "identity"} anchor has been created.
-  <div class="hint" style="margin-top:8px">
-    UUID: <code>${escapeHtml(uuid)}</code><br>
-    Type: <span class="type-badge">${escapeHtml(entityType)}</span><br>
-    Name: <strong>${escapeHtml(name)}</strong>
+  <h1 style="margin:0 0 8px 0"><span class="icon">✓</span>Your AnchorID is Ready!</h1>
+  <div style="font-size:14px;color:#155724">
+    <strong>UUID:</strong> <code>${escapeHtml(uuid)}</code><br>
+    <strong>Type:</strong> <span class="type-badge">${escapeHtml(entityType)}</span>
+    <strong>Name:</strong> ${escapeHtml(name)}
   </div>
 </div>
 
 ${backupToken ? `
-<div class="card warning">
-  <strong>Save Your Backup Token</strong>
-  <p style="margin:8px 0">This token lets you recover access if you lose your email.
-  <strong>It will only be shown once.</strong></p>
+<div class="card critical">
+  <h2><span class="icon">⚠️</span>CRITICAL: Save Your Backup Recovery Token</h2>
+  <p style="margin:8px 0;font-size:15px"><strong>This token will only be shown once.</strong> If you lose access to your email, this is the ONLY way to recover your AnchorID.</p>
 
   <div class="token-box" id="token">${escapeHtml(backupToken)}</div>
 
-  <button type="button" onclick="copyToken()">Copy Token</button>
-  <button type="button" class="secondary" onclick="downloadToken()">Download as File</button>
+  <div style="margin:12px 0">
+    <button type="button" onclick="copyToken()"><span class="icon">📋</span>Copy Token</button>
+    <button type="button" class="secondary" onclick="downloadToken()"><span class="icon">💾</span>Download as File</button>
+    <span id="saveStatus" class="saved-indicator" style="display:none">Copied!</span>
+  </div>
 
-  <p class="hint" style="margin-top:12px">
-    Store this somewhere safe (password manager, secure note, printed copy).
-  </p>
+  <div class="hint" style="background:#fff;padding:10px;border-radius:6px;border:1px solid #ffc107">
+    <strong>Where to save it:</strong><br>
+    ✓ Password manager (1Password, Bitwarden, etc.)<br>
+    ✓ Secure note app (encrypted)<br>
+    ✓ Printed and stored in a safe location<br>
+    ✗ Do NOT store in plain text files or unencrypted notes
+  </div>
 </div>
 
 <script>
+let tokenSaved = false;
+
 function copyToken() {
-  navigator.clipboard.writeText(document.getElementById('token').textContent);
-  alert('Token copied to clipboard');
+  const tokenText = document.getElementById('token').textContent;
+  navigator.clipboard.writeText(tokenText).then(function() {
+    const status = document.getElementById('saveStatus');
+    status.style.display = 'inline-block';
+    tokenSaved = true;
+    setTimeout(() => { status.style.display = 'none'; }, 3000);
+  });
 }
+
 function downloadToken() {
   const token = document.getElementById('token').textContent;
-  const blob = new Blob(['AnchorID Backup Token\\n\\nUUID: ${escapeHtml(uuid)}\\nToken: ' + token + '\\n\\nKeep this file safe.'], {type: 'text/plain'});
+  const blob = new Blob([
+    'AnchorID Backup Recovery Token\\n' +
+    '================================\\n\\n' +
+    'UUID: ${escapeHtml(uuid)}\\n' +
+    'Type: ${escapeHtml(entityType)}\\n' +
+    'Name: ${escapeHtml(name)}\\n\\n' +
+    'Backup Token:\\n' + token + '\\n\\n' +
+    'IMPORTANT: Keep this file secure and private.\\n' +
+    'This token grants full access to your AnchorID.\\n'
+  ], {type: 'text/plain'});
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = 'anchorid-backup-${escapeHtml(uuid.slice(0, 8))}.txt';
   a.click();
+  tokenSaved = true;
 }
+
+window.addEventListener('beforeunload', function(e) {
+  if (!tokenSaved) {
+    e.preventDefault();
+    e.returnValue = 'Have you saved your backup token? It will not be shown again.';
+    return e.returnValue;
+  }
+});
 </script>
 ` : `
 <div class="card warning">
-  <strong>Backup token already viewed</strong>
-  <p class="hint">The backup token was shown when you first completed setup.</p>
+  <h2><span class="icon">ℹ️</span>Backup Token Already Viewed</h2>
+  <p class="hint">The backup token was displayed when you first completed setup. If you didn't save it, you won't be able to recover access without your email.</p>
 </div>
 `}
 
-<div class="card action-box">
-  <a href="/edit?token=${escapeHtml(token)}" class="btn">Edit this AnchorID</a>
-  <p class="hint" style="margin-top:12px">
-    This link can be used once to finish setup.<br>
-    After saving, you'll need to request a new edit link by email.
-  </p>
+<div class="card">
+  <h2>Next Steps</h2>
+
+  <div class="step">
+    <span class="step-number">1</span>
+    <strong>Complete Your Profile</strong>
+    <p style="margin:8px 0 8px 38px;color:#555;font-size:14px">Add your name, URL, description, and other details to make your identity more useful.</p>
+    <div style="margin-left:38px">
+      <a href="/edit?token=${escapeHtml(token)}" class="btn">Edit Profile Now</a>
+    </div>
+    <p class="hint" style="margin-left:38px">This setup link expires after first save. To edit later, request a new link at <a href="/login">/login</a></p>
+  </div>
+
+  <div class="step">
+    <span class="step-number">2</span>
+    <strong>View Your Public Identity</strong>
+    <p style="margin:8px 0 8px 38px;color:#555;font-size:14px">See how your identity appears to others and search engines.</p>
+    <div style="margin-left:38px">
+      <a href="/resolve/${escapeHtml(uuid)}" target="_blank" rel="noopener">View /resolve/${escapeHtml(uuid.slice(0,8))}...</a>
+    </div>
+  </div>
+
+  <div class="step">
+    <span class="step-number">3</span>
+    <strong>Add Identity Proofs</strong>
+    <p style="margin:8px 0 8px 38px;color:#555;font-size:14px">Prove ownership of websites, domains, and accounts. Verified claims strengthen your identity and appear in your sameAs links.</p>
+    <div style="margin-left:38px">
+      <a href="/proofs" target="_blank">Learn about identity proofs →</a>
+    </div>
+  </div>
+
+  <div class="step">
+    <span class="step-number">4</span>
+    <strong>Place Your AnchorID</strong>
+    <p style="margin:8px 0 8px 38px;color:#555;font-size:14px">Link to your AnchorID from your website, social profiles, and projects.</p>
+    <div style="margin-left:38px">
+      <a href="/guide" target="_blank">Read the placement guide →</a>
+    </div>
+  </div>
 </div>
 
-<div class="card">
-  <strong>What's Next?</strong>
-  <ul style="margin:8px 0;padding-left:20px">
-    <li>View your public identity: <a href="/resolve/${escapeHtml(uuid)}" target="_blank">/resolve/${escapeHtml(uuid.slice(0, 8))}...</a></li>
-    <li>To edit later, request a magic link at <a href="/login">/login</a></li>
-    <li>Add verifiable claims to link your websites and profiles</li>
+<div class="card" style="background:#f9f9f9;border:1px solid #ddd">
+  <h2 style="font-size:16px">Remember:</h2>
+  <ul style="font-size:14px">
+    <li><strong>Email access:</strong> Request magic links at <a href="/login">/login</a></li>
+    <li><strong>Backup token:</strong> Use it at <a href="/login">/login</a> if you lose email access</li>
+    <li><strong>Identity is permanent:</strong> Your UUID and email cannot be changed</li>
+    <li><strong>Everything else is editable:</strong> Name, description, claims, sameAs links</li>
   </ul>
 </div>
 
@@ -809,7 +1595,11 @@ function htmlError(title: string, message: string, backLink: string): Response {
 </body></html>`;
   return new Response(html, {
     status: 400,
-    headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" },
+    headers: {
+      "content-type": "text/html; charset=utf-8",
+      "cache-control": "no-store",
+      ...securityHeaders(),
+    },
   });
 }
 
@@ -824,11 +1614,15 @@ function htmlSuccess(title: string, message: string, email: string): Response {
 <p><a href="/">Return home</a></p>
 </body></html>`;
   return new Response(html, {
-    headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" },
+    headers: {
+      "content-type": "text/html; charset=utf-8",
+      "cache-control": "no-store",
+      ...securityHeaders(),
+    },
   });
 }
 
-// GET /login - Public login form (request magic link)
+// GET /login - Public login form (request magic link or use backup token)
 async function handleLoginPage(request: Request, env: Env): Promise<Response> {
   const { token: csrfToken, needsSet } = ensureCsrfToken(request);
 
@@ -840,32 +1634,120 @@ async function handleLoginPage(request: Request, env: Env): Promise<Response> {
   .card { background:#f6f6f6; padding:14px; border-radius:10px; margin-bottom:14px; }
   label { font-weight:600; display:block; margin-bottom:6px; }
   input { width:100%; box-sizing:border-box; padding:10px; border:1px solid #ddd; border-radius:8px; font:inherit; }
+  input[type="radio"], input[type="checkbox"] { width:auto; }
   button { padding:10px 14px; border-radius:10px; border:1px solid #111; background:#111; color:#fff; cursor:pointer; font:inherit; }
   .hint { color:#555; font-size:13px; margin-top:6px; }
-  a { color:#1a73e8; }
+  a { color:#1a73e8; text-decoration:none; }
+  a:hover { text-decoration:underline; }
+  .tabs { display:flex; gap:8px; margin-bottom:20px; border-bottom:2px solid #e0e0e0; }
+  .tab { padding:10px 16px; cursor:pointer; border:none; background:none; font:inherit; font-weight:500; color:#666; border-bottom:2px solid transparent; margin-bottom:-2px; }
+  .tab.active { color:#111; border-bottom-color:#111; }
+  .tab-content { display:none; }
+  .tab-content.active { display:block; }
+  code { background:#eee; padding:2px 6px; border-radius:4px; font-family:monospace; font-size:13px; }
 </style>
 </head>
 <body>
-<h1>Request Edit Link</h1>
-<p>Enter your email to receive a magic link for editing your AnchorID.</p>
+<h1>Login to AnchorID</h1>
+<p>Choose your login method below.</p>
 
-<form method="post" action="/login">
-  <input type="hidden" name="_csrf" value="${escapeHtml(csrfToken)}">
+<div class="tabs">
+  <button class="tab active" onclick="switchTab('email')">Email Magic Link</button>
+  <button class="tab" onclick="switchTab('backup')">Backup Token</button>
+</div>
 
-  <div class="card">
-    <label>Email</label>
-    <input name="email" type="email" placeholder="you@example.com" required>
-    <div class="hint">We'll send a secure edit link if this email has an AnchorID.</div>
+<!-- Email Magic Link Tab -->
+<div id="email-tab" class="tab-content active">
+  <h2 style="margin-top:0;font-size:18px">Request Edit Link via Email</h2>
+  <p style="margin-bottom:14px;color:#555">We'll send a secure edit link to your email.</p>
+
+  <form method="post" action="/login">
+    <input type="hidden" name="_csrf" value="${escapeHtml(csrfToken)}">
+
+    <div class="card">
+      <label>Email</label>
+      <input name="email" type="email" placeholder="you@example.com" required>
+      <div class="hint">We'll send a secure edit link if this email has an AnchorID.</div>
+    </div>
+
+    <div style="margin-top:14px">
+      <button type="submit">Send Edit Link</button>
+    </div>
+  </form>
+</div>
+
+<!-- Backup Token Tab -->
+<div id="backup-tab" class="tab-content">
+  <h2 style="margin-top:0;font-size:18px">Login with Backup Token</h2>
+  <p style="margin-bottom:14px;color:#555">Use your backup recovery token to access your profile.</p>
+
+  <form id="backupForm" onsubmit="return handleBackupLogin(event)">
+    <div class="card">
+      <label>AnchorID (UUID)</label>
+      <input id="uuidInput" type="text" placeholder="4ff7ed97-b78f-4ae6-9011-5af714ee241c" required pattern="[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}">
+      <div class="hint">Your 36-character UUID identifier.</div>
+    </div>
+
+    <div class="card">
+      <label>Backup Token</label>
+      <input id="tokenInput" type="text" placeholder="Enter your backup recovery token" required>
+      <div class="hint">The token you saved when creating your AnchorID. This is case-sensitive.</div>
+    </div>
+
+    <div style="margin-top:14px">
+      <button type="submit">Login with Backup Token</button>
+    </div>
+  </form>
+
+  <div class="card" style="background:#fff8e6;border:1px solid #ffe58f;margin-top:14px">
+    <strong>What is a backup token?</strong>
+    <p style="margin:6px 0 0 0;font-size:13px;color:#555">
+      Your backup token is a recovery code shown once during account creation.
+      It allows you to access your AnchorID if you lose access to your email.
+      If you don't have it, you'll need to use email login instead.
+    </p>
   </div>
-
-  <div style="margin-top:14px">
-    <button type="submit">Send Edit Link</button>
-  </div>
-</form>
+</div>
 
 <p style="margin-top:24px;font-size:13px;color:#555">
-  Don't have an AnchorID? <a href="/signup">Create one</a>
+  Don't have an AnchorID? <a href="/create">Create one</a>
 </p>
+
+<script>
+function switchTab(tab) {
+  // Update tab buttons
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  event.target.classList.add('active');
+
+  // Update tab content
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+  document.getElementById(tab + '-tab').classList.add('active');
+}
+
+function handleBackupLogin(e) {
+  e.preventDefault();
+
+  const uuid = document.getElementById('uuidInput').value.trim().toLowerCase();
+  const token = document.getElementById('tokenInput').value.trim();
+
+  if (!uuid || !token) {
+    alert('Please enter both UUID and backup token.');
+    return false;
+  }
+
+  // Validate UUID format
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!uuidRegex.test(uuid)) {
+    alert('Invalid UUID format. Please check and try again.');
+    return false;
+  }
+
+  // Redirect to edit page with backup token parameters
+  window.location.href = '/edit?backup_token=' + encodeURIComponent(token) + '&uuid=' + encodeURIComponent(uuid);
+  return false;
+}
+</script>
+
 </body></html>`;
 
   const headers: Record<string, string> = {
@@ -1085,6 +1967,7 @@ async function handleEditPage(request: Request, env: Env): Promise<Response> {
   .field { margin-bottom:20px; }
   .field label { font-weight:500; display:block; margin-bottom:4px; }
   .field input, .field textarea { width:100%; padding:8px; border:1px solid #ccc; border-radius:6px; font:inherit; box-sizing:border-box; }
+  .field input[type="radio"], .field input[type="checkbox"] { width:auto; }
   .field textarea { resize:vertical; }
   .hint { color:#555; font-size:13px; margin-top:4px; }
   .hint-secondary { color:#777; font-size:12px; margin-top:2px; }
@@ -1206,12 +2089,333 @@ ${isOrg ? `
   </div>
 </form>
 
+<div class="section" style="margin-top:40px">
+  <h2>Identity Claims</h2>
+  <p class="hint">Prove ownership of websites, domains, and accounts. Verified claims automatically appear in your sameAs.</p>
+
+${claims.length === 0 ? `<div style="background:#f6f6f6;padding:14px;border-radius:8px;margin:14px 0">
+  <p style="margin:0;color:#666">No claims yet. Add your first claim below.</p>
+</div>` : `
+<div style="margin-top:14px;display:grid;gap:14px">
+  ${claims.map((c) => {
+    const statusStyle = c.status === "verified"
+      ? "background:#d4edda;color:#155724;padding:3px 8px;border-radius:4px;font-size:12px"
+      : c.status === "failed"
+      ? "background:#f8d7da;color:#721c24;padding:3px 8px;border-radius:4px;font-size:12px"
+      : "background:#fff3cd;color:#856404;padding:3px 8px;border-radius:4px;font-size:12px";
+
+    // Map claim type to display name
+    const typeDisplayName = c.type === "website" ? "WEBSITE"
+      : c.type === "github" ? "GITHUB"
+      : c.type === "dns" ? "DNS"
+      : (c.type === "public" || c.type === "social") ? "PUBLIC PROFILE"  // Accept both new and old names
+      : escapeHtml(c.type).toUpperCase();
+
+    let proofDetails = "";
+    if (c.type === "dns" && c.proof.kind === "dns_txt") {
+      const qname = escapeHtml((c.proof as any).qname || "");
+      const token = escapeHtml((c.proof as any).expectedToken || "");
+      proofDetails = `
+        <div style="margin-top:8px;font-size:12px;color:#555">
+          <strong>Query name:</strong> <code>${qname}</code><br>
+          <strong>Expected:</strong> <code style="font-size:11px">${token}</code>
+        </div>`;
+    } else if (c.proof.kind === "well_known") {
+      proofDetails = `
+        <div style="margin-top:8px;font-size:12px;color:#555">
+          <strong>Proof location:</strong> <code style="font-size:11px">${escapeHtml((c.proof as any).url || "")}</code>
+        </div>`;
+    } else if (c.proof.kind === "github_readme") {
+      proofDetails = `
+        <div style="margin-top:8px;font-size:12px;color:#555">
+          <strong>Proof location:</strong> <code style="font-size:11px">${escapeHtml((c.proof as any).url || "")}</code>
+        </div>`;
+    }
+
+    return `
+    <div style="background:#f6f6f6;padding:14px;border-radius:8px">
+      <div style="display:flex;justify-content:space-between;align-items:start">
+        <div style="flex:1">
+          <div style="font-weight:500;margin-bottom:4px">
+            ${typeDisplayName}
+            <span style="${statusStyle}">${escapeHtml(c.status)}</span>
+          </div>
+          <code style="font-size:13px;word-break:break-all">${escapeHtml(c.url)}</code>
+          ${proofDetails}
+          ${c.failReason ? `<div style="margin-top:8px;color:#721c24;font-size:12px">Error: ${escapeHtml(c.failReason)}</div>` : ""}
+          ${c.lastCheckedAt ? `<div style="margin-top:6px;font-size:11px;color:#777">Last checked: ${escapeHtml(c.lastCheckedAt)}</div>` : ""}
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px;margin-left:10px">
+          <button type="button" class="verify-claim-btn" data-claim-id="${escapeHtml(c.id)}"
+            style="padding:6px 12px;font-size:12px;white-space:nowrap;cursor:pointer;background:#111;color:#fff;border:1px solid #111;border-radius:6px">
+            Verify
+          </button>
+          <button type="button" class="delete-claim-btn"
+            data-claim-id="${escapeHtml(c.id)}"
+            data-claim-type="${escapeHtml(typeDisplayName)}"
+            data-claim-url="${escapeHtml(c.url)}"
+            data-claim-status="${escapeHtml(c.status)}"
+            style="padding:6px 12px;font-size:12px;white-space:nowrap;cursor:pointer;background:#fff;color:#856404;border:1px solid #ddd;border-radius:6px">
+            Delete
+          </button>
+        </div>
+      </div>
+    </div>`;
+  }).join("")}
+</div>
+`}
+
+<details style="margin-top:20px;border:1px solid #ddd;border-radius:8px;padding:14px;background:#f9f9f9">
+  <summary style="cursor:pointer;font-weight:600;font-size:14px">Add New Claim</summary>
+
+  <div style="margin-top:14px">
+    <form id="addClaimForm">
+      <label style="display:block;margin-bottom:8px;font-weight:500">Claim Type</label>
+      <select id="claimType" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;margin-bottom:12px;font:inherit">
+        <option value="website">Website (.well-known/anchorid.txt)</option>
+        <option value="github">GitHub (profile README)</option>
+        <option value="dns">DNS (TXT record)</option>
+        <option value="public">Public Profile (any public bio)</option>
+      </select>
+
+      <label style="display:block;margin-bottom:8px;font-weight:500" id="urlLabel">URL or Domain</label>
+      <input type="text" id="claimUrl" placeholder="https://example.com or example.com"
+        style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;margin-bottom:12px;font:inherit;box-sizing:border-box">
+
+      <div id="dnsHint" style="display:none;font-size:12px;color:#555;margin-bottom:12px;padding:10px;background:#fff;border:1px solid #e0e0e0;border-radius:6px">
+        <strong>DNS Setup Instructions:</strong><br>
+        Add a TXT record at <code>_anchorid.yourdomain.com</code> with value:<br>
+        <code style="font-size:11px">anchorid=urn:uuid:${escapeHtml(uuid)}</code>
+      </div>
+
+      <button type="submit" style="padding:8px 16px;background:#111;color:#fff;border:1px solid #111;border-radius:6px;cursor:pointer;font:inherit">
+        Add Claim
+      </button>
+      <span id="claimStatus" style="margin-left:10px;font-size:13px"></span>
+    </form>
+  </div>
+</details>
+</div>
+
 <pre id="out"></pre>
 
 <div class="footer">
   AnchorID favors durability over convenience.<br>
   Most changes are reversible. The identifier is not.
 </div>
+
+<!-- Delete Claim Confirmation Modal -->
+<div id="deleteClaimModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:10000;justify-content:center;align-items:center">
+  <div style="background:#fff;border-radius:12px;padding:24px;max-width:500px;width:90%;box-shadow:0 4px 20px rgba(0,0,0,0.15)">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <h3 style="margin:0;font-size:18px;font-weight:600;color:#721c24">Delete this claim?</h3>
+      <button id="closeDeleteModal" style="background:none;border:none;font-size:24px;cursor:pointer;color:#999;line-height:1">&times;</button>
+    </div>
+
+    <div id="deleteModalClaimInfo" style="background:#f8f9fa;padding:14px;border-radius:6px;border:1px solid #e0e0e0;margin-bottom:16px;font-size:13px">
+      <!-- Claim details will be inserted here -->
+    </div>
+
+    <div style="background:#fff3cd;border:1px solid #ffc107;color:#856404;padding:12px;border-radius:6px;margin-bottom:20px;font-size:13px">
+      <strong>⚠️ Warning:</strong> This will permanently remove this claim from your AnchorID record. This action cannot be undone.
+    </div>
+
+    <div style="display:flex;gap:12px;justify-content:flex-end">
+      <button id="cancelDeleteBtn" style="padding:10px 20px;background:#fff;color:#333;border:1px solid #ddd;border-radius:6px;cursor:pointer;font-size:14px;font-weight:500">
+        Cancel
+      </button>
+      <button id="confirmDeleteBtn" style="padding:10px 20px;background:#dc3545;color:#fff;border:1px solid #dc3545;border-radius:6px;cursor:pointer;font-size:14px;font-weight:500">
+        Delete Claim
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+// Claim form handling
+(function() {
+  const sessionToken = "${escapeHtml(sessionToken)}";
+  const profileUuid = "${escapeHtml(uuid)}";
+
+  // Update form hints based on claim type
+  document.getElementById("claimType").addEventListener("change", function() {
+    const type = this.value;
+    const urlLabel = document.getElementById("urlLabel");
+    const urlInput = document.getElementById("claimUrl");
+    const dnsHint = document.getElementById("dnsHint");
+
+    if (type === "website") {
+      urlLabel.textContent = "Website URL";
+      urlInput.placeholder = "https://example.com";
+      dnsHint.style.display = "none";
+    } else if (type === "github") {
+      urlLabel.textContent = "GitHub Profile URL";
+      urlInput.placeholder = "https://github.com/username";
+      dnsHint.style.display = "none";
+    } else if (type === "dns") {
+      urlLabel.textContent = "Domain";
+      urlInput.placeholder = "example.com or _anchorid.example.com";
+      dnsHint.style.display = "block";
+    } else if (type === "public") {
+      urlLabel.textContent = "Profile URL or @handle";
+      urlInput.placeholder = "@user@mastodon.social or https://bsky.app/profile/user.bsky.social";
+      dnsHint.style.display = "none";
+    }
+  });
+
+  // Add claim form submission
+  document.getElementById("addClaimForm").addEventListener("submit", async function(e) {
+    e.preventDefault();
+    const statusEl = document.getElementById("claimStatus");
+    statusEl.textContent = "Adding...";
+    statusEl.style.color = "#666";
+
+    const type = document.getElementById("claimType").value;
+    const url = document.getElementById("claimUrl").value.trim();
+
+    try {
+      const res = await fetch("/claim", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer " + sessionToken
+        },
+        body: JSON.stringify({ uuid: profileUuid, type, url })
+      });
+
+      if (res.ok) {
+        statusEl.textContent = "✓ Added! Reloading...";
+        statusEl.style.color = "#155724";
+        setTimeout(() => location.reload(), 1000);
+      } else {
+        const text = await res.text();
+        statusEl.textContent = "✗ Failed: " + text;
+        statusEl.style.color = "#721c24";
+      }
+    } catch (err) {
+      statusEl.textContent = "✗ Network error";
+      statusEl.style.color = "#721c24";
+    }
+  });
+
+  // Verify claim buttons
+  document.querySelectorAll(".verify-claim-btn").forEach(btn => {
+    btn.addEventListener("click", async function() {
+      const claimId = this.getAttribute("data-claim-id");
+      this.textContent = "Verifying...";
+      this.disabled = true;
+
+      try {
+        const res = await fetch("/claim/verify", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": "Bearer " + sessionToken
+          },
+          body: JSON.stringify({ uuid: profileUuid, claimId })
+        });
+
+        if (res.ok) {
+          this.textContent = "✓ Done";
+          setTimeout(() => location.reload(), 1000);
+        } else {
+          const text = await res.text();
+          alert("Verification failed: " + text);
+          this.textContent = "Verify";
+          this.disabled = false;
+        }
+      } catch (err) {
+        alert("Network error: " + err.message);
+        this.textContent = "Verify";
+        this.disabled = false;
+      }
+    });
+  });
+
+  // Delete claim buttons with two-step confirmation
+  const deleteModal = document.getElementById("deleteClaimModal");
+  const deleteModalClaimInfo = document.getElementById("deleteModalClaimInfo");
+  const confirmDeleteBtn = document.getElementById("confirmDeleteBtn");
+  const cancelDeleteBtn = document.getElementById("cancelDeleteBtn");
+  const closeModalBtn = document.getElementById("closeDeleteModal");
+  let pendingDeleteClaimId = null;
+
+  document.querySelectorAll(".delete-claim-btn").forEach(btn => {
+    btn.addEventListener("click", function() {
+      const claimId = this.getAttribute("data-claim-id");
+      const claimType = this.getAttribute("data-claim-type");
+      const claimUrl = this.getAttribute("data-claim-url");
+      const claimStatus = this.getAttribute("data-claim-status");
+
+      pendingDeleteClaimId = claimId;
+
+      // Populate modal with claim details
+      deleteModalClaimInfo.innerHTML = \`
+        <div style="margin-bottom:12px"><strong>Claim Type:</strong> \${claimType}</div>
+        <div style="margin-bottom:12px"><strong>URL:</strong> <code style="font-size:13px;word-break:break-all">\${claimUrl}</code></div>
+        <div style="margin-bottom:12px"><strong>Status:</strong> \${claimStatus}</div>
+      \`;
+
+      // Show modal
+      deleteModal.style.display = "flex";
+    });
+  });
+
+  // Cancel deletion
+  function closeDeleteModal() {
+    deleteModal.style.display = "none";
+    pendingDeleteClaimId = null;
+  }
+
+  cancelDeleteBtn.addEventListener("click", closeDeleteModal);
+  closeModalBtn.addEventListener("click", closeDeleteModal);
+
+  // Close modal on outside click
+  deleteModal.addEventListener("click", function(e) {
+    if (e.target === deleteModal) {
+      closeDeleteModal();
+    }
+  });
+
+  // Confirm deletion
+  confirmDeleteBtn.addEventListener("click", async function() {
+    if (!pendingDeleteClaimId) return;
+
+    confirmDeleteBtn.textContent = "Deleting...";
+    confirmDeleteBtn.disabled = true;
+
+    try {
+      const res = await fetch("/claim/delete", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer " + sessionToken
+        },
+        body: JSON.stringify({ uuid: profileUuid, claimId: pendingDeleteClaimId })
+      });
+
+      if (res.ok) {
+        closeDeleteModal();
+        // Show success message and reload
+        const successMsg = document.createElement("div");
+        successMsg.style.cssText = "position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#155724;color:#fff;padding:12px 24px;border-radius:6px;z-index:10001";
+        successMsg.textContent = "✓ Claim deleted successfully";
+        document.body.appendChild(successMsg);
+        setTimeout(() => location.reload(), 1500);
+      } else {
+        const text = await res.text();
+        alert("Failed to delete claim: " + text);
+        confirmDeleteBtn.textContent = "Delete Claim";
+        confirmDeleteBtn.disabled = false;
+      }
+    } catch (err) {
+      alert("Network error: " + err.message);
+      confirmDeleteBtn.textContent = "Delete Claim";
+      confirmDeleteBtn.disabled = false;
+    }
+  });
+})();
+</script>
 <script>
 async function submitForm(e){
   e.preventDefault();
@@ -1331,7 +2535,15 @@ async function handleUpdate(request: Request, env: Env): Promise<Response> {
   });
 
   if (changed) {
-    await env.ANCHOR_KV.put(key, JSON.stringify(next));
+    // Preserve metadata fields (email, backup token, etc.) when saving
+    const profileWithMeta = {
+      ...next,
+      ...(current._emailHash ? { _emailHash: current._emailHash } : {}),
+      ...(current._backupTokenHash ? { _backupTokenHash: current._backupTokenHash } : {}),
+      ...(current._email ? { _email: current._email } : {}),
+    };
+
+    await env.ANCHOR_KV.put(key, JSON.stringify(profileWithMeta));
 
     // Audit log
     const method = session.backupAccess ? "backup_token" : "magic_link";
@@ -1397,12 +2609,23 @@ function isUuid(s: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(s);
 }
 
+// Security headers applied to all responses
+function securityHeaders(): Record<string, string> {
+  return {
+    "x-content-type-options": "nosniff",
+    "x-frame-options": "DENY",
+    "referrer-policy": "strict-origin-when-cross-origin",
+    "permissions-policy": "interest-cohort=()",
+    "content-security-policy": "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; base-uri 'self'; form-action 'self'",
+  };
+}
+
 function json(obj: unknown, status = 200, extraHeaders: Record<string, string> = {}) {
   return new Response(JSON.stringify(obj, null, 2), {
     status,
     headers: {
       "content-type": "application/json; charset=utf-8",
-      "x-content-type-options": "nosniff",
+      ...securityHeaders(),
       ...extraHeaders,
     },
   });
@@ -1413,7 +2636,7 @@ function ldjson(obj: unknown, status = 200, extraHeaders: Record<string, string>
     status,
     headers: {
       "content-type": "application/ld+json; charset=utf-8",
-      "x-content-type-options": "nosniff",
+      ...securityHeaders(),
       ...extraHeaders,
     },
   });
@@ -1485,11 +2708,13 @@ async function checkIpRateLimit(
 
 interface AuditEntry {
   timestamp: string;
-  action: "create" | "update" | "rotate_token";
-  method: "admin" | "magic_link" | "backup_token";
+  action: "create" | "update" | "rotate_token" | "claim_deleted";
+  method: "admin" | "magic_link" | "backup_token" | "session_token";
   ipHash: string;
   changes?: string[];
   summary?: string;
+  claimType?: string;
+  claimUrl?: string;
 }
 
 async function appendAuditLog(

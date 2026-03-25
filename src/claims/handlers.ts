@@ -1,19 +1,52 @@
-// src/claims/handlers.ts
+/**
+ * AnchorID - Permanent Attribution Anchor Service
+ *
+ * Copyright (c) 2025-2026 Mike Johnson (Mycal) / AnchorID
+ *
+ * Author:       https://anchorid.net/resolve/4ff7ed97-b78f-4ae6-9011-5af714ee241c
+ * Organization: https://anchorid.net/resolve/4c785577-9f55-4a22-a80b-dd1f4d9b4658
+ * Repository:   https://github.com/lowerpower/anchorid
+ *
+ * SPDX-License-Identifier: MIT
+ * See LICENSE file for full terms.
+ *
+ * AnchorID provides UUID-based permanent attribution anchors for the AI era.
+ * Part of the Mycal Labs infrastructure preservation project.
+ */
 
 import type { Env } from "../env";
-import type { Claim, ClaimsEnv } from "./types";
+import type { Claim } from "./types";
 import { nowIso, isUuid, normalizeUrl, normalizeIdentityUrl, loadClaims, saveClaims, upsertClaim } from "./store";
 import {
   claimIdForWebsite,
   claimIdForGitHub,
+  claimIdForDns,
+  claimIdForPublic,
   buildWellKnownProof,
   buildGitHubReadmeProof,
+  buildDnsProof,
+  buildPublicProof,
+  parseFediverseHandle,
+  validateProfileUrl,
   verifyClaim,
 } from "./verify";
+import { getErrorInfo } from "./errors";
+import { sendClaimVerifiedEmail, sendClaimFailedEmail, shouldSendNotification } from "./notifications";
 
 // Optional: pass base resolver host in if you want staging/prod support later
 function resolverUrlFor(uuid: string): string {
   return `https://anchorid.net/resolve/${uuid}`;
+}
+
+// Security headers for all responses
+function securityHeaders(): Record<string, string> {
+  return {
+    "x-content-type-options": "nosniff",
+    "x-frame-options": "DENY",
+    "referrer-policy": "strict-origin-when-cross-origin",
+    "permissions-policy": "interest-cohort=()",
+    "content-security-policy": "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; base-uri 'self'; form-action 'self'",
+  };
 }
 
 
@@ -31,6 +64,7 @@ export async function handleGetClaims(
     headers: {
       "content-type": "application/json; charset=utf-8",
       "cache-control": "public, max-age=60, s-maxage=300, stale-while-revalidate=86400",
+      ...securityHeaders(),
     },
   });
 }
@@ -60,6 +94,16 @@ export async function handleGetClaimsHtml(
   }
 
   function renderClaim(c: any): string {
+    let failReasonHtml = "";
+    if (c.failReason) {
+      const errorInfo = getErrorInfo(c.failReason);
+      failReasonHtml = `<div class="fail" style="margin-top:8px">
+        <strong>Error:</strong> ${esc(errorInfo.message)}
+        ${errorInfo.hint ? `<br><span style="font-size:12px">${esc(errorInfo.hint)}</span>` : ""}
+        ${errorInfo.docLink ? `<br><a href="${esc(errorInfo.docLink)}" style="font-size:11px">View documentation →</a>` : ""}
+      </div>`;
+    }
+
     return `
       <div class="claim">
         <div class="row">
@@ -68,11 +112,11 @@ export async function handleGetClaimsHtml(
         </div>
         <div class="url"><a href="${esc(c.url)}" rel="me noopener" target="_blank">${esc(c.url)}</a></div>
         <div class="meta">
-          <span>${esc(c.type)}</span>
+          <span>${esc(c.type === "social" ? "public" : c.type)}</span>
           ${c.verifiedAt ? `<span>Verified: <code>${esc(c.verifiedAt)}</code></span>` : ""}
           ${c.lastCheckedAt ? `<span>Checked: <code>${esc(c.lastCheckedAt)}</code></span>` : ""}
-          ${c.failReason ? `<span class="fail">Fail: <code>${esc(c.failReason)}</code></span>` : ""}
         </div>
+        ${failReasonHtml}
         <details>
           <summary>Proof</summary>
           <div class="proof">
@@ -145,6 +189,7 @@ export async function handleGetClaimsHtml(
     headers: {
       "content-type": "text/html; charset=utf-8",
       "cache-control": "public, max-age=60, s-maxage=300, stale-while-revalidate=86400",
+      ...securityHeaders(),
     },
   });
 }
@@ -152,16 +197,18 @@ export async function handleGetClaimsHtml(
 
 // Token-gated in router (reuse your existing auth guard there)
 export async function handlePostClaim(request: Request,   env: Env): Promise<Response> {
-  const payload = await request.json().catch(() => null);
+  const payload: any = await request.json().catch(() => null);
   if (!payload) return new Response("Bad JSON", { status: 400 });
 
   const uuid = String(payload.uuid || "").trim();
   const type = String(payload.type || "").trim();
-  // normalize FIRST, before building ids or proofs
-  const url = normalizeIdentityUrl(String(payload.url || ""));
+  // normalize FIRST, before building ids or proofs (except for public/social, which needs special handling)
+  const url = (type === "public" || type === "social") ? String(payload.url || "").trim() : normalizeIdentityUrl(String(payload.url || ""));
 
   if (!isUuid(uuid)) return new Response("Bad UUID", { status: 400 });
-  if (type !== "website" && type !== "github") return new Response("Bad type", { status: 400 });
+  if (url.length > 2048) return new Response("URL too long", { status: 400 });
+  // Accept both "public" (new) and "social" (backward compatibility)
+  if (type !== "website" && type !== "github" && type !== "dns" && type !== "public" && type !== "social") return new Response("Bad type", { status: 400 });
 
   const resolverUrl = resolverUrlFor(uuid);
   const now = nowIso();
@@ -181,7 +228,7 @@ export async function handlePostClaim(request: Request,   env: Env): Promise<Res
       createdAt: now,
       updatedAt: now,
     };
-  } else {
+  } else if (type === "github") {
     const id = claimIdForGitHub(url);
     const proof = buildGitHubReadmeProof(url, resolverUrl);
     claim = {
@@ -193,6 +240,76 @@ export async function handlePostClaim(request: Request,   env: Env): Promise<Res
       createdAt: now,
       updatedAt: now,
     };
+  } else if (type === "dns") {
+    // Parse domain input to determine qname
+    // Accept: "example.com" (defaults to _anchorid.example.com)
+    // Accept: "_anchorid.example.com" (explicit subdomain)
+    let domain = url.toLowerCase().trim();
+
+    // Remove protocol if present
+    domain = domain.replace(/^https?:\/\//, "");
+    // Remove trailing slash
+    domain = domain.replace(/\/$/, "");
+    // Remove path
+    domain = domain.split("/")[0];
+
+    let qname: string;
+    if (domain.startsWith("_anchorid.")) {
+      // User specified subdomain explicitly
+      qname = domain;
+    } else {
+      // Default to subdomain method
+      qname = `_anchorid.${domain}`;
+    }
+
+    const id = claimIdForDns(qname);
+    const proof = buildDnsProof(qname, uuid);
+
+    // Use the base domain as the url for display
+    const displayUrl = domain.startsWith("_anchorid.") ? domain.slice(10) : domain;
+
+    claim = {
+      id,
+      type: "dns",
+      url: displayUrl,
+      status: "self_asserted",
+      proof,
+      createdAt: now,
+      updatedAt: now,
+    };
+  } else if (type === "public" || type === "social") {
+    // Parse @user@instance format or accept full URL
+    let profileUrl = url;
+
+    // Try parsing as Fediverse handle first
+    if (url.includes('@') && !url.startsWith('http')) {
+      const parsed = parseFediverseHandle(url);
+      if (!parsed) {
+        return new Response("Invalid Fediverse handle format. Use @user@instance.social or full URL", { status: 400 });
+      }
+      profileUrl = parsed;
+    }
+
+    // Validate URL for SSRF protection
+    const validation = validateProfileUrl(profileUrl);
+    if (!validation.ok) {
+      return new Response(`Invalid URL: ${validation.error}`, { status: 400 });
+    }
+
+    const id = claimIdForPublic(profileUrl);
+    const proof = buildPublicProof(profileUrl, resolverUrl);
+
+    claim = {
+      id,
+      type: "public",  // Always create new claims with "public" type
+      url: profileUrl,
+      status: "self_asserted",
+      proof,
+      createdAt: now,
+      updatedAt: now,
+    };
+  } else {
+    return new Response("Invalid claim type", { status: 400 });
   }
 
   const list = await loadClaims(env, uuid);
@@ -200,7 +317,10 @@ export async function handlePostClaim(request: Request,   env: Env): Promise<Res
   await saveClaims(env, uuid, updated);
 
   return new Response(JSON.stringify({ ok: true, claim }, null, 2), {
-    headers: { "content-type": "application/json; charset=utf-8" },
+    headers: {
+      "content-type": "application/json; charset=utf-8",
+      ...securityHeaders(),
+    },
   });
 }
 
@@ -208,11 +328,12 @@ export async function handlePostClaimVerify(
   request: Request,
   env: Env
 ): Promise<Response> {
-  const payload = await request.json().catch(() => null);
+  const payload: any = await request.json().catch(() => null);
   if (!payload) return new Response("Bad JSON", { status: 400 });
 
   const uuid = String(payload.uuid || "").trim();
-  const id = String(payload.id || "").trim();
+  const id = String(payload.claimId || payload.id || "").trim();
+  const bypassCache = Boolean(payload.bypassCache || payload.recheckNow);
 
   if (!isUuid(uuid)) return new Response("Bad UUID", { status: 400 });
   if (!id) return new Response("Bad claim id", { status: 400 });
@@ -222,11 +343,12 @@ export async function handlePostClaimVerify(
   if (idx < 0) return new Response("Claim not found", { status: 404 });
 
   const claim = { ...list[idx] };
+  const previousStatus = claim.status; // Track previous status for notifications
   const now = nowIso();
 
   let result: { status: Claim["status"]; failReason?: string };
   try {
-    result = await verifyClaim(claim);
+    result = await verifyClaim(claim, env.ANCHOR_KV, bypassCache);
   } catch (e: any) {
     result = { status: "failed", failReason: `verify_error:${String(e?.message || e)}` };
   }
@@ -245,8 +367,83 @@ export async function handlePostClaimVerify(
   updated[idx] = claim;
   await saveClaims(env, uuid, updated);
 
+  // Send notification if status changed (success or failure)
+  if (previousStatus !== result.status) {
+    // Get profile to retrieve email (if notifications enabled)
+    const profile = await env.ANCHOR_KV.get(`profile:${uuid}`, { type: "json" }) as any | null;
+    const email = profile?._email;
+
+    if (shouldSendNotification(env, email)) {
+      // Send in background (don't wait for email to send)
+      if (result.status === "verified") {
+        sendClaimVerifiedEmail(env, email, uuid, claim).catch(e => {
+          console.error("Failed to send verification success notification:", e);
+        });
+      } else if (result.status === "failed") {
+        sendClaimFailedEmail(env, email, uuid, claim).catch(e => {
+          console.error("Failed to send verification failure notification:", e);
+        });
+      }
+    }
+  }
+
   return new Response(JSON.stringify({ ok: true, claim }, null, 2), {
-    headers: { "content-type": "application/json; charset=utf-8" },
+    headers: {
+      "content-type": "application/json; charset=utf-8",
+      ...securityHeaders(),
+    },
+  });
+}
+
+/**
+ * Delete a claim from a user's profile
+ * Requires authentication (admin or user session token)
+ * Note: Audit logging is handled by the caller in index.ts
+ */
+export async function handlePostClaimDelete(
+  request: Request,
+  env: Env
+): Promise<Response> {
+  const payload: any = await request.json().catch(() => null);
+  if (!payload) return new Response("Bad JSON", { status: 400 });
+
+  const uuid = String(payload.uuid || "").trim();
+  const claimId = String(payload.claimId || "").trim();
+
+  if (!isUuid(uuid)) return new Response("Bad UUID", { status: 400 });
+  if (!claimId) return new Response("Bad claim ID", { status: 400 });
+
+  // Load current claims
+  const list = await loadClaims(env, uuid);
+  const idx = list.findIndex((c) => c.id === claimId);
+
+  if (idx < 0) {
+    return new Response("Claim not found", { status: 404 });
+  }
+
+  // Store claim info for response (will be used for audit logging by caller)
+  const deletedClaim = list[idx];
+
+  // Remove the claim from the array
+  const updated = [...list.slice(0, idx), ...list.slice(idx + 1)];
+
+  // Save updated claims list
+  await saveClaims(env, uuid, updated);
+
+  return new Response(JSON.stringify({
+    ok: true,
+    message: "Claim deleted successfully",
+    deletedClaimId: claimId,
+    deletedClaim: {
+      type: deletedClaim.type,
+      url: deletedClaim.url,
+      status: deletedClaim.status
+    }
+  }, null, 2), {
+    headers: {
+      "content-type": "application/json; charset=utf-8",
+      ...securityHeaders(),
+    },
   });
 }
 

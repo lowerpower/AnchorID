@@ -1,8 +1,23 @@
+/**
+ * AnchorID - Permanent Attribution Anchor Service
+ *
+ * Copyright (c) 2025-2026 Mike Johnson (Mycal) / AnchorID
+ *
+ * Author:       https://anchorid.net/resolve/4ff7ed97-b78f-4ae6-9011-5af714ee241c
+ * Organization: https://anchorid.net/resolve/4c785577-9f55-4a22-a80b-dd1f4d9b4658
+ * Repository:   https://github.com/lowerpower/anchorid
+ *
+ * SPDX-License-Identifier: MIT
+ * See LICENSE file for full terms.
+ *
+ * AnchorID provides UUID-based permanent attribution anchors for the AI era.
+ * Part of the Mycal Labs infrastructure preservation project.
+ */
 
-// src/admin/handlers.ts
 import type { Env } from "../env";
 import { buildProfile, mergeSameAs } from "../domain/profile";
 import { loadClaims } from "../claims/store";
+import { formatErrorHtml } from "../claims/errors";
 
 // ------------------ Cookie auth ------------------
 
@@ -348,7 +363,39 @@ export async function handleAdminLogoutPost(req: Request, env: Env): Promise<Res
   });
 }
 
-// ------------------ Helper functions for admin list view ------------------
+// Helper function to fetch all profile UUIDs (paginated through KV list cursor)
+async function fetchAllProfileUUIDs(env: Env): Promise<string[]> {
+  const uuids: string[] = [];
+  let cursor: string | undefined;
+
+  do {
+    const list = await env.ANCHOR_KV.list({
+      prefix: "profile:",
+      limit: 1000,
+      cursor
+    });
+
+    uuids.push(
+      ...list.keys
+        .map(k => k.name.slice("profile:".length))
+        .filter(Boolean)
+    );
+
+    cursor = list.list_complete ? undefined : list.cursor;
+  } while (cursor);
+
+  return uuids.sort();
+}
+
+// Helper to build query string for pagination
+function buildQueryString(query: string, page: number): string {
+  const params = new URLSearchParams();
+  if (query) params.set('q', query);
+  if (page > 1) params.set('page', page.toString());
+  return params.toString();
+}
+
+// ------------------ Helper functions for admin list view metadata ------------------
 
 /**
  * Obfuscates an email for display: m***l@example.com
@@ -416,35 +463,53 @@ export async function handleAdminHome(req: Request, env: Env): Promise<Response>
 
   const csrf = csrfInput(req);
 
-  // 1. List all profile UUIDs
-  const list = await env.ANCHOR_KV.list({ prefix: "profile:", limit: 200 });
-  const uuids = list.keys
-    .map((k) => k.name.slice("profile:".length))
-    .filter(Boolean);
+  // Parse query parameters
+  const url = new URL(req.url);
+  const query = (url.searchParams.get("q") || "").trim();
+  const pageParam = parseInt(url.searchParams.get("page") || "1", 10);
+  const currentPage = Math.max(1, isNaN(pageParam) ? 1 : pageParam);
+  const deletedName = url.searchParams.get("deleted") || "";
 
-  if (uuids.length === 0) {
-    const html = `<!doctype html>
-<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>AnchorID Admin</title></head>
-<body style="font-family:system-ui;max-width:1200px;margin:40px auto;padding:0 16px;line-height:1.45">
-<h1>AnchorID Admin</h1>
+  const perPage = 100;
 
-<p><a href="/admin/new">Create new profile</a></p>
+  // Fetch all profile UUIDs
+  const allUuids = await fetchAllProfileUUIDs(env);
 
-<p>(no profiles)</p>
+  // Filter by search query if provided
+  let filteredUuids = allUuids;
 
-<form method="post" action="/admin/logout" style="margin-top:24px">
-  ${csrf}
-  <button type="submit">Logout</button>
-</form>
-</body></html>`;
+  if (query) {
+    const queryLower = query.toLowerCase();
+    const matchingUuids: string[] = [];
 
-    return htmlResponseWithCsrf(html, req);
+    // Fetch all profiles and search through their JSON data
+    for (const uuid of allUuids) {
+      const profile = await env.ANCHOR_KV.get(`profile:${uuid}`, { type: "json" });
+      if (profile) {
+        const profileJson = JSON.stringify(profile).toLowerCase();
+        if (profileJson.includes(queryLower)) {
+          matchingUuids.push(uuid);
+        }
+      }
+    }
+
+    filteredUuids = matchingUuids;
   }
 
-  // 2. Load all profiles, emails, and audit logs in parallel
+  // Pagination metadata
+  const total = filteredUuids.length;
+  const totalPages = Math.ceil(total / perPage);
+  const startIndex = (currentPage - 1) * perPage;
+  const endIndex = Math.min(startIndex + perPage, total);
+  const hasPrev = currentPage > 1;
+  const hasNext = currentPage < totalPages;
+
+  // Get current page items
+  const pageUuids = filteredUuids.slice(startIndex, endIndex);
+
+  // Load profiles, emails, and audit logs for the current page
   const allData = await Promise.all(
-    uuids.map(async (uuid) => {
+    pageUuids.map(async (uuid) => {
       const [profile, email, audit] = await Promise.all([
         env.ANCHOR_KV.get(`profile:${uuid}`, { type: "json" }) as Promise<any | null>,
         env.ANCHOR_KV.get(`email:unhashed:${uuid}`),
@@ -454,14 +519,7 @@ export async function handleAdminHome(req: Request, env: Env): Promise<Response>
     })
   );
 
-  // 3. Sort by dateModified descending (most recently modified first)
-  allData.sort((a, b) => {
-    const aDate = a.profile?.dateModified || a.profile?.dateCreated || "";
-    const bDate = b.profile?.dateModified || b.profile?.dateCreated || "";
-    return bDate.localeCompare(aDate);
-  });
-
-  // 4. Build table rows
+  // Build table rows with metadata
   const rows = allData
     .map((data) => {
       const { uuid, profile, email, audit } = data;
@@ -490,19 +548,67 @@ export async function handleAdminHome(req: Request, env: Env): Promise<Response>
 <title>AnchorID Admin</title>
 <style>
   body { font-family:system-ui; max-width:1200px; margin:40px auto; padding:0 16px; line-height:1.45; }
+  .alert { padding:12px 14px; border-radius:10px; margin-bottom:14px; }
+  .alert-success { background:#d4edda; border:1px solid #c3e6cb; color:#155724; }
+  .alert-warning { background:#fff3cd; border:1px solid #ffc107; color:#856404; }
+  .backup-section { background:#f8f9fa; border:1px solid #dee2e6; padding:14px; border-radius:10px; margin-bottom:20px; }
+  .backup-section h2 { margin:0 0 8px 0; font-size:16px; }
+  .backup-section p { margin:0 0 10px 0; font-size:14px; color:#555; }
+  .backup-section button { padding:8px 16px; background:#111; color:#fff; border:1px solid #111; border-radius:6px; cursor:pointer; font:inherit; }
+  .backup-section button:hover { background:#333; }
+  .backup-section .hint { font-size:12px; color:#666; margin-top:8px; }
+  .search-box { margin-bottom:20px; }
+  .search-box input { padding:8px 12px; width:400px; max-width:100%; border:1px solid #ccc; border-radius:6px; font:inherit; }
+  .search-box button { padding:8px 16px; margin-left:8px; border:1px solid #111; background:#111; color:#fff; border-radius:6px; cursor:pointer; font:inherit; }
+  .search-box a { margin-left:8px; }
+  .result-summary { color:#666; font-size:14px; margin-bottom:12px; }
   table { width:100%; border-collapse:collapse; margin:20px 0; }
   th { text-align:left; padding:8px; border-bottom:2px solid #ddd; background:#f5f5f5; font-weight:600; }
   td { padding:8px; border-bottom:1px solid #eee; }
   tr:hover { background:#f9f9f9; }
   a { color:#0066cc; text-decoration:none; }
   a:hover { text-decoration:underline; }
+  .pagination { margin-top:20px; display:flex; gap:12px; align-items:center; }
+  .pagination a { text-decoration:none; color:#1a73e8; }
+  .pagination span.disabled { color:#ccc; }
 </style>
 </head>
 <body>
 <h1>AnchorID Admin</h1>
 
-<p><a href="/admin/new">Create new profile</a> | <strong>${allData.length}</strong> profile${allData.length === 1 ? "" : "s"}</p>
+${deletedName ? `<div class="alert alert-success">✓ Profile deleted: <strong>${escapeHtml(deletedName)}</strong></div>` : ""}
 
+<p><a href="/admin/new">Create new profile</a></p>
+
+<div class="backup-section">
+  <h2>📥 Database Backup</h2>
+  <p>Download a complete backup of all profiles, claims, and audit logs.</p>
+  <form method="get" action="/admin/backup" style="margin:0">
+    <button type="submit">Download Full Backup</button>
+    <span class="hint">JSON format · ${total} profile${total !== 1 ? 's' : ''}</span>
+  </form>
+  <div class="alert alert-warning" style="margin-top:10px;font-size:13px">
+    ⚠️ <strong>Security Notice:</strong> This backup contains sensitive data including email hashes and authentication credentials. Store securely.
+  </div>
+</div>
+
+<form method="get" action="/admin" class="search-box">
+  <input
+    type="text"
+    name="q"
+    value="${escapeHtml(query)}"
+    placeholder="Search profiles (UUID, name, email, etc.)">
+  <button type="submit">Search</button>
+  ${query ? '<a href="/admin">Clear</a>' : ''}
+</form>
+
+<h2>Profiles</h2>
+
+<p class="result-summary">
+  ${query ? `Found ${total} matching profile${total !== 1 ? 's' : ''}` : `Showing ${total} profile${total !== 1 ? 's' : ''}`}${totalPages > 1 ? ` (page ${currentPage} of ${totalPages})` : ''}
+</p>
+
+${allData.length > 0 ? `
 <table>
   <thead>
     <tr>
@@ -519,6 +625,19 @@ export async function handleAdminHome(req: Request, env: Env): Promise<Response>
 ${rows}
   </tbody>
 </table>
+` : '<p>(no profiles)</p>'}
+
+${totalPages > 1 ? `
+<nav class="pagination">
+  ${hasPrev
+    ? `<a href="/admin?${buildQueryString(query, currentPage - 1)}">← Previous</a>`
+    : '<span class="disabled">← Previous</span>'}
+  <span>Page ${currentPage} of ${totalPages}</span>
+  ${hasNext
+    ? `<a href="/admin?${buildQueryString(query, currentPage + 1)}">Next →</a>`
+    : '<span class="disabled">Next →</span>'}
+</nav>
+` : ''}
 
 <form method="post" action="/admin/logout" style="margin-top:24px">
   ${csrf}
@@ -882,14 +1001,23 @@ export async function handleAdminEditGet(req: Request, env: Env, uuid: string): 
   const foundingDate = isOrg ? ((canonical as any).foundingDate || "") : "";
   const affiliation = !isOrg ? extractUuids((canonical as any).affiliation) : [];
 
+  // Check if profile is deletable (less than 7 days old)
+  const createdDate = canonical.dateCreated ? new Date(canonical.dateCreated) : null;
+  const now = new Date();
+  const ageInDays = createdDate ? (now.getTime() - createdDate.getTime()) / (1000 * 60 * 60 * 24) : 999;
+  const isDeletable = ageInDays < 7;
+
   const successMessages: Record<string, string> = {
     saved: "Profile saved successfully.",
     no_changes: "No changes detected.",
+    email_added: "Email address added successfully. Magic link login is now enabled.",
   };
 
   const errorMessages: Record<string, string> = {
     save_failed: "Failed to save profile. Please try again.",
     invalid_url: "One or more URLs are invalid.",
+    invalid_email: "Please enter a valid email address.",
+    email_exists: "This email is already associated with another profile.",
   };
 
   const html = `<!doctype html>
@@ -966,8 +1094,16 @@ ${error ? `<div class="alert alert-error">${escapeHtml(errorMessages[error] || e
   <div class="card danger">
     <label>Email Access <span class="badge" style="background:#ffd6d6">Not configured</span></label>
     <div class="hint" style="margin-top:0">
-      Created before email-based access was added.
+      Created before email-based access was added. Add an email below to enable magic link login.
     </div>
+    <form method="post" action="/admin/save/${escapeHtml(uuid)}" style="margin-top:10px">
+      ${csrf}
+      <input type="hidden" name="is_email_update" value="1">
+      <label style="font-size:13px;font-weight:600;display:block;margin-bottom:4px">Add Email Address</label>
+      <input type="email" name="email" placeholder="user@example.com" required
+        style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font:inherit;margin-bottom:8px">
+      <button type="submit" style="padding:6px 12px;font-size:13px">Add Email</button>
+    </form>
   </div>
   `}
 
@@ -1115,6 +1251,375 @@ ${isOrg ? `
   </div>
 </form>
 
+<h2 style="margin-top:32px">Identity Claims</h2>
+<p class="hint">Prove ownership of websites, domains, and accounts. Verified claims automatically appear in your sameAs.</p>
+
+${claims.length === 0 ? `<div class="card" style="margin:14px 0">
+  <p style="margin:0;color:#666">No claims yet. Add your first claim below.</p>
+</div>` : `
+<div class="grid" style="margin-top:14px">
+  ${claims.map((c) => {
+    const statusBadgeStyle = c.status === "verified"
+      ? "background:#d4edda;color:#155724"
+      : c.status === "failed"
+      ? "background:#f8d7da;color:#721c24"
+      : "background:#fff3cd;color:#856404";
+
+    // Map claim type to display name
+    const typeDisplayName = c.type === "website" ? "WEBSITE"
+      : c.type === "github" ? "GITHUB"
+      : c.type === "dns" ? "DNS"
+      : (c.type === "public" || c.type === "social") ? "PUBLIC PROFILE"  // Accept both new and old names
+      : escapeHtml(c.type).toUpperCase();
+
+    let proofDetails = "";
+    if (c.type === "dns" && c.proof.kind === "dns_txt") {
+      const qname = escapeHtml((c.proof as any).qname || "");
+      const token = escapeHtml((c.proof as any).expectedToken || "");
+      proofDetails = `
+        <div style="margin-top:8px;font-size:12px;color:#555">
+          <strong>Query name:</strong> <code>${qname}</code><br>
+          <strong>Expected:</strong> <code style="font-size:11px">${token}</code>
+        </div>`;
+    } else if (c.proof.kind === "well_known") {
+      proofDetails = `
+        <div style="margin-top:8px;font-size:12px;color:#555">
+          <strong>Proof location:</strong> <code style="font-size:11px">${escapeHtml((c.proof as any).url || "")}</code>
+        </div>`;
+    } else if (c.proof.kind === "github_readme") {
+      proofDetails = `
+        <div style="margin-top:8px;font-size:12px;color:#555">
+          <strong>Proof location:</strong> <code style="font-size:11px">${escapeHtml((c.proof as any).url || "")}</code>
+        </div>`;
+    }
+
+    return `
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:start">
+        <div style="flex:1">
+          <label style="margin-bottom:4px">
+            ${typeDisplayName}
+            <span class="badge" style="${statusBadgeStyle}">${escapeHtml(c.status)}</span>
+          </label>
+          <code style="font-size:13px;word-break:break-all">${escapeHtml(c.url)}</code>
+          ${proofDetails}
+          ${c.failReason ? `<div style="margin-top:8px;color:#721c24;font-size:12px">${formatErrorHtml(c.failReason)}</div>` : ""}
+          ${c.lastCheckedAt ? `<div style="margin-top:6px;font-size:11px;color:#777">Last checked: ${escapeHtml(c.lastCheckedAt)}</div>` : ""}
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px;margin-left:10px">
+          <button type="button" class="verify-btn" data-uuid="${escapeHtml(uuid)}" data-claim-id="${escapeHtml(c.id)}"
+            style="padding:6px 12px;font-size:12px;white-space:nowrap">
+            Verify
+          </button>
+          <button type="button" class="delete-claim-btn"
+            data-uuid="${escapeHtml(uuid)}"
+            data-claim-id="${escapeHtml(c.id)}"
+            data-claim-type="${escapeHtml(typeDisplayName)}"
+            data-claim-url="${escapeHtml(c.url)}"
+            data-claim-status="${escapeHtml(c.status)}"
+            style="padding:6px 12px;font-size:12px;white-space:nowrap;background:#fff;color:#856404;border:1px solid #ddd">
+            Delete
+          </button>
+        </div>
+      </div>
+    </div>`;
+  }).join("")}
+</div>
+`}
+
+<details style="margin-top:20px;border:1px solid #ddd;border-radius:10px;padding:14px;background:#f9f9f9">
+  <summary style="cursor:pointer;font-weight:600;font-size:14px">Add New Claim</summary>
+
+  <div style="margin-top:14px">
+    <form id="addClaimForm">
+      <input type="hidden" name="uuid" value="${escapeHtml(uuid)}">
+
+      <label style="display:block;margin-bottom:8px">
+        <strong>Claim Type</strong>
+      </label>
+      <select name="type" id="claimType" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;margin-bottom:12px">
+        <option value="website">Website (.well-known/anchorid.txt)</option>
+        <option value="github">GitHub (profile README)</option>
+        <option value="dns">DNS (TXT record)</option>
+        <option value="public">Public Profile (bio/description)</option>
+      </select>
+
+      <label style="display:block;margin-bottom:8px">
+        <strong id="urlLabel">URL or Domain</strong>
+      </label>
+      <input type="text" name="url" id="claimUrl" placeholder="https://example.com or example.com"
+        style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;margin-bottom:12px">
+
+      <div id="dnsHint" style="display:none;font-size:12px;color:#555;margin-bottom:12px;padding:10px;background:#fff;border:1px solid #e0e0e0;border-radius:6px">
+        <strong>DNS Setup Instructions:</strong><br>
+        Add a TXT record at <code>_anchorid.yourdomain.com</code> with value:<br>
+        <code style="font-size:11px">anchorid=urn:uuid:${escapeHtml(uuid)}</code>
+      </div>
+
+      <button type="submit" style="padding:8px 16px;background:#111;color:#fff;border:1px solid #111;border-radius:6px;cursor:pointer">
+        Add Claim
+      </button>
+      <span id="claimStatus" style="margin-left:10px;font-size:13px"></span>
+    </form>
+  </div>
+</details>
+
+<!-- Delete Claim Confirmation Modal -->
+<div id="deleteClaimModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:10000;justify-content:center;align-items:center">
+  <div style="background:#fff;border-radius:12px;padding:24px;max-width:500px;width:90%;box-shadow:0 4px 20px rgba(0,0,0,0.15)">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <h3 style="margin:0;font-size:18px;font-weight:600;color:#721c24">Delete this claim?</h3>
+      <button id="closeDeleteModal" style="background:none;border:none;font-size:24px;cursor:pointer;color:#999;line-height:1">&times;</button>
+    </div>
+
+    <div id="deleteModalClaimInfo" style="background:#f8f9fa;padding:14px;border-radius:6px;border:1px solid #e0e0e0;margin-bottom:16px;font-size:13px">
+      <!-- Claim details will be inserted here -->
+    </div>
+
+    <div style="background:#fff3cd;border:1px solid #ffc107;color:#856404;padding:12px;border-radius:6px;margin-bottom:20px;font-size:13px">
+      <strong>⚠️ Warning:</strong> This will permanently remove this claim from the profile. This action cannot be undone.
+    </div>
+
+    <div style="display:flex;gap:12px;justify-content:flex-end">
+      <button id="cancelDeleteBtn" style="padding:10px 20px;background:#fff;color:#333;border:1px solid #ddd;border-radius:6px;cursor:pointer;font-size:14px;font-weight:500">
+        Cancel
+      </button>
+      <button id="confirmDeleteBtn" style="padding:10px 20px;background:#dc3545;color:#fff;border:1px solid #dc3545;border-radius:6px;cursor:pointer;font-size:14px;font-weight:500">
+        Delete Claim
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  const adminToken = "${escapeHtml(getAdminSecret(env) || "")}";
+
+  // Update form hints based on claim type
+  document.getElementById("claimType").addEventListener("change", function() {
+    const type = this.value;
+    const urlLabel = document.getElementById("urlLabel");
+    const urlInput = document.getElementById("claimUrl");
+    const dnsHint = document.getElementById("dnsHint");
+
+    if (type === "website") {
+      urlLabel.textContent = "Website URL";
+      urlInput.placeholder = "https://example.com";
+      dnsHint.style.display = "none";
+    } else if (type === "github") {
+      urlLabel.textContent = "GitHub Profile URL";
+      urlInput.placeholder = "https://github.com/username";
+      dnsHint.style.display = "none";
+    } else if (type === "dns") {
+      urlLabel.textContent = "Domain";
+      urlInput.placeholder = "example.com or _anchorid.example.com";
+      dnsHint.style.display = "block";
+    } else if (type === "public") {
+      urlLabel.textContent = "Profile URL or @handle";
+      urlInput.placeholder = "@user@mastodon.social or https://bsky.app/profile/user.bsky.social";
+      dnsHint.style.display = "none";
+    }
+  });
+
+  // Add claim form submission
+  document.getElementById("addClaimForm").addEventListener("submit", async function(e) {
+    e.preventDefault();
+    const statusEl = document.getElementById("claimStatus");
+    statusEl.textContent = "Adding...";
+    statusEl.style.color = "#666";
+
+    const formData = new FormData(e.target);
+    const payload = {
+      uuid: formData.get("uuid"),
+      type: formData.get("type"),
+      url: formData.get("url")
+    };
+
+    try {
+      const res = await fetch("/claim", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer " + adminToken
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (res.ok) {
+        statusEl.textContent = "✓ Added! Reloading...";
+        statusEl.style.color = "#155724";
+        setTimeout(() => location.reload(), 1000);
+      } else {
+        const text = await res.text();
+        statusEl.textContent = "✗ Error: " + text;
+        statusEl.style.color = "#721c24";
+      }
+    } catch (err) {
+      statusEl.textContent = "✗ Network error";
+      statusEl.style.color = "#721c24";
+    }
+  });
+
+  // Verify button handlers
+  document.querySelectorAll(".verify-btn").forEach(btn => {
+    btn.addEventListener("click", async function() {
+      const uuid = this.dataset.uuid;
+      const claimId = this.dataset.claimId;
+
+      this.textContent = "Verifying...";
+      this.disabled = true;
+
+      try {
+        const res = await fetch("/claim/verify", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": "Bearer " + adminToken
+          },
+          body: JSON.stringify({ uuid, id: claimId })
+        });
+
+        if (res.ok) {
+          location.reload();
+        } else {
+          const text = await res.text();
+          alert("Verification failed: " + text);
+          this.textContent = "Verify";
+          this.disabled = false;
+        }
+      } catch (err) {
+        alert("Network error: " + err.message);
+        this.textContent = "Verify";
+        this.disabled = false;
+      }
+    });
+  });
+
+  // Delete claim buttons with two-step confirmation
+  const deleteModal = document.getElementById("deleteClaimModal");
+  const deleteModalClaimInfo = document.getElementById("deleteModalClaimInfo");
+  const confirmDeleteBtn = document.getElementById("confirmDeleteBtn");
+  const cancelDeleteBtn = document.getElementById("cancelDeleteBtn");
+  const closeModalBtn = document.getElementById("closeDeleteModal");
+  let pendingDeleteUuid = null;
+  let pendingDeleteClaimId = null;
+
+  document.querySelectorAll(".delete-claim-btn").forEach(btn => {
+    btn.addEventListener("click", function() {
+      const uuid = this.getAttribute("data-uuid");
+      const claimId = this.getAttribute("data-claim-id");
+      const claimType = this.getAttribute("data-claim-type");
+      const claimUrl = this.getAttribute("data-claim-url");
+      const claimStatus = this.getAttribute("data-claim-status");
+
+      pendingDeleteUuid = uuid;
+      pendingDeleteClaimId = claimId;
+
+      // Populate modal with claim details
+      deleteModalClaimInfo.innerHTML = \`
+        <div style="margin-bottom:12px"><strong>Claim Type:</strong> \${claimType}</div>
+        <div style="margin-bottom:12px"><strong>URL:</strong> <code style="font-size:13px;word-break:break-all">\${claimUrl}</code></div>
+        <div style="margin-bottom:12px"><strong>Status:</strong> \${claimStatus}</div>
+      \`;
+
+      // Show modal
+      deleteModal.style.display = "flex";
+    });
+  });
+
+  // Cancel deletion
+  function closeDeleteModal() {
+    deleteModal.style.display = "none";
+    pendingDeleteUuid = null;
+    pendingDeleteClaimId = null;
+  }
+
+  cancelDeleteBtn.addEventListener("click", closeDeleteModal);
+  closeModalBtn.addEventListener("click", closeDeleteModal);
+
+  // Close modal on outside click
+  deleteModal.addEventListener("click", function(e) {
+    if (e.target === deleteModal) {
+      closeDeleteModal();
+    }
+  });
+
+  // Confirm deletion
+  confirmDeleteBtn.addEventListener("click", async function() {
+    if (!pendingDeleteUuid || !pendingDeleteClaimId) return;
+
+    confirmDeleteBtn.textContent = "Deleting...";
+    confirmDeleteBtn.disabled = true;
+
+    try {
+      const res = await fetch("/claim/delete", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer " + adminToken
+        },
+        body: JSON.stringify({ uuid: pendingDeleteUuid, claimId: pendingDeleteClaimId })
+      });
+
+      if (res.ok) {
+        closeDeleteModal();
+        // Show success message and reload
+        const successMsg = document.createElement("div");
+        successMsg.style.cssText = "position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#155724;color:#fff;padding:12px 24px;border-radius:6px;z-index:10001";
+        successMsg.textContent = "✓ Claim deleted successfully";
+        document.body.appendChild(successMsg);
+        setTimeout(() => location.reload(), 1500);
+      } else {
+        const text = await res.text();
+        alert("Failed to delete claim: " + text);
+        confirmDeleteBtn.textContent = "Delete Claim";
+        confirmDeleteBtn.disabled = false;
+      }
+    } catch (err) {
+      alert("Network error: " + err.message);
+      confirmDeleteBtn.textContent = "Delete Claim";
+      confirmDeleteBtn.disabled = false;
+    }
+  });
+})();
+</script>
+
+${isDeletable ? `
+<div style="margin-top:32px;padding:20px;border:2px solid #dc3545;border-radius:10px;background:#fff5f5">
+  <h2 style="margin:0 0 8px 0;font-size:18px;color:#dc3545">⚠️ Danger Zone</h2>
+  <p style="margin:0 0 12px 0;color:#721c24;font-size:14px">
+    This profile is <strong>${Math.floor(ageInDays)} days old</strong> and can be deleted.
+    Profiles older than 7 days cannot be deleted to prevent accidental loss of established identities.
+  </p>
+
+  <details style="margin-bottom:12px">
+    <summary style="cursor:pointer;font-weight:600;color:#721c24;font-size:14px">What gets deleted?</summary>
+    <ul style="margin:8px 0;padding-left:20px;font-size:13px;color:#555">
+      <li>Profile data (<code>profile:${escapeHtml(uuid)}</code>)</li>
+      <li>Email mapping (<code>email:&lt;hash&gt;</code>)</li>
+      <li>Claims ledger (<code>claims:${escapeHtml(uuid)}</code>)</li>
+      <li>Audit log (<code>audit:${escapeHtml(uuid)}</code>)</li>
+    </ul>
+  </details>
+
+  <form method="post" action="/admin/delete/${escapeHtml(uuid)}"
+    onsubmit="return confirm('⚠️ DELETE PROFILE?\\n\\nThis will permanently delete:\\n- Profile: ${escapeHtml(name || uuid)}\\n- Email access\\n- All claims\\n- Audit log\\n\\nThis action CANNOT be undone.\\n\\nType DELETE in the box below to confirm.');">
+    ${csrf}
+    <button type="submit" style="background:#dc3545;color:#fff;border-color:#dc3545;font-weight:600">
+      Delete Profile Permanently
+    </button>
+  </form>
+</div>
+` : `
+<div style="margin-top:32px;padding:16px;border:1px solid #d0d7de;border-radius:10px;background:#f6f8fa">
+  <h3 style="margin:0 0 6px 0;font-size:14px;color:#555">🔒 Profile Protection</h3>
+  <p style="margin:0;font-size:13px;color:#666">
+    This profile is <strong>${Math.floor(ageInDays)} days old</strong> and cannot be deleted.
+    Only profiles less than 7 days old can be deleted to prevent accidental loss of established identities.
+  </p>
+</div>
+`}
+
 <form method="post" action="/admin/logout" style="margin-top:18px">
   ${csrf}
   <button type="submit">Logout</button>
@@ -1159,6 +1664,59 @@ export async function handleAdminSavePost(
     return csrfError();
   }
 
+  // Check if this is an email update request
+  const isEmailUpdate = fd.get("is_email_update") === "1";
+
+  if (isEmailUpdate) {
+    // Handle email addition/update
+    const rawEmail = String(fd.get("email") || "").trim();
+    const email = normalizeEmail(rawEmail);
+
+    if (!email || !isValidEmail(email)) {
+      return new Response(null, {
+        status: 303,
+        headers: { Location: `/admin/edit/${uuid}?error=invalid_email`, "cache-control": "no-store" },
+      });
+    }
+
+    const emailHash = await sha256Hex(email);
+
+    // Check if this email is already associated with a different profile
+    const existingUuid = await env.ANCHOR_KV.get(`email:${emailHash}`);
+    if (existingUuid && existingUuid !== uuid) {
+      return new Response(null, {
+        status: 303,
+        headers: { Location: `/admin/edit/${uuid}?error=email_exists`, "cache-control": "no-store" },
+      });
+    }
+
+    // Update the profile with the email hash
+    const updatedProfile = {
+      ...stored,
+      _emailHash: emailHash,
+    };
+
+    // Optionally store email for claim verification notifications
+    if (env.ENABLE_CLAIM_NOTIFICATIONS === "true") {
+      updatedProfile._email = email;
+    }
+
+    // Save profile and email mapping
+    await Promise.all([
+      env.ANCHOR_KV.put(`profile:${uuid}`, JSON.stringify(updatedProfile)),
+      env.ANCHOR_KV.put(`email:${emailHash}`, uuid),
+    ]);
+
+    // Audit log
+    await appendAuditLog(env, uuid, req, "update", "admin", ["_emailHash"], "Email added");
+
+    return new Response(null, {
+      status: 303,
+      headers: { Location: `/admin/edit/${uuid}?success=email_added`, "cache-control": "no-store" },
+    });
+  }
+
+  // Regular profile update
   const input: Record<string, unknown> = {
     name: fd.get("name"),
     alternateName: fd.get("alternateName"), // string with newlines is OK
@@ -1187,7 +1745,15 @@ export async function handleAdminSavePost(
   }
 
   if (changed) {
-    await env.ANCHOR_KV.put(`profile:${uuid}`, JSON.stringify(next));
+    // Preserve metadata fields (email, backup token, etc.) when saving
+    const profileWithMeta = {
+      ...next,
+      ...(stored._emailHash ? { _emailHash: stored._emailHash } : {}),
+      ...(stored._backupTokenHash ? { _backupTokenHash: stored._backupTokenHash } : {}),
+      ...(stored._email ? { _email: stored._email } : {}),
+    };
+
+    await env.ANCHOR_KV.put(`profile:${uuid}`, JSON.stringify(profileWithMeta));
 
     // Audit log
     const changedFields = computeChangedFields(stored, next);
@@ -1296,4 +1862,121 @@ function downloadToken() {
 </body></html>`;
 
   return htmlResponse(html);
+}
+
+
+// POST /admin/delete/<uuid> - Delete profile and all associated records (only if less than 7 days old)
+export async function handleAdminDelete(
+  req: Request,
+  env: Env,
+  uuid: string
+): Promise<Response> {
+  const denied = requireAdminCookie(req, env);
+  if (denied) return denied;
+
+  if (!isUuid(uuid)) return new Response("Invalid UUID", { status: 400 });
+
+  // Validate CSRF token
+  const fd = await req.formData();
+  if (!await validateCsrf(req, fd)) {
+    return csrfError();
+  }
+
+  const stored = (await env.ANCHOR_KV.get(`profile:${uuid}`, { type: "json" })) as any | null;
+  if (!stored) return new Response("Not found", { status: 404 });
+
+  // Check if profile is less than 7 days old
+  const createdDate = stored.dateCreated ? new Date(stored.dateCreated) : null;
+  if (!createdDate) {
+    return new Response("Profile has no creation date, cannot determine age", { status: 400 });
+  }
+
+  const now = new Date();
+  const ageInDays = (now.getTime() - createdDate.getTime()) / (1000 * 60 * 60 * 24);
+
+  if (ageInDays >= 7) {
+    return new Response("Profile is too old to delete (>= 7 days). Only profiles less than 7 days old can be deleted.", {
+      status: 403,
+      headers: { "content-type": "text/plain" }
+    });
+  }
+
+  // Delete all associated records
+  const keysToDelete: string[] = [
+    `profile:${uuid}`,
+    `claims:${uuid}`,
+    `audit:${uuid}`,
+    `signup:${uuid}`,
+    `created:${uuid}`,
+  ];
+
+  // Delete email mapping if it exists
+  if (stored._emailHash) {
+    keysToDelete.push(`email:${stored._emailHash}`);
+  }
+
+  // Delete all keys in parallel
+  await Promise.all(keysToDelete.map(key => env.ANCHOR_KV.delete(key)));
+
+  // Redirect to admin home with success message
+  const name = stored.name || uuid.slice(0, 8);
+  return new Response(null, {
+    status: 303,
+    headers: {
+      Location: `/admin?deleted=${encodeURIComponent(name)}`,
+      "cache-control": "no-store"
+    },
+  });
+}
+
+// GET /admin/backup - Download complete database backup as JSON
+export async function handleAdminBackup(req: Request, env: Env): Promise<Response> {
+  const denied = requireAdminCookie(req, env);
+  if (denied) return denied;
+
+  // Fetch all profile UUIDs
+  const uuids = await fetchAllProfileUUIDs(env);
+
+  // Build backup metadata
+  const backup = {
+    metadata: {
+      timestamp: new Date().toISOString(),
+      anchorid_version: "1.0",
+      backup_type: "full",
+      profile_count: uuids.length,
+      generator: "AnchorID Admin Backup"
+    },
+    profiles: [] as any[]
+  };
+
+  // Fetch each profile with associated data
+  for (const uuid of uuids) {
+    const profile = await env.ANCHOR_KV.get(`profile:${uuid}`, { type: "json" });
+    const claims = await env.ANCHOR_KV.get(`claims:${uuid}`, { type: "json" }) || [];
+    const audit = await env.ANCHOR_KV.get(`audit:${uuid}`, { type: "json" }) || [];
+
+    if (profile) {
+      backup.profiles.push({
+        uuid,
+        profile,
+        claims,
+        audit,
+      });
+    }
+  }
+
+  // Generate filename with timestamp
+  const timestamp = new Date().toISOString().replace(/:/g, '-').replace(/\..+/, '');
+  const filename = `anchorid-backup-${timestamp}.json`;
+
+  // Return as downloadable JSON file
+  return new Response(JSON.stringify(backup, null, 2), {
+    status: 200,
+    headers: {
+      "content-type": "application/json; charset=utf-8",
+      "content-disposition": `attachment; filename="${filename}"`,
+      "cache-control": "no-store",
+      "x-content-type-options": "nosniff",
+    },
+  });
 }

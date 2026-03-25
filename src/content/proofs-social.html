@@ -1,0 +1,657 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <title>Public Profile Proof Guide | AnchorID</title>
+  <meta name="description" content="Verify control of any public profile page by adding your AnchorID to your bio. Works with social media, forums, community sites, and any HTTPS profile." />
+
+  <link rel="canonical" href="https://anchorid.net/proofs/social" />
+
+  <style>
+    :root {
+      --bg: #ffffff;
+      --fg: #111111;
+      --muted: #555555;
+      --rule: #e7e7e7;
+      --codebg: #f6f6f6;
+      --link: #0b57d0;
+      --maxw: 860px;
+    }
+    html, body { background: var(--bg); color: var(--fg); margin: 0; padding: 0; }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; line-height: 1.55; }
+    .wrap { max-width: var(--maxw); margin: 0 auto; padding: 32px 20px; }
+    a { color: var(--link); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    h1 { font-size: 2rem; margin: 0 0 10px 0; letter-spacing: -0.02em; }
+    h2 { font-size: 1.35rem; margin: 20px 0 10px 0; letter-spacing: -0.01em; }
+    h3 { font-size: 1.1rem; margin: 18px 0 8px 0; }
+    .kicker { color: var(--muted); margin: 0 0 18px 0; }
+    .small { font-size: 0.95rem; color: var(--muted); }
+    hr { border: 0; border-top: 1px solid var(--rule); margin: 24px 0; }
+    p { margin: 10px 0; }
+    ul, ol { margin: 10px 0 10px 20px; }
+    li { margin: 6px 0; }
+    code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+    code { background: var(--codebg); padding: 2px 6px; border-radius: 4px; }
+    pre { background: var(--codebg); padding: 14px; border: 1px solid var(--rule); border-radius: 10px; overflow: auto; }
+    pre code { background: none; padding: 0; }
+    .callout { border-left: 3px solid var(--rule); padding: 10px 14px; background: #fafafa; border-radius: 10px; margin: 16px 0; }
+    .warning { border-left-color: #ff9800; background: #fff8e6; }
+    footer { border-top: 1px solid var(--rule); }
+    header.wrap { padding-bottom: 6px; }
+    main.wrap { padding-top: 6px; }
+    header.wrap hr { margin: 6px 0; }
+    nav.topnav { font-size: 14px; margin-bottom: 24px; }
+    nav.topnav span { color: #111; font-weight: 500; }
+    nav.topnav a, nav.topnav span { margin-right: 16px; }
+  </style>
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Person",
+      "@id": "https://blog.mycal.net/about/#mycal",
+      "identifier": {
+        "@type": "PropertyValue",
+        "propertyID": "canonical-uuid",
+        "value": "urn:uuid:4ff7ed97-b78f-4ae6-9011-5af714ee241c"
+      },
+      "name": "Mike Johnson",
+      "alternateName": ["Mycal", "Michael Johnson"],
+      "url": "https://blog.mycal.net/about/",
+      "sameAs": [
+        "https://anchorid.net/resolve/4ff7ed97-b78f-4ae6-9011-5af714ee241c",
+        "https://github.com/lowerpower",
+        "https://music.mycal.net"
+      ]
+    },
+    {
+      "@type": "Organization",
+      "@id": "https://anchorid.net/#org",
+      "identifier": {
+        "@type": "PropertyValue",
+        "propertyID": "canonical-uuid",
+        "value": "urn:uuid:4c785577-9f55-4a22-a80b-dd1f4d9b4658"
+      },
+      "name": "AnchorID",
+      "alternateName": "AnchorID.net",
+      "description": "A permanent attribution anchor for long-lived work. Durable, UUID-based attribution that survives platform changes and outlives any single service.",
+      "url": "https://anchorid.net",
+      "foundingDate": "2026-01-11",
+      "founder": {
+        "@id": "https://blog.mycal.net/about/#mycal"
+      },
+      "sameAs": [
+        "https://anchorid.net/resolve/4c785577-9f55-4a22-a80b-dd1f4d9b4658",
+        "https://github.com/lowerpower/AnchorID"
+      ],
+      "slogan": "Attribution as infrastructure, not a profile"
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://anchorid.net/#website",
+      "name": "AnchorID",
+      "url": "https://anchorid.net",
+      "publisher": {
+        "@id": "https://anchorid.net/#org"
+      },
+      "creator": {
+        "@id": "https://blog.mycal.net/about/#mycal"
+      },
+      "copyrightYear": 2026,
+      "copyrightHolder": {
+        "@id": "https://anchorid.net/#org"
+      },
+      "inLanguage": "en"
+    },
+    {
+      "@type": "SoftwareApplication",
+      "@id": "https://anchorid.net/#service",
+      "name": "AnchorID Service",
+      "applicationCategory": "Attribution Infrastructure",
+      "operatingSystem": "Web",
+      "description": "A UUID-based attribution service that provides permanent, machine-readable attribution anchors for long-lived work. Enables work and ideas to be attributed to the same enduring source across time, platforms, and system failures.",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      },
+      "provider": {
+        "@id": "https://anchorid.net/#org"
+      },
+      "url": "https://anchorid.net"
+    },
+    {
+      "@type": "WebPage",
+      "@id": "https://anchorid.net/proofs/social#webpage",
+      "url": "https://anchorid.net/proofs/social",
+      "name": "Public Profile Proof Guide",
+      "description": "Prove you control a social profile by adding your AnchorID to your bio. Works with Mastodon, forums, and any public profile page.",
+      "isPartOf": {
+        "@id": "https://anchorid.net/#website"
+      },
+      "about": {
+        "@id": "https://anchorid.net/proofs/social#howto"
+      },
+      "publisher": {
+        "@id": "https://anchorid.net/#org"
+      },
+      "inLanguage": "en",
+      "breadcrumb": {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          {
+            "@type": "ListItem",
+            "position": 1,
+            "name": "Home",
+            "item": "https://anchorid.net/"
+          },
+          {
+            "@type": "ListItem",
+            "position": 2,
+            "name": "Proofs",
+            "item": "https://anchorid.net/proofs"
+          },
+          {
+            "@type": "ListItem",
+            "position": 3,
+            "name": "Public Profile Proof Guide",
+            "item": "https://anchorid.net/proofs/social"
+          }
+        ]
+      }
+    },
+    {
+      "@type": "HowTo",
+      "@id": "https://anchorid.net/proofs/social#howto",
+      "name": "How to Create a Public Profile Proof for AnchorID",
+      "description": "Prove you control any public profile page or repository by adding your AnchorID to visible text. Works with social media (Mastodon, Fediverse), forums, community platforms, GitHub repositories, and any publicly accessible HTTPS page with editable content.",
+      "author": {
+        "@id": "https://blog.mycal.net/about/#mycal"
+      },
+      "publisher": {
+        "@id": "https://anchorid.net/#org"
+      },
+      "inLanguage": "en",
+      "estimatedCost": {
+        "@type": "MonetaryAmount",
+        "currency": "USD",
+        "value": "0"
+      },
+      "totalTime": "PT2M",
+      "step": [
+        {
+          "@type": "HowToStep",
+          "name": "Add AnchorID to any public page",
+          "text": "Edit any public page you control (profile bio, forum signature, GitHub repository README, project documentation) and add your resolver URL: https://anchorid.net/resolve/<your-uuid>. For space-constrained environments, you can use just the UUID: <your-uuid>. Either format will verify successfully.",
+          "url": "https://anchorid.net/proofs/social#setup"
+        },
+        {
+          "@type": "HowToStep",
+          "name": "Ensure profile is public",
+          "text": "Verify your profile is accessible via HTTPS without authentication. Test by viewing your profile in an incognito/private browser window.",
+          "url": "https://anchorid.net/proofs/social#setup"
+        },
+        {
+          "@type": "HowToStep",
+          "name": "Create claim in AnchorID",
+          "text": "Log in to AnchorID at /login, scroll to 'Identity Claims' section, click 'Add New Claim', choose 'Public Profile' proof type, and enter your profile URL or Fediverse handle (e.g., @user@instance.social).",
+          "url": "https://anchorid.net/proofs/social#setup"
+        },
+        {
+          "@type": "HowToStep",
+          "name": "Verify the claim",
+          "text": "Click 'Verify' next to your claim. AnchorID will fetch your public profile page and search the entire HTML for your resolver URL.",
+          "url": "https://anchorid.net/proofs/social#setup"
+        }
+      ],
+      "tool": [
+        {
+          "@type": "HowToTool",
+          "name": "Any public page with editable content (profile, repository, documentation, etc.)"
+        }
+      ],
+      "supply": [
+        {
+          "@type": "HowToSupply",
+          "name": "Your AnchorID UUID"
+        }
+      ]
+    },
+    {
+      "@type": "TechArticle",
+      "@id": "https://anchorid.net/proofs/social#article",
+      "headline": "Public Profile Proof Guide",
+      "description": "Complete guide to proving control of any public page through AnchorID verification. Works with any publicly accessible HTTPS page including social media, forums, community platforms, GitHub repositories, and project documentation. Includes Fediverse WebFinger support and SSRF protection.",
+      "author": {
+        "@id": "https://blog.mycal.net/about/#mycal"
+      },
+      "publisher": {
+        "@id": "https://anchorid.net/#org"
+      },
+      "datePublished": "2026-01-11",
+      "dateModified": "2026-01-25",
+      "inLanguage": "en",
+      "about": [
+        "Public page verification",
+        "Social media identity",
+        "Fediverse profiles",
+        "Community platforms",
+        "GitHub repositories",
+        "Project attribution",
+        "Account control proof"
+      ],
+      "teaches": [
+        "Social/public profile proof works with ANY publicly accessible HTTPS page, not just social media - including GitHub repositories, project documentation, and any editable public content",
+        "Supported platforms include Mastodon/Fediverse, forums, Reddit, Hacker News, Stack Overflow, GitHub repositories (any public repo README, not just profile), and any site with public editable content",
+        "Flexible verification: matches either the full resolver URL (https://anchorid.net/resolve/<UUID>) OR just the UUID itself for space-constrained environments",
+        "UUID-only option enables verification in character-limited spaces: Twitter bios, forum signatures, git commit messages, code comments, and any context where the full URL doesn't fit",
+        "Use cases: social profiles, forum accounts, repository attribution (proves you can edit a specific repo), project documentation, and any public page you control",
+        "Fediverse handles (@user@instance.social) are automatically converted to profile URLs using WebFinger",
+        "The verification process: AnchorID fetches the public page HTML and searches for either the resolver URL or the UUID pattern anywhere on the page",
+        "Security: SSRF protection blocks localhost, private IPs (192.168.x.x, 10.x.x.x), cloud metadata endpoints (169.254.169.254), and non-HTTPS URLs",
+        "Social/public proof provides moderate signal strength - proves page/account control at a moment in time, not infrastructure ownership",
+        "No authentication or OAuth is used - only public page fetching",
+        "Privacy: AnchorID only sees public HTML during verification, never private messages, credentials, or follower lists"
+      ]
+    },
+    {
+      "@type": "FAQPage",
+      "@id": "https://anchorid.net/proofs/social#faq",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "Does social proof only work with social media?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "No. Despite the name 'social proof', this method works with ANY publicly accessible HTTPS page. It supports social media (Mastodon, Fediverse), forums (Discourse, phpBB), community platforms (Reddit, Hacker News, Stack Overflow), GitHub repositories (any public repo README or documentation, not just the profile README), project homepages, and any website with publicly editable content. The only requirements are: must be HTTPS, must be publicly accessible without login, and must display your AnchorID URL or UUID somewhere in the page content."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Can I use just the UUID instead of the full resolver URL?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes! For space-constrained environments (Twitter bios, forum signatures, character-limited fields), you can use just the UUID: '4ff7ed97-b78f-4ae6-9011-5af714ee241c' instead of the full URL 'https://anchorid.net/resolve/4ff7ed97-b78f-4ae6-9011-5af714ee241c'. AnchorID will match either format. The UUID is the anchor - the URL is just a human-friendly wrapper. This makes verification possible in contexts where full URLs don't fit: git commit messages, code comments, metadata fields, and any character-limited space."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "What is SSRF protection and why does it matter?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "SSRF (Server-Side Request Forgery) is a security vulnerability where an attacker tricks a server into making requests to internal resources. AnchorID blocks verification requests to localhost (127.0.0.0/8), private IP ranges (192.168.0.0/16, 10.0.0.0/8), cloud metadata endpoints (169.254.169.254), and non-HTTPS URLs. This prevents attackers from using the verification system to scan internal networks or access cloud credentials."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How does Fediverse handle conversion work?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "AnchorID supports WebFinger-style Fediverse handles. When you enter '@user@instance.social' or 'user@instance.social', AnchorID automatically converts it to the profile URL 'https://instance.social/@user'. This makes it easy to verify Mastodon and other ActivityPub profiles without manually constructing the URL."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "What signal strength does social/public profile proof provide?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Social/public profile proof provides a 'moderate signal' or 'good signal' strength. It proves you control an account at a moment in time, but not domain ownership or infrastructure control. For stronger signals, combine social proof with website proof (domain file access) or DNS proof (domain registrar access)."
+          }
+        }
+      ]
+    },
+    {
+      "@type": "DefinedTerm",
+      "@id": "https://anchorid.net/proofs/social#public-profile-proof",
+      "name": "Public Profile Proof",
+      "description": "A verification method that works with any publicly accessible HTTPS page, not limited to social media profiles. Proves control by verifying that a public page contains either the user's AnchorID resolver URL (https://anchorid.net/resolve/<UUID>) or just the UUID itself. The UUID-only option enables verification in space-constrained environments like Twitter bios, forum signatures, git commit messages, and code comments. Works with social profiles, forum accounts, GitHub repositories (any public repo README or docs), project documentation, and any editable public content. Unlike domain-based proofs (website, DNS), public profile proof only demonstrates temporary page/account control, not infrastructure ownership. Useful for repository attribution (proves you can edit a specific repo even if you're not the owner), project contributions, and distributed identity across platforms. Supports Fediverse WebFinger handles for ActivityPub platforms.",
+      "inDefinedTermSet": "https://anchorid.net/proofs/social"
+    },
+    {
+      "@type": "DefinedTerm",
+      "@id": "https://anchorid.net/proofs/social#ssrf-protection",
+      "name": "SSRF Protection",
+      "description": "Server-Side Request Forgery protection that prevents the verification system from being used to access internal resources. AnchorID blocks requests to localhost (127.0.0.0/8), private network ranges (192.168.0.0/16, 10.0.0.0/8), cloud metadata endpoints (169.254.169.254), and non-HTTPS URLs. This security measure prevents attackers from using the profile verification feature to scan internal networks or steal cloud credentials.",
+      "inDefinedTermSet": "https://anchorid.net/proofs/social"
+    },
+    {
+      "@type": "DefinedTerm",
+      "@id": "https://anchorid.net/proofs/social#webfinger",
+      "name": "WebFinger for Fediverse",
+      "description": "A protocol for discovering information about people and resources on the internet, commonly used by ActivityPub platforms like Mastodon. AnchorID supports WebFinger-style handles (@user@instance.social) and automatically converts them to profile URLs (https://instance.social/@user) for verification. This makes it easy to verify Fediverse profiles without manually constructing URLs.",
+      "inDefinedTermSet": "https://anchorid.net/proofs/social"
+    }
+  ]
+}
+</script>
+
+</head>
+
+<body>
+  <header class="wrap">
+    <nav class="topnav">
+      <a href="/">Home</a>
+      <a href="/about">About</a>
+      <a href="/guide">Guide</a>
+      <a href="/proofs">Proofs</a>
+      <a href="/faq">FAQ</a>
+      <a href="/privacy">Privacy</a>
+    </nav>
+    <h1>Public Profile Proof Guide</h1>
+    <p class="kicker">Verify control of any public page by adding your AnchorID to your bio.</p>
+    <p class="small" style="margin-top: 8px; color: #ff9800;">Works with any public page — not just social media. Includes GitHub repos, project docs, forums, and more.</p>
+    <hr />
+  </header>
+
+  <main class="wrap">
+    <div class="callout">
+      <p><strong>What is this?</strong> Public profile proof lets you verify control of <strong>ANY publicly accessible page</strong> by adding your AnchorID resolver URL. Works with social media profiles, forum accounts, GitHub repositories, project documentation, personal sites, and any public page with editable content.</p>
+      <p><strong>Important:</strong> This is an <strong>edit-access</strong> proof. It demonstrates you can edit a specific public page at a moment in time, not legal identity.</p>
+    </div>
+
+    <div class="callout" style="background: #fff8e6; border-left-color: #ff9800;">
+      <p><strong>About the name:</strong> Despite being called "social proof," this method works with <strong>any public HTTPS page</strong> — not just social media. It applies to GitHub repositories, project documentation, forums, community sites, personal websites, or any public page where you can add text. The name is historical; think of it as "public page verification."</p>
+    </div>
+
+    <hr />
+
+    <h2>Supported Platforms</h2>
+
+    <p><strong>This works with ANY publicly accessible HTTPS page, not just social media.</strong></p>
+
+    <p>Examples include:</p>
+
+    <ul>
+      <li><strong>GitHub repositories</strong> - Any public repo README, docs, or CONTRIBUTORS.md</li>
+      <li><strong>Project documentation</strong> - Public docs sites, wikis, project pages</li>
+      <li><strong>Mastodon / Fediverse</strong> - ActivityPub instances</li>
+      <li><strong>Medium</strong> - Blog posts and author profiles</li>
+      <li><strong>Forums</strong> - Discourse, phpBB, custom forums</li>
+      <li><strong>Community platforms</strong> - Reddit, Hacker News, Stack Overflow</li>
+      <li><strong>Profile pages</strong> - Personal sites with public bios</li>
+      <li><strong>Any public HTTPS page</strong> with editable content</li>
+    </ul>
+
+    <div class="callout warning">
+      <p><strong>Security:</strong> AnchorID blocks access to:</p>
+      <ul>
+        <li>Localhost and private IP ranges (127.0.0.0/8, 192.168.0.0/16, 10.0.0.0/8)</li>
+        <li>Cloud metadata endpoints (169.254.169.254)</li>
+        <li>Non-HTTPS URLs</li>
+      </ul>
+      <p>This prevents SSRF (Server-Side Request Forgery) attacks.</p>
+    </div>
+
+    <hr />
+
+    <h2>Repository Attribution</h2>
+
+    <p>Unlike the <a href="/proofs/github">GitHub profile proof</a> (which verifies your GitHub identity), public profile proof can verify you have <strong>edit access to ANY public repository</strong>.</p>
+
+    <p>This is useful for:</p>
+    <ul>
+      <li><strong>Proving contribution to specific projects</strong> - Show you have write access to a repository</li>
+      <li><strong>Attributing work on repositories you don't own</strong> - Link your identity to projects you contribute to</li>
+      <li><strong>Linking project documentation to your identity</strong> - Claim ownership of specific docs or wikis</li>
+      <li><strong>Multi-repository attribution</strong> - Verify access to multiple projects without needing separate GitHub profile proof</li>
+    </ul>
+
+    <p><strong>Just add your AnchorID to any public README, docs file, or CONTRIBUTORS.md</strong></p>
+
+    <p><strong>Example URLs:</strong></p>
+    <pre><code>https://github.com/username/projectname
+https://github.com/org/repo/blob/main/README.md
+https://github.com/org/repo/blob/main/docs/contributors.md
+https://raw.githubusercontent.com/user/repo/main/README.md</code></pre>
+
+    <p>AnchorID will fetch the public page and verify your resolver URL appears in the content.</p>
+
+    <hr />
+
+    <h2>Setup Instructions</h2>
+
+    <h3>1. Add AnchorID to any public page</h3>
+
+    <p>Edit any public page you have access to and add your resolver URL anywhere in the content:</p>
+
+    <pre><code>https://anchorid.net/resolve/&lt;your-uuid&gt;</code></pre>
+
+    <p><strong>Example for profile bio:</strong></p>
+    <pre><code>Software developer interested in open source.
+Canonical identity: https://anchorid.net/resolve/4ff7ed97-b78f-4ae6-9011-5af714ee241c</code></pre>
+
+    <p><strong>Example for repository README:</strong></p>
+    <pre><code># My Project
+
+This project is maintained by [Your Name].
+
+Canonical identity: https://anchorid.net/resolve/4ff7ed97-b78f-4ae6-9011-5af714ee241c</code></pre>
+
+    <p>The URL just needs to appear somewhere in the page content. AnchorID will search the entire page for it.</p>
+
+    <h3>2. Create the claim in AnchorID</h3>
+
+    <p>Go to <a href="/login">/login</a> and authenticate, then:</p>
+
+    <ol>
+      <li>Scroll to "Identity Claims" section</li>
+      <li>Click "Add New Claim"</li>
+      <li>Choose <strong>Public Profile</strong> proof type</li>
+      <li>Enter the page URL (profile URL, repo URL, Fediverse handle, etc.)</li>
+      <li>Click "Add Claim"</li>
+    </ol>
+
+    <h3>3. Verify the claim</h3>
+
+    <p>After adding your AnchorID to the public page, click the "Verify" button next to your claim.</p>
+
+    <p>AnchorID will:</p>
+    <ol>
+      <li>Fetch the public page</li>
+      <li>Search for your resolver URL <strong>OR</strong> just your UUID</li>
+      <li>Mark the claim as <strong>verified</strong> if found ✅</li>
+    </ol>
+
+    <hr />
+
+    <h2>Space-Constrained Environments</h2>
+
+    <p>For platforms with strict character limits (like social media bios or short profile fields), you can use <strong>just the UUID</strong> instead of the full resolver URL:</p>
+
+    <div class="callout">
+      <p><strong>Full URL (recommended):</strong></p>
+      <pre><code>https://anchorid.net/resolve/4ff7ed97-b78f-4ae6-9011-5af714ee241c</code></pre>
+      <p style="margin-top:12px"><strong>UUID only (space-constrained):</strong></p>
+      <pre><code>4ff7ed97-b78f-4ae6-9011-5af714ee241c</code></pre>
+    </div>
+
+    <p><strong>Examples:</strong></p>
+
+    <p><strong>Twitter bio (limited space):</strong></p>
+    <pre><code>Software developer | Open source contributor
+Identity: 4ff7ed97-b78f-4ae6-9011-5af714ee241c</code></pre>
+
+    <p><strong>Forum signature (limited space):</strong></p>
+    <pre><code>AnchorID: 4ff7ed97-b78f-4ae6-9011-5af714ee241c</code></pre>
+
+    <p><strong>GitHub bio (160 chars):</strong></p>
+    <pre><code>Developer working on distributed systems. 4ff7ed97-b78f-4ae6-9011-5af714ee241c</code></pre>
+
+    <p>AnchorID verification will find <strong>either</strong> the full resolver URL or just the UUID. The UUID must match the exact format (8-4-4-4-12 hex digits).</p>
+
+    <p><strong>Note:</strong> While the UUID-only format saves space, the full URL is more human-readable and immediately identifies the verification service. Use UUID-only only when character limits require it.</p>
+
+    <hr />
+
+    <h2>Input Formats</h2>
+
+    <h3>Mastodon / Fediverse Handles</h3>
+
+    <p>You can use WebFinger-style handles or full URLs:</p>
+
+    <pre><code>@mycal@noauthority.social          → https://noauthority.social/@mycal
+mycal@noauthority.social           → https://noauthority.social/@mycal
+https://noauthority.social/@mycal  → (used as-is)</code></pre>
+
+    <p>AnchorID automatically converts handles to profile URLs.</p>
+
+    <h3>Full URLs</h3>
+
+    <p>For other platforms, use the full profile URL:</p>
+
+    <pre><code>https://forum.example.com/users/username
+https://reddit.com/u/username
+https://news.ycombinator.com/user?id=username</code></pre>
+
+    <p><strong>Requirements:</strong></p>
+    <ul>
+      <li>Must be HTTPS (not HTTP)</li>
+      <li>Must be publicly accessible without login</li>
+      <li>Must contain your bio/description with your AnchorID URL</li>
+    </ul>
+
+    <hr />
+
+    <h2>Troubleshooting</h2>
+
+    <h3>"Failed to fetch profile page"</h3>
+    <ul>
+      <li>Confirm the URL is publicly accessible without authentication</li>
+      <li>Check that the URL uses HTTPS (not HTTP)</li>
+      <li>Verify the page loads in an incognito/private browser window</li>
+      <li>Some platforms may block automated requests - try again later</li>
+    </ul>
+
+    <h3>"Profile fetched but resolver URL not found"</h3>
+    <ul>
+      <li>Confirm you added the complete resolver URL to your bio</li>
+      <li>Check for typos in the UUID</li>
+      <li>Make sure the bio/description section is publicly visible</li>
+      <li>Try refreshing your profile to ensure changes are saved</li>
+    </ul>
+
+    <h3>"URL blocked for security reasons"</h3>
+    <p>This means the URL points to:</p>
+    <ul>
+      <li>Localhost or private network (127.0.0.1, 192.168.x.x, 10.x.x.x)</li>
+      <li>Cloud metadata endpoint (169.254.169.254)</li>
+      <li>Non-HTTPS URL</li>
+    </ul>
+    <p>AnchorID only allows public HTTPS URLs for security.</p>
+
+    <h3>Fediverse handle not recognized</h3>
+    <p>Make sure the handle format is correct:</p>
+    <ul>
+      <li>✅ Correct: <code>@user@instance.social</code> or <code>user@instance.social</code></li>
+      <li>❌ Incorrect: <code>@user</code> (missing instance)</li>
+      <li>❌ Incorrect: <code>instance.social/@user</code> (use full URL or @user@instance format)</li>
+    </ul>
+
+    <h3>Can I use just the UUID instead of the full URL?</h3>
+    <p><strong>Yes!</strong> For space-constrained environments (Twitter bios, forum signatures, etc.), you can use just your UUID:</p>
+    <pre><code>4ff7ed97-b78f-4ae6-9011-5af714ee241c</code></pre>
+    <p>AnchorID verification will find <strong>either</strong> the full resolver URL or just the UUID in your profile content.</p>
+    <p><strong>Note:</strong> The full URL (<code>https://anchorid.net/resolve/your-uuid</code>) is recommended when space permits, as it's more human-readable and immediately identifies the verification service. Use UUID-only only when character limits require it.</p>
+
+    <hr />
+
+    <h2>What public profile proof is good for</h2>
+
+    <p>Use this proof type to verify control of:</p>
+
+    <ul>
+      <li><strong>Repository attribution</strong> - Prove you can edit specific GitHub repos or projects</li>
+      <li><strong>Project contributions</strong> - Link your work on open source projects to your identity</li>
+      <li><strong>Social media accounts</strong> - Mastodon, Fediverse, Bluesky, Medium</li>
+      <li><strong>Community platforms</strong> - Forums, Stack Overflow, Hacker News</li>
+      <li><strong>Professional networks</strong> - LinkedIn, AngelList, or industry-specific platforms</li>
+      <li><strong>Personal sites with bios</strong> - Portfolio sites, About pages, author profiles</li>
+      <li><strong>Distributed identity</strong> - Multiple profiles across different platforms</li>
+      <li><strong>Attribution signals</strong> - Help others find your canonical identity</li>
+    </ul>
+
+    <div class="callout">
+      <p><strong>Proof strength:</strong> Public profile proof is a <strong>moderate signal</strong>. It proves you control an account but not domain ownership.</p>
+      <p>For stronger signals, combine with:</p>
+      <ul>
+        <li><a href="/proofs/website">Website proof</a> (domain control)</li>
+        <li><a href="/proofs/dns">DNS proof</a> (domain control)</li>
+      </ul>
+    </div>
+
+    <hr />
+
+    <h2>Privacy Considerations</h2>
+
+    <p><strong>What AnchorID sees:</strong></p>
+    <ul>
+      <li>The public HTML of your profile page (only during verification)</li>
+      <li>Your profile URL (stored in claims record)</li>
+    </ul>
+
+    <p><strong>What AnchorID does NOT see:</strong></p>
+    <ul>
+      <li>Private messages or posts</li>
+      <li>Account credentials</li>
+      <li>OAuth tokens or session data</li>
+      <li>Follower lists or private information</li>
+    </ul>
+
+    <p>AnchorID only fetches the public profile page to verify your resolver URL appears in the bio. No authentication is used.</p>
+
+    <hr />
+
+    <h2>Examples</h2>
+
+    <h3>Example 1: Mastodon Setup</h3>
+
+    <ol>
+      <li>Log in to your Mastodon instance</li>
+      <li>Go to Preferences → Profile → Bio</li>
+      <li>Add: <code>https://anchorid.net/resolve/&lt;your-uuid&gt;</code></li>
+      <li>Save changes</li>
+      <li>In AnchorID, add claim with: <code>@username@instance.social</code></li>
+      <li>Click "Verify"</li>
+    </ol>
+
+    <p>Your Mastodon profile is now linked to your AnchorID! ✅</p>
+
+    <h3>Example 2: GitHub Repository</h3>
+
+    <ol>
+      <li>Open a public repository you have write access to</li>
+      <li>Edit the README.md (or create CONTRIBUTORS.md, docs/about.md, etc.)</li>
+      <li>Add anywhere in the file:<br>
+        <code>Canonical identity: https://anchorid.net/resolve/&lt;your-uuid&gt;</code></li>
+      <li>Commit and push changes</li>
+      <li>In AnchorID, add claim with the repo URL:<br>
+        <code>https://github.com/username/projectname</code><br>
+        or direct file URL:<br>
+        <code>https://github.com/org/repo/blob/main/README.md</code></li>
+      <li>Click "Verify"</li>
+    </ol>
+
+    <p>Your contribution to this repository is now verifiable via your AnchorID! ✅</p>
+
+    <div class="callout">
+      <p><strong>Tip:</strong> You can verify multiple repositories by adding separate claims for each one. This is useful for proving you contribute to multiple open source projects or maintaining attribution across different codebases.</p>
+    </div>
+
+  </main>
+
+  <footer class="wrap">
+    <hr />
+    <p class="small">
+      <a href="/proofs">← Back to all proofs</a> ·
+      <a href="/guide">Placement guide</a> ·
+      <a href="/faq">FAQ</a>
+    </p>
+  </footer>
+
+</body>
+</html>

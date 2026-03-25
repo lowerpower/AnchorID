@@ -1,14 +1,54 @@
 
 # AnchorID
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Deploy to Cloudflare](https://img.shields.io/badge/Deploy-Cloudflare-f38020?logo=cloudflare&logoColor=white)](
+https://deploy.workers.cloudflare.com/?url=https://github.com/lowerpower/AnchorID)
+![Uptime](https://img.shields.io/uptime-rocket/host/anchorid.net?label=Service%20Uptime)
 
-**TL;DR:** AnchorID provides a durable, UUID-based identity anchor that lets people prove who they are across websites and platforms without relying on any single service.
+**TL;DR:** AnchorID provides a durable, UUID-based attribution anchor that allows work and ideas to be attributed to the same source across websites and pl	atforms without relying on any single service.
 
+**AnchorID** is a minimal attribution resolver for people — built on UUIDs, JSON-LD, and verifiable external claims.
 
-**AnchorID** is a minimal identity resolver for people — built on UUIDs, JSON-LD, and verifiable external claims.
+It provides a stable, canonical attribution record (`/resolve/<uuid>`) that can be linked to websites, GitHub profiles, and other public attribution surfaces using simple, auditable proofs.
 
-It provides a stable, canonical identity record (`/resolve/<uuid>`) that can be linked to websites, GitHub profiles, and other public identities using simple, auditable proofs.
+AnchorID is designed for **longevity, decentralization, and crawlability**, not account silos or proprietary systems.
 
-AnchorID is designed for **longevity, decentralization, and crawlability**, not account silos or proprietary identity systems.
+### Get Started in 4 Steps
+
+To create your own AnchorID:
+
+1. **Create your identity**
+   Visit [https://anchorid.net/create](https://anchorid.net/create)
+   You'll receive your permanent UUID via a magic link email.
+
+2. **Receive your UUID**  
+   Click the magic link in your email — no password or account creation required.
+
+3. **Add proofs (optional but recommended)**  
+   Prove ownership of your surfaces by placing verification files:  
+   - Website: create `/.well-known/anchorid.txt` containing only your resolver URL  
+   - DNS: add a TXT record `_anchorid.yourdomain.com`  
+   - GitHub: embed the resolver URL in your profile README
+
+4. **Embed the AnchorID in your content**  
+   Add this line to your site's HTML head or JSON-LD:
+
+   ```html
+   <link href="https://anchorid.net/resolve/<your-uuid>" rel="me">
+
+**Or include it in schema.org JSON-LD:**
+
+```json
+{
+  "@type": "Person",
+  "@id": "https://your-site.com/#me",
+  "sameAs": [
+    "https://anchorid.net/resolve/<your-uuid>"
+  ]
+}
+```
+That’s it — your AnchorID is now a durable, cross-platform attribution anchor.
+
 
 ## Documentation
 
@@ -16,15 +56,16 @@ AnchorID is designed for **longevity, decentralization, and crawlability**, not 
 - **[Threat Model](docs/threat-model.md)** — Security model, known threats, and mitigations
 - **[FAQ](docs/faq.md)** — Frequently asked questions
 - **[Placement Guide](https://anchorid.net/guide)** — How to place your AnchorID across profiles and platforms
+- **[Identity Proofs](https://anchorid.net/proofs)** — How to prove ownership of websites, domains, and accounts
 - **[Why AnchorID Is Deliberately Boring](docs/why-anchorid-is-deliberately-boring.md)** — Design philosophy
 
 ---
 
 ## Why AnchorID Exists
 
-The modern web has no durable way to say *“this person is the same person”* across time, platforms, and failures. Usernames change, domains expire, companies disappear, and social graphs rot. Identity today is fragmented across silos that users do not control and cannot reliably preserve.
+The modern web has no durable way to say *"these works came from the same source"* across time, platforms, and failures. Usernames change, domains expire, companies disappear, and social graphs rot. Attribution today is fragmented across silos that users do not control and cannot reliably preserve.
 
-AnchorID exists to provide a **stable, platform-agnostic identity anchor**: a UUID-backed record that is independent of any single service, yet verifiable through many of them. It favors URLs over accounts, proofs over trust, and auditability over convenience. The goal is not to replace identity systems, but to give humans and machines a long-lived reference point that can survive migrations, outages, and decades of change.
+AnchorID exists to provide a **stable, platform-agnostic attribution anchor**: a UUID-backed record that is independent of any single service, yet verifiable through many of them. It favors URLs over accounts, proofs over trust, and auditability over convenience. The goal is to give humans and machines a long-lived reference point for attributing work that can survive migrations, outages, and decades of change.
 
 ---
 
@@ -32,24 +73,24 @@ AnchorID exists to provide a **stable, platform-agnostic identity anchor**: a UU
 
 At its core, AnchorID provides:
 
-* **Canonical identity URLs**
+* **Canonical attribution URLs**
   `https://anchorid.net/resolve/<uuid>`
 
 * **Machine-readable profiles** (schema.org JSON-LD)
 
 * **Human-readable claims pages**
 
-* **Verifiable external identity claims**
+* **Verifiable external attribution claims**
 
-* **Immutable identity anchors** decoupled from platforms
+* **Immutable attribution anchors** decoupled from platforms
 
-You can think of it as a **permanent “about me” record** that outlives any single website or service.
+You can think of it as a **permanent "about me" record** that outlives any single website or service.
 
 ---
 
 ## Core Endpoints
 
-### `/resolve/<uuid>` — Canonical identity record
+### `/resolve/<uuid>` — Canonical attribution record
 
 Returns a JSON-LD `Person` object.
 
@@ -70,7 +111,7 @@ Includes:
 
 ### `/claims/<uuid>` — Claims ledger (JSON + HTML)
 
-Returns the list of identity claims associated with a UUID.
+Returns the list of attribution claims associated with a UUID.
 
 * `Accept: application/json` → machine-readable claims
 * `Accept: text/html` → human-readable audit page
@@ -85,7 +126,50 @@ This page acts as a **public verification ledger**.
 
 ---
 
-## Identity Claims
+## Rate Limits
+
+All endpoints are protected with rate limiting to prevent abuse while maintaining availability for legitimate use.
+
+### Public Endpoints (Generous Limits)
+
+| Endpoint | Limit | Scope | Purpose |
+|----------|-------|-------|---------|
+| `/resolve/<uuid>` | 300/hour | Per IP | Allows search engines and aggregators |
+| `/claims/<uuid>` | 300/hour | Per IP | Allows verification services |
+
+### User Endpoints (Balanced Limits)
+
+| Endpoint | Limit | Scope | Purpose |
+|----------|-------|-------|---------|
+| `/create` | 10/hour | Per IP | Prevent spam accounts |
+| `/login` | 10/hour | Per IP | Prevent enumeration |
+| `/login` | 3/hour | Per email | Prevent targeted attacks |
+| `/edit` | 30/hour | Per IP | Allow browsing, prevent scraping |
+| `/update` | 60/hour | Per IP | Allow editing sessions |
+| `/update` | 20/hour | Per UUID | Prevent rapid changes |
+
+### Claim Endpoints (Dual Protection)
+
+| Endpoint | Limit | Scope | Purpose |
+|----------|-------|-------|---------|
+| `/claim` | 30/hour | Per IP | Prevent claim spam |
+| `/claim` | 10/hour | Per UUID | Limit per profile |
+| `/claim/verify` | 20/hour | Per IP | Prevent verification spam |
+| `/claim/verify` | 20/hour | Per UUID | Limit per profile |
+
+### Admin Endpoints (Strict Limits)
+
+| Endpoint | Limit | Scope | Purpose |
+|----------|-------|-------|---------|
+| `/admin/login` | 5/hour | Per IP | Prevent brute force |
+
+All rate limits reset automatically after 1 hour. When rate limited, endpoints return HTTP 429 with a `Retry-After: 3600` header.
+
+**Design Philosophy**: Public endpoints have generous limits to support legitimate automated use (search engines, verification services). User and admin endpoints balance security with usability.
+
+---
+
+## Attribution Claims
 
 AnchorID supports **self-asserted claims** that can be **verified automatically**.
 
@@ -97,7 +181,15 @@ AnchorID supports **self-asserted claims** that can be **verified automatically*
   ```
   https://example.com/.well-known/anchorid.txt
   ```
-* **GitHub identity**
+
+* **DNS/Domain control**
+  Proof via DNS TXT record:
+
+  ```
+  _anchorid.example.com  TXT  "anchorid=urn:uuid:<uuid>"
+  ```
+
+* **GitHub profile**
   Proof via GitHub profile README (`username/username` repo)
 
 Each claim includes:
@@ -202,10 +294,10 @@ npm run deploy
 
 ### AnchorID *is for*:
 
-* **Independent creators, engineers, and researchers** who want a stable identity that outlives platforms.
+* **Independent creators, engineers, and researchers** who want a stable attribution anchor that outlives platforms.
 * **People publishing long-lived work** (blogs, papers, software, art) who care about attribution decades from now.
 * **Systems and crawlers** that need a canonical, machine-readable reference for a person.
-* **Decentralization-friendly projects** that prefer URLs, proofs, and auditability over opaque identity providers.
+* **Decentralization-friendly projects** that prefer URLs, proofs, and auditability.
 
 ### AnchorID *is not for*:
 
@@ -251,8 +343,7 @@ AnchorID assumes an adversarial web where links rot, platforms fail, and incenti
 * **Machine-readable always**
 * **Decentralization-friendly**
 
-AnchorID does not try to replace identity systems.
-It gives you a **durable anchor** that other systems can reference.
+AnchorID gives you a **durable attribution anchor** that other systems can reference.
 
 ---
 
@@ -264,8 +355,26 @@ Schema-first, migration-light, intentionally boring.
 
 ---
 
+## Contributing
+
+AnchorID is early-stage and single-maintainer. Issues, PRs, and discussions are welcome — especially for:
+- New proof types
+- Self-hosting improvements
+- Documentation / examples
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) (coming soon) for guidelines.
+
+---
+
 ## License
 
 MIT
 
+---
+
+## Permanent Attribution
+This repository is part of the Mycal Labs infrastructure preservation project.
+- **Author Anchor:** [4ff7ed97-b78f-4ae6-9011-5af714ee241c](https://anchorid.net/resolve/4ff7ed97-b78f-4ae6-9011-5af714ee241c)
+- **Org Anchor:** [4c785577-9f55-4a22-a80b-dd1f4d9b4658](https://anchorid.net/resolve/4c785577-9f55-4a22-a80b-dd1f4d9b4658)
+- **Canonical ID:** `https://anchorid.net/resolve/4c785577-9f55-4a22-a80b-dd1f4d9b4658`
 

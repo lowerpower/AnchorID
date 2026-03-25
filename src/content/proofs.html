@@ -1,0 +1,680 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <title>Identity Proofs | AnchorID</title>
+  <meta name="description" content="Prove ownership of websites, domains, and accounts to strengthen your AnchorID canonical identity." />
+
+  <link rel="canonical" href="https://anchorid.net/proofs" />
+
+  <meta property="og:type" content="article" />
+  <meta property="og:site_name" content="AnchorID" />
+  <meta property="og:title" content="Identity Proofs" />
+  <meta property="og:description" content="Prove ownership of websites, domains, and accounts to strengthen your AnchorID canonical identity." />
+  <meta property="og:url" content="https://anchorid.net/proofs" />
+  <meta name="twitter:card" content="summary" />
+
+  <style>
+    :root {
+      --bg: #ffffff;
+      --fg: #111111;
+      --muted: #555555;
+      --rule: #e7e7e7;
+      --codebg: #f6f6f6;
+      --link: #0b57d0;
+      --maxw: 860px;
+    }
+    html, body { background: var(--bg); color: var(--fg); margin: 0; padding: 0; }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; line-height: 1.55; }
+    header, main, footer { display: block; }
+    .wrap { max-width: var(--maxw); margin: 0 auto; padding: 32px 20px; }
+    a { color: var(--link); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    h1 { font-size: 2rem; margin: 0 0 10px 0; letter-spacing: -0.02em; }
+    .kicker { color: var(--muted); margin: 0 0 18px 0; }
+    .meta { color: var(--muted); font-size: 0.95rem; }
+    hr { border: 0; border-top: 1px solid var(--rule); margin: 24px 0; }
+    h2 { font-size: 1.35rem; margin: 28px 0 10px 0; letter-spacing: -0.01em; }
+    h3 { font-size: 1.1rem; margin: 18px 0 8px 0; }
+    p { margin: 10px 0; }
+    ul, ol { margin: 10px 0 10px 20px; }
+    li { margin: 6px 0; }
+    code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+    pre { background: var(--codebg); padding: 14px; border: 1px solid var(--rule); border-radius: 10px; overflow: auto; }
+    .callout { border-left: 3px solid var(--rule); padding: 10px 14px; background: #fafafa; border-radius: 10px; }
+    .small { font-size: 0.95rem; color: var(--muted); }
+    footer { border-top: 1px solid var(--rule); }
+    header.wrap { padding-bottom: 6px; }
+    main.wrap { padding-top: 6px; }
+    header.wrap hr { margin: 6px 0; }
+    main.wrap > h2:first-child { margin-top: 8px; }
+    h2 { font-size: 1.35rem; margin: 20px 0 10px 0; letter-spacing: -0.01em; }
+    nav.topnav { font-size: 14px; margin-bottom: 24px; }
+    nav.topnav span { color: #111; font-weight: 500; }
+    nav.topnav a, nav.topnav span { margin-right: 16px; }
+
+    .proof-card {
+      border: 1px solid var(--rule);
+      border-radius: 12px;
+      padding: 16px;
+      margin: 16px 0;
+      background: #fafafa;
+    }
+    .proof-card h3 { margin-top: 0; }
+    .proof-card .status {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 0.85rem;
+      font-weight: 500;
+      margin-left: 8px;
+    }
+    .status.strong { background: #e7f7ee; color: #0d652d; border: 1px solid #bfe8cf; }
+    .status.good { background: #e6f3ff; color: #0b57d0; border: 1px solid #b3d9ff; }
+    .proof-card ul { margin-top: 8px; }
+  </style>
+   
+  <script type="application/ld+json">
+  {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Person",
+      "@id": "https://blog.mycal.net/about/#mycal",
+      "identifier": {
+        "@type": "PropertyValue",
+        "propertyID": "canonical-uuid",
+        "value": "urn:uuid:4ff7ed97-b78f-4ae6-9011-5af714ee241c"
+      },
+      "name": "Mike Johnson",
+      "alternateName": ["Mycal", "Michael Johnson"],
+      "url": "https://blog.mycal.net/about/",
+      "sameAs": [
+        "https://anchorid.net/resolve/4ff7ed97-b78f-4ae6-9011-5af714ee241c",
+        "https://github.com/lowerpower",
+        "https://music.mycal.net"
+      ]
+    },
+    {
+      "@type": "Organization",
+      "@id": "https://anchorid.net/#org",
+      "identifier": {
+        "@type": "PropertyValue",
+        "propertyID": "canonical-uuid",
+        "value": "urn:uuid:4c785577-9f55-4a22-a80b-dd1f4d9b4658"
+      },
+      "name": "AnchorID",
+      "alternateName": "AnchorID.net",
+      "description": "A permanent attribution anchor for long-lived work. Durable, UUID-based attribution that survives platform changes and outlives any single service.",
+      "url": "https://anchorid.net",
+      "foundingDate": "2026-01-11",
+      "founder": {
+        "@id": "https://blog.mycal.net/about/#mycal"
+      },
+      "sameAs": [
+        "https://anchorid.net/resolve/4c785577-9f55-4a22-a80b-dd1f4d9b4658",
+        "https://github.com/lowerpower/AnchorID"
+      ],
+      "slogan": "Attribution as infrastructure, not a profile"
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://anchorid.net/#website",
+      "name": "AnchorID",
+      "url": "https://anchorid.net",
+      "publisher": {
+        "@id": "https://anchorid.net/#org"
+      },
+      "creator": {
+        "@id": "https://blog.mycal.net/about/#mycal"
+      },
+      "copyrightYear": 2026,
+      "copyrightHolder": {
+        "@id": "https://anchorid.net/#org"
+      },
+      "inLanguage": "en"
+    },
+    {
+      "@type": "SoftwareApplication",
+      "@id": "https://anchorid.net/#service",
+      "name": "AnchorID Service",
+      "applicationCategory": "Attribution Infrastructure",
+      "operatingSystem": "Web",
+      "description": "A UUID-based attribution service that provides permanent, machine-readable attribution anchors for long-lived work. Enables work and ideas to be attributed to the same enduring source across time, platforms, and system failures.",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      },
+      "provider": {
+        "@id": "https://anchorid.net/#org"
+      },
+      "url": "https://anchorid.net"
+    },
+    {
+      "@type": "WebPage",
+      "@id": "https://anchorid.net/proofs#webpage",
+      "url": "https://anchorid.net/proofs",
+      "name": "Identity Proofs",
+      "description": "Prove ownership of websites, domains, and accounts to strengthen your AnchorID canonical identity.",
+      "isPartOf": {
+        "@id": "https://anchorid.net/#website"
+      },
+      "about": {
+        "@id": "https://anchorid.net/#service"
+      },
+      "publisher": {
+        "@id": "https://anchorid.net/#org"
+      },
+      "dateModified": "2026-01-22T07:15:00Z",
+      "inLanguage": "en"
+    },
+    {
+      "@type": "TechArticle",
+      "@id": "https://anchorid.net/proofs#article",
+      "headline": "Identity Proofs",
+      "description": "Prove ownership of websites, domains, and accounts to strengthen your AnchorID canonical identity through cryptographic verification.",
+      "author": {
+        "@id": "https://blog.mycal.net/about/#mycal"
+      },
+      "publisher": {
+        "@id": "https://anchorid.net/#org"
+      },
+      "datePublished": "2026-01-11",
+      "dateModified": "2026-01-22T07:15:00Z",
+      "inLanguage": "en",
+      "about": [
+        "Identity verification",
+        "Cryptographic proofs",
+        "Domain ownership verification",
+        "Cross-platform identity"
+      ],
+      "teaches": [
+        "How to cryptographically verify control of websites, domains, and accounts",
+        "Four proof types: Website (.well-known), DNS (TXT record), GitHub (README), Social profiles",
+        "Proof strength hierarchy from strongest (DNS + Website) to good (GitHub, Social)",
+        "Verified proofs create machine-readable ownership signals",
+        "Proofs demonstrate control, not legal identity"
+      ]
+    },
+    {
+      "@type": "HowTo",
+      "@id": "https://anchorid.net/proofs#website-proof",
+      "name": "How to Create a Website Proof",
+      "description": "Prove you control a website by publishing a proof file at /.well-known/anchorid.txt",
+      "author": {
+        "@id": "https://blog.mycal.net/about/#mycal"
+      },
+      "publisher": {
+        "@id": "https://anchorid.net/#org"
+      },
+      "inLanguage": "en",
+      "step": [
+        {
+          "@type": "HowToStep",
+          "name": "Create proof file",
+          "text": "Create a text file at https://example.com/.well-known/anchorid.txt containing only your resolver URL: https://anchorid.net/resolve/<your-uuid>",
+          "url": "https://anchorid.net/proofs#website-proof"
+        },
+        {
+          "@type": "HowToStep",
+          "name": "Add claim via AnchorID",
+          "text": "Log in to your AnchorID at /login and add a website claim for your domain",
+          "url": "https://anchorid.net/proofs#website-proof"
+        },
+        {
+          "@type": "HowToStep",
+          "name": "Verify claim",
+          "text": "Click 'Verify' to trigger verification. AnchorID will fetch the proof file and confirm it matches your UUID",
+          "url": "https://anchorid.net/proofs#website-proof"
+        }
+      ],
+      "tool": {
+        "@type": "HowToTool",
+        "name": "Text editor or web server file manager"
+      }
+    },
+    {
+      "@type": "HowTo",
+      "@id": "https://anchorid.net/proofs#dns-proof",
+      "name": "How to Create a DNS Proof",
+      "description": "Prove you control a domain by publishing a DNS TXT record at _anchorid subdomain",
+      "author": {
+        "@id": "https://blog.mycal.net/about/#mycal"
+      },
+      "publisher": {
+        "@id": "https://anchorid.net/#org"
+      },
+      "inLanguage": "en",
+      "step": [
+        {
+          "@type": "HowToStep",
+          "name": "Create DNS TXT record",
+          "text": "In your DNS provider, create a TXT record with Name: _anchorid, Type: TXT, Value: anchorid=urn:uuid:<your-uuid>",
+          "url": "https://anchorid.net/proofs#dns-proof"
+        },
+        {
+          "@type": "HowToStep",
+          "name": "Wait for DNS propagation",
+          "text": "Allow time for DNS changes to propagate (usually a few minutes to an hour)",
+          "url": "https://anchorid.net/proofs#dns-proof"
+        },
+        {
+          "@type": "HowToStep",
+          "name": "Add claim via AnchorID",
+          "text": "Log in to your AnchorID and add a DNS claim for your domain",
+          "url": "https://anchorid.net/proofs#dns-proof"
+        },
+        {
+          "@type": "HowToStep",
+          "name": "Verify claim",
+          "text": "Click 'Verify' to trigger verification. AnchorID will query the DNS TXT record and confirm it matches your UUID",
+          "url": "https://anchorid.net/proofs#dns-proof"
+        }
+      ],
+      "tool": {
+        "@type": "HowToTool",
+        "name": "DNS provider control panel"
+      }
+    },
+    {
+      "@type": "HowTo",
+      "@id": "https://anchorid.net/proofs#github-proof",
+      "name": "How to Create a GitHub Proof",
+      "description": "Prove you control a GitHub account by adding your AnchorID to your profile README",
+      "author": {
+        "@id": "https://blog.mycal.net/about/#mycal"
+      },
+      "publisher": {
+        "@id": "https://anchorid.net/#org"
+      },
+      "inLanguage": "en",
+      "step": [
+        {
+          "@type": "HowToStep",
+          "name": "Create or edit profile README",
+          "text": "Create or edit the repository github.com/username/username/README.md (a special repository that displays on your profile)",
+          "url": "https://anchorid.net/proofs#github-proof"
+        },
+        {
+          "@type": "HowToStep",
+          "name": "Add canonical identity line",
+          "text": "Add the line 'Canonical identity: https://anchorid.net/resolve/<your-uuid>' to your README",
+          "url": "https://anchorid.net/proofs#github-proof"
+        },
+        {
+          "@type": "HowToStep",
+          "name": "Add claim via AnchorID",
+          "text": "Log in to your AnchorID and add a GitHub claim with your username",
+          "url": "https://anchorid.net/proofs#github-proof"
+        },
+        {
+          "@type": "HowToStep",
+          "name": "Verify claim",
+          "text": "Click 'Verify' to trigger verification. AnchorID will fetch your profile README and confirm your resolver URL is present",
+          "url": "https://anchorid.net/proofs#github-proof"
+        }
+      ],
+      "tool": {
+        "@type": "HowToTool",
+        "name": "GitHub account and repository"
+      }
+    },
+    {
+      "@type": "HowTo",
+      "@id": "https://anchorid.net/proofs#social-proof",
+      "name": "How to Create a Public Profile Proof",
+      "description": "Verify control of any public profile page by adding your AnchorID to your bio or description",
+      "author": {
+        "@id": "https://blog.mycal.net/about/#mycal"
+      },
+      "publisher": {
+        "@id": "https://anchorid.net/#org"
+      },
+      "inLanguage": "en",
+      "step": [
+        {
+          "@type": "HowToStep",
+          "name": "Add AnchorID to profile bio",
+          "text": "Edit your social profile bio/description and add your resolver URL: https://anchorid.net/resolve/<your-uuid>",
+          "url": "https://anchorid.net/proofs#social-proof"
+        },
+        {
+          "@type": "HowToStep",
+          "name": "Ensure profile is public",
+          "text": "Verify your profile is accessible via HTTPS without authentication",
+          "url": "https://anchorid.net/proofs#social-proof"
+        },
+        {
+          "@type": "HowToStep",
+          "name": "Add claim via AnchorID",
+          "text": "Log in to your AnchorID and add a public profile claim with your profile URL or Fediverse handle (@user@instance.social)",
+          "url": "https://anchorid.net/proofs#social-proof"
+        },
+        {
+          "@type": "HowToStep",
+          "name": "Verify claim",
+          "text": "Click 'Verify' to trigger verification. AnchorID will fetch your public profile and confirm your resolver URL is present",
+          "url": "https://anchorid.net/proofs#social-proof"
+        }
+      ],
+      "tool": {
+        "@type": "HowToTool",
+        "name": "Public social media profile"
+      }
+    },
+    {
+      "@type": "DefinedTerm",
+      "@id": "https://anchorid.net/proofs#cryptographic-verification",
+      "name": "Cryptographic Verification",
+      "description": "The process of proving control over digital resources (websites, domains, accounts) by publishing verifiable proof at specific locations. AnchorID uses bidirectional verification similar to Mastodon's rel=me, where both the identity record links to the resource and the resource links back to the identity.",
+      "inDefinedTermSet": "https://anchorid.net/proofs"
+    },
+    {
+      "@type": "DefinedTerm",
+      "@id": "https://anchorid.net/proofs#proof-strength",
+      "name": "Proof Strength",
+      "description": "The level of confidence a proof provides about identity ownership. Stronger proofs like DNS + Website require more technical control and are harder to forge. The hierarchy from strongest to good: DNS + Website (strongest), DNS only (strong), Website only (strong), GitHub (good), Public Profile (good).",
+      "inDefinedTermSet": "https://anchorid.net/proofs"
+    },
+    {
+      "@type": "DefinedTerm",
+      "@id": "https://anchorid.net/proofs#claims-ledger",
+      "name": "Claims Ledger",
+      "description": "A public, timestamped record of all identity claims and their verification status. Published at https://anchorid.net/claims/<UUID>, the ledger provides an audit trail showing when claims were made, verified, and by whom.",
+      "inDefinedTermSet": "https://anchorid.net/proofs"
+    }
+  ]
+}
+</script>
+
+</head>
+
+<body>
+  <header class="wrap">
+    <nav class="topnav">
+      <a href="/">Home</a>
+      <a href="/about">About</a>
+      <a href="/guide">Guide</a>
+      <span>Proofs</span>
+      <a href="/faq">FAQ</a>
+      <a href="/privacy">Privacy</a>
+    </nav>
+    <h1>Identity Proofs</h1>
+    <p class="kicker">Prove ownership of websites, domains, and accounts to strengthen your canonical identity.</p>
+    <p class="small"><strong>Last modified:</strong> January 22, 2026</p>
+    <hr />
+  </header>
+
+  <main class="wrap">
+    <h2>What are identity proofs?</h2>
+
+    <p>
+      Identity proofs let you <strong>cryptographically verify</strong> that you control specific resources—websites, domains, or accounts—and bind them to your AnchorID.
+    </p>
+
+    <p>
+      Once verified, these proofs are added to your <strong>canonical identity record</strong> and published in your resolver's <code>sameAs</code> field, creating a web of verified connections.
+    </p>
+
+    <div class="callout">
+      <p><strong>Why use proofs?</strong></p>
+      <ul>
+        <li>Reduce impersonation risk</li>
+        <li>Strengthen search and AI attribution</li>
+        <li>Provide machine-readable ownership signals</li>
+        <li>Build a verifiable web of identity across platforms</li>
+      </ul>
+    </div>
+
+    <hr />
+
+    <h2>How proofs work</h2>
+
+    <ol>
+      <li><strong>Claim</strong> a resource (website, domain, GitHub profile)</li>
+      <li><strong>Publish proof</strong> at a specific location (TXT record, .well-known file, README)</li>
+      <li><strong>Verify</strong> the claim through AnchorID</li>
+      <li><strong>Verified resources</strong> appear in your canonical identity resolver</li>
+    </ol>
+
+    <p>
+      All verified proofs are publicly viewable at:
+    </p>
+
+    <pre><code>https://anchorid.net/claims/&lt;UUID&gt;</code></pre>
+
+    <hr />
+
+    <h2>Available proof types</h2>
+
+    <div class="proof-card">
+      <h3>Website Proof <span class="status strong">Strong Signal</span></h3>
+
+      <p>Prove you control a website by publishing a proof file at <code>/.well-known/anchorid.txt</code></p>
+
+      <p><strong>Good for:</strong></p>
+      <ul>
+        <li>Personal websites and blogs</li>
+        <li>Company websites</li>
+        <li>Project homepages</li>
+      </ul>
+
+      <p><strong>Proof location:</strong></p>
+      <pre><code>https://example.com/.well-known/anchorid.txt</code></pre>
+
+      <p><strong>File contents:</strong></p>
+      <pre><code>https://anchorid.net/resolve/&lt;your-uuid&gt;</code></pre>
+
+      <p class="small">
+        <a href="/proofs/website">View detailed guide →</a>
+      </p>
+    </div>
+
+    <div class="proof-card">
+      <h3>DNS Proof (Domain Control) <span class="status strong">Strong Signal</span></h3>
+
+      <p>Prove you control a domain by publishing a DNS TXT record.</p>
+
+      <p><strong>Good for:</strong></p>
+      <ul>
+        <li>Organizations with domain control</li>
+        <li>Software projects tied to domains</li>
+        <li>Personal domains</li>
+        <li>Strongest signal when paired with website proof</li>
+      </ul>
+
+      <p><strong>DNS record:</strong></p>
+      <pre><code>Name:  _anchorid
+Type:  TXT
+Value: anchorid=urn:uuid:&lt;your-uuid&gt;</code></pre>
+
+      <p><strong>Example:</strong></p>
+      <pre><code>_anchorid.example.com  TXT  "anchorid=urn:uuid:4ff7ed97-..."</code></pre>
+
+      <p class="small">
+        <a href="/proofs/dns">View detailed guide →</a>
+      </p>
+    </div>
+
+    <div class="proof-card">
+      <h3>GitHub Proof <span class="status good">Good Signal</span></h3>
+
+      <p>Prove you control a GitHub account by adding your AnchorID to your profile README.</p>
+
+      <p><strong>Good for:</strong></p>
+      <ul>
+        <li>Developers and open source contributors</li>
+        <li>Code attribution</li>
+        <li>Technical identity verification</li>
+      </ul>
+
+      <p><strong>Proof location:</strong></p>
+      <pre><code>https://github.com/username/username/README.md</code></pre>
+
+      <p><strong>Add to README:</strong></p>
+      <pre><code>Canonical identity: https://anchorid.net/resolve/&lt;your-uuid&gt;</code></pre>
+
+      <p class="small">
+        <a href="/proofs/github">View detailed guide →</a>
+      </p>
+    </div>
+
+    <div class="proof-card">
+      <h3>Public Profile Proof <span class="status good">Good Signal</span></h3>
+
+      <p>Verify control of any public profile page by adding your AnchorID to your bio/description.</p>
+
+      <p><strong>Works with any public HTTPS profile:</strong></p>
+      <ul>
+        <li>Social media (Mastodon, Fediverse, Bluesky, Medium)</li>
+        <li>Forums and community platforms</li>
+        <li>Professional networks (LinkedIn, etc.)</li>
+        <li>Personal sites with public bios</li>
+      </ul>
+
+      <p><strong>Special support for:</strong></p>
+      <ul>
+        <li>Fediverse handles: <code>@user@instance.social</code></li>
+      </ul>
+
+      <p><strong>Add to your bio:</strong></p>
+      <pre><code>https://anchorid.net/resolve/&lt;your-uuid&gt;</code></pre>
+
+      <p class="small">
+        <a href="/proofs/social">View detailed guide →</a>
+      </p>
+    </div>
+
+    <hr />
+
+    <h2>Proof strength comparison</h2>
+
+    <table style="width: 100%; border-collapse: collapse; margin: 16px 0;">
+      <thead>
+        <tr style="border-bottom: 2px solid var(--rule);">
+          <th style="text-align: left; padding: 8px;">Proof Type</th>
+          <th style="text-align: left; padding: 8px;">Signal Strength</th>
+          <th style="text-align: left; padding: 8px;">Best For</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr style="border-bottom: 1px solid var(--rule);">
+          <td style="padding: 8px;">DNS + Website</td>
+          <td style="padding: 8px;"><strong>Strongest</strong></td>
+          <td style="padding: 8px;">Organizations, official projects</td>
+        </tr>
+        <tr style="border-bottom: 1px solid var(--rule);">
+          <td style="padding: 8px;">DNS only</td>
+          <td style="padding: 8px;"><strong>Strong</strong></td>
+          <td style="padding: 8px;">Domain owners</td>
+        </tr>
+        <tr style="border-bottom: 1px solid var(--rule);">
+          <td style="padding: 8px;">Website only</td>
+          <td style="padding: 8px;"><strong>Strong</strong></td>
+          <td style="padding: 8px;">Personal sites, blogs</td>
+        </tr>
+        <tr style="border-bottom: 1px solid var(--rule);">
+          <td style="padding: 8px;">GitHub</td>
+          <td style="padding: 8px;">Good</td>
+          <td style="padding: 8px;">Developers, technical work</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px;">Public Profile</td>
+          <td style="padding: 8px;">Good</td>
+          <td style="padding: 8px;">Any public profile page, social media, forums</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <hr />
+
+    <h2>Creating and verifying proofs</h2>
+
+    <h3>Via Web Interface (Recommended)</h3>
+    <ol>
+      <li>Go to <code>/login</code> and authenticate with your email or backup token</li>
+      <li>Scroll to the "Identity Claims" section on your edit page</li>
+      <li>Click "Add New Claim" and select the proof type (Website, GitHub, or DNS)</li>
+      <li>Enter the URL or domain name</li>
+      <li>Publish the proof at the required location (TXT record, .well-known file, or README)</li>
+      <li>Click "Verify" next to your claim to trigger verification</li>
+    </ol>
+
+    <p class="small">
+      The web interface provides real-time feedback and displays the current status of all your claims.
+    </p>
+
+    <h3>Via API</h3>
+    <p>Developers can manage proofs programmatically using your session token:</p>
+
+    <pre><code># Create a claim
+POST https://anchorid.net/claim
+Authorization: Bearer &lt;your-session-token&gt;
+Content-Type: application/json
+
+{
+  "uuid": "&lt;your-uuid&gt;",
+  "type": "dns",
+  "url": "example.com"
+}
+
+# Verify a claim
+POST https://anchorid.net/claim/verify
+Authorization: Bearer &lt;your-session-token&gt;
+Content-Type: application/json
+
+{
+  "uuid": "&lt;your-uuid&gt;",
+  "claimId": "dns:_anchorid.example.com"
+}</code></pre>
+
+    <p class="small">
+      Your session token is the same token from your magic link. It's valid for the duration of your editing session.
+    </p>
+
+    <hr />
+
+    <h2>Viewing your verified proofs</h2>
+
+    <p>All verified proofs are publicly visible at your claims page:</p>
+
+    <pre><code>https://anchorid.net/claims/&lt;UUID&gt;</code></pre>
+
+    <p>Verified resources also appear in your resolver's <code>sameAs</code> field:</p>
+
+    <pre><code>https://anchorid.net/resolve/&lt;UUID&gt;</code></pre>
+
+    <hr />
+
+    <h2>Security and verification</h2>
+
+    <div class="callout">
+      <p><strong>Important:</strong></p>
+      <ul>
+        <li>Proofs demonstrate <strong>control</strong>, not legal identity</li>
+        <li>DNS and website proofs are stronger than social account proofs</li>
+        <li>Combine multiple proof types for strongest signal</li>
+        <li>Proofs can be re-verified at any time</li>
+      </ul>
+    </div>
+
+    <hr />
+
+    <h2>Questions?</h2>
+
+    <p>
+      See the <a href="/faq">FAQ</a> for common questions or consult the detailed proof guides linked above.
+    </p>
+  </main>
+
+  <footer class="wrap">
+    <p class="small">&copy; <span id="y"></span> AnchorID. <a href="/">Home</a> · <a href="/about">About</a> · <a href="/guide">Guide</a> · <a href="/proofs">Proofs</a> · <a href="/faq">FAQ</a> · <a href="/privacy">Privacy</a></p>
+    <script>
+      document.getElementById("y").textContent = String(new Date().getFullYear());
+    </script>
+  </footer>
+</body>
+</html>

@@ -1,5 +1,19 @@
-//
-// src/env.ts
+/**
+ * AnchorID - Permanent Attribution Anchor Service
+ *
+ * Copyright (c) 2025-2026 Mike Johnson (Mycal) / AnchorID
+ *
+ * Author:       https://anchorid.net/resolve/4ff7ed97-b78f-4ae6-9011-5af714ee241c
+ * Organization: https://anchorid.net/resolve/4c785577-9f55-4a22-a80b-dd1f4d9b4658
+ * Repository:   https://github.com/lowerpower/anchorid
+ *
+ * SPDX-License-Identifier: MIT
+ * See LICENSE file for full terms.
+ *
+ * AnchorID provides UUID-based permanent attribution anchors for the AI era.
+ * Part of the Mycal Labs infrastructure preservation project.
+ */
+
 export interface Env {
   // Required: KV storage for profiles/claims/sessions/pages
   ANCHOR_KV: KVNamespace;
@@ -12,13 +26,36 @@ export interface Env {
   ANCHOR_ADMIN_TOKEN?: string;
   ANCHOR_ADMIN_COOKIE?: string;
 
-  // Email login/update
-  RESEND_API_KEY?: string;
-  EMAIL_FROM?: string;
+  // Email providers
+  MAIL_SEND_SECRET?: string;       // mycal-style mailer secret
+  MYCAL_MAIL_ENDPOINT?: string;    // mycal-style mailer endpoint URL (required if using MAIL_SEND_SECRET)
+  RESEND_API_KEY?: string;         // Resend API
+  EMAIL_FROM?: string;             // Sender address (required for Resend)
+  BREVO_API_KEY?: string;          // Brevo API key
+  BREVO_FROM?: string;             // Sender email for Brevo
+  BREVO_DOMAINS?: string;          // Comma-separated domains (e.g., "outlook.com,hotmail.com")
 
   // TTL + limits
   LOGIN_TTL_SECONDS?: string; // default 900
   LOGIN_RL_PER_HOUR?: string; // default 3
   UPDATE_RL_PER_HOUR?: string; // default 20
+
+  // Per-IP rate limits
+  IP_RESOLVE_RL_PER_HOUR?: string; // default 300 (per IP for /resolve/<uuid> endpoint)
+  IP_CLAIMS_RL_PER_HOUR?: string;  // default 300 (per IP for /claims/<uuid> endpoint)
+  IP_LOGIN_RL_PER_HOUR?: string;   // default 10 (per IP for login attempts)
+  IP_EDIT_RL_PER_HOUR?: string;    // default 30 (per IP for edit page loads)
+  IP_UPDATE_RL_PER_HOUR?: string;  // default 60 (per IP for update submissions)
+  IP_CLAIM_RL_PER_HOUR?: string;   // default 30 (per IP for claim creation)
+  IP_VERIFY_RL_PER_HOUR?: string;  // default 20 (per IP for claim verification)
+  IP_ADMIN_LOGIN_RL_PER_HOUR?: string; // default 5 (per IP for admin login)
+
+  // Per-UUID rate limits for claims
+  CLAIM_RL_PER_HOUR?: string;      // default 10 (per UUID for claim creation)
+  VERIFY_RL_PER_HOUR?: string;     // default 20 (per UUID for claim verification)
+
+  // Optional: Enable claim verification notifications
+  // If enabled, stores email in plaintext (as _email in profile) for notifications
+  ENABLE_CLAIM_NOTIFICATIONS?: string; // "true" to enable
 }
 
