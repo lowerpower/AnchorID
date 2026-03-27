@@ -29,3 +29,6 @@ test/ratelimit-test.sh
 pnpm-lock.yaml
 
 mycal.profile.json
+
+# KV backups
+backup/
