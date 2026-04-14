@@ -267,6 +267,37 @@ async function handleHealthCheck(env: Env): Promise<Response> {
 }
 
 
+// Purge unverified profiles that are 5+ days old (run from scheduled cron)
+async function purgeUnverifiedProfiles(env: Env): Promise<void> {
+  const fiveDays = 5 * 24 * 60 * 60 * 1000;
+  const now = Date.now();
+
+  // List all profile UUIDs
+  const uuids: string[] = [];
+  let cursor: string | undefined;
+  do {
+    const result = await env.ANCHOR_KV.list({ prefix: "profile:", limit: 1000, cursor });
+    uuids.push(...result.keys.map(k => k.name.slice("profile:".length)));
+    cursor = result.list_complete ? undefined : (result as any).cursor;
+  } while (cursor);
+
+  for (const uuid of uuids) {
+    const stored = await env.ANCHOR_KV.get(`profile:${uuid}`, { type: "json" }) as any | null;
+    if (!stored || stored._emailVerified) continue;
+
+    const created = stored.dateCreated ? new Date(stored.dateCreated).getTime() : null;
+    if (!created || (now - created) < fiveDays) continue;
+
+    const keysToDelete = [
+      `profile:${uuid}`, `claims:${uuid}`, `audit:${uuid}`,
+      `signup:${uuid}`, `created:${uuid}`,
+      `email:unhashed:${uuid}`, `ip:${uuid}`,
+    ];
+    if (stored._emailHash) keysToDelete.push(`email:${stored._emailHash}`);
+    await Promise.all(keysToDelete.map(k => env.ANCHOR_KV.delete(k)));
+  }
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
@@ -1018,6 +1049,10 @@ https://anchorid.net/resolve/4ff7ed97-b78f-4ae6-9011-5af714ee241c
 
     return new Response("Not Found", { status: 404 });
   },
+
+  async scheduled(_event: ScheduledEvent, env: Env, _ctx: ExecutionContext): Promise<void> {
+    await purgeUnverifiedProfiles(env);
+  },
 };
 
 // ------------------ Routes ------------------
@@ -1352,6 +1387,7 @@ async function handleSignup(request: Request, env: Env): Promise<Response> {
     env.ANCHOR_KV.put(`profile:${uuid}`, JSON.stringify(profile)),
     env.ANCHOR_KV.put(`email:${emailHash}`, uuid),
     env.ANCHOR_KV.put(`email:unhashed:${uuid}`, email, { expirationTtl: 604800 }), // 7 days for admin spam detection
+    env.ANCHOR_KV.put(`ip:${uuid}`, getClientIp(request), { expirationTtl: 604800 }), // 7 days for admin spam detection
     env.ANCHOR_KV.put(`login:${editToken}`, JSON.stringify({ uuid, emailHash, isSetup: true }), { expirationTtl: ttl }),
     env.ANCHOR_KV.put(`signup:${uuid}`, backupToken, { expirationTtl: 300 }), // 5 min to show backup token
   ]);
@@ -1905,10 +1941,19 @@ async function handleEditPage(request: Request, env: Env): Promise<Response> {
     sessionToken = token;
   }
 
+  const isMagicLink = !backupToken;
+
   // Stored profile (manual fields live here)
   const stored = (await env.ANCHOR_KV.get(`profile:${uuid}`, {
     type: "json",
   })) as any | null;
+
+  // Set email verified flag on first magic link access
+  if (isMagicLink && stored && !stored._emailVerified) {
+    stored._emailVerified = true;
+    await env.ANCHOR_KV.put(`profile:${uuid}`, JSON.stringify(stored));
+    await appendAuditLog(env, uuid, request, "email_verified", "magic_link", undefined, "Email verified via magic link");
+  }
 
   // Verified URLs from claims ledger (read-only)
   const claims = await loadClaims(env, uuid);
@@ -2541,6 +2586,7 @@ async function handleUpdate(request: Request, env: Env): Promise<Response> {
       ...(current._emailHash ? { _emailHash: current._emailHash } : {}),
       ...(current._backupTokenHash ? { _backupTokenHash: current._backupTokenHash } : {}),
       ...(current._email ? { _email: current._email } : {}),
+      ...(current._emailVerified ? { _emailVerified: current._emailVerified } : {}),
     };
 
     await env.ANCHOR_KV.put(key, JSON.stringify(profileWithMeta));
@@ -2708,7 +2754,7 @@ async function checkIpRateLimit(
 
 interface AuditEntry {
   timestamp: string;
-  action: "create" | "update" | "rotate_token" | "claim_deleted";
+  action: "create" | "update" | "rotate_token" | "claim_deleted" | "email_verified";
   method: "admin" | "magic_link" | "backup_token" | "session_token";
   ipHash: string;
   changes?: string[];
