@@ -10,7 +10,8 @@
     "cf-typegen": "wrangler types",
 
     "kv:list:prod": "wrangler kv key list --namespace-id 813539ddad014d25b787ecb551dbe51b --prefix \"profile:\" --remote",
-    "kv:get:prod": "wrangler kv key get --namespace-id 813539ddad014d25b787ecb551dbe51b --remote"
+    "kv:get:prod": "wrangler kv key get --namespace-id 813539ddad014d25b787ecb551dbe51b --remote",
+    "backup": "bash scripts/backup-kv.sh"
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "^0.8.19",
