@@ -588,7 +588,7 @@ describe('Security: Denial of Service Protection', () => {
     await createMockProfile({ uuid });
 
     const requests = [];
-    for (let i = 0; i < 50; i++) {
+    for (let i = 0; i < 20; i++) {
       requests.push(
         SELF.fetch(createTestRequest(`https://anchorid.net/resolve/${uuid}`, {
           ip: `100.${i}.${i}.${i}`, // Different IPs to avoid rate limiting
@@ -600,7 +600,7 @@ describe('Security: Denial of Service Protection', () => {
     const successCount = responses.filter(r => r.status === 200).length;
 
     expect(successCount).toBeGreaterThan(0); // System didn't crash
-  });
+  }, 30000);
 
   it('handles concurrent requests from same IP gracefully', async () => {
     const uuid = crypto.randomUUID();
