@@ -129,7 +129,7 @@ export function requireAdminCookie(request: Request, env: Env): Response | null 
 
 export interface AuditEntry {
   timestamp: string;       // ISO 8601
-  action: "create" | "update" | "rotate_token";
+  action: "create" | "update" | "rotate_token" | "email_verified";
   method: "admin" | "magic_link" | "backup_token";
   ipHash: string;          // First 16 chars of SHA-256(IP)
   changes?: string[];      // List of changed fields
@@ -387,12 +387,43 @@ async function fetchAllProfileUUIDs(env: Env): Promise<string[]> {
   return uuids.sort();
 }
 
-// Helper to build query string for pagination
-function buildQueryString(query: string, page: number): string {
+// Helper to build query string for pagination (preserves sort and search)
+function buildQueryString(query: string, page: number, sort: string, dir: string): string {
   const params = new URLSearchParams();
-  if (query) params.set('q', query);
-  if (page > 1) params.set('page', page.toString());
+  if (query) params.set("q", query);
+  if (page > 1) params.set("page", page.toString());
+  if (sort !== "created") params.set("sort", sort);
+  if (dir !== "desc") params.set("dir", dir);
   return params.toString();
+}
+
+// Sort profiles by field and direction
+function sortProfiles<T extends { uuid: string; profile: any }>(
+  items: Array<T>,
+  field: string,
+  dir: "asc" | "desc"
+): Array<T> {
+  return [...items].sort((a, b) => {
+    let av: string, bv: string;
+    switch (field) {
+      case "name":     av = (a.profile?.name || "").toLowerCase(); bv = (b.profile?.name || "").toLowerCase(); break;
+      case "type":     av = a.profile?.["@type"] || ""; bv = b.profile?.["@type"] || ""; break;
+      case "modified": av = a.profile?.dateModified || ""; bv = b.profile?.dateModified || ""; break;
+      default:         av = a.profile?.dateCreated || ""; bv = b.profile?.dateCreated || ""; break;
+    }
+    const cmp = av < bv ? -1 : av > bv ? 1 : 0;
+    return dir === "asc" ? cmp : -cmp;
+  });
+}
+
+// Render a sortable column header link
+function sortHeader(label: string, field: string, currentField: string, currentDir: string, query: string): string {
+  const isActive = currentField === field;
+  const nextDir = isActive && currentDir === "desc" ? "asc" : "desc";
+  const indicator = isActive ? (currentDir === "desc" ? " ▼" : " ▲") : "";
+  const qs = buildQueryString(query, 1, field, nextDir);
+  const style = isActive ? "font-weight:700" : "color:#444";
+  return `<a href="/admin${qs ? "?" + qs : ""}" style="text-decoration:none;${style}">${label}${indicator}</a>`;
 }
 
 // ------------------ Helper functions for admin list view metadata ------------------
@@ -448,13 +479,15 @@ function formatAuditSummary(audit: any[] | null): string {
     create: "🆕",
     update: "✏️",
     rotate_token: "🔄",
+    email_verified: "✅",
   };
 
   const icon = actionIcons[recent.action] || "📝";
   const timeAgo = formatTimeAgo(recent.timestamp);
   const method = recent.method || "unknown";
 
-  return `${timeAgo}: ${icon} ${recent.action} via ${method}`;
+  const ipHint = recent.ipHash ? ` [${recent.ipHash}]` : "";
+  return `${timeAgo}: ${icon} ${recent.action} via ${method}${ipHint}`;
 }
 
 export async function handleAdminHome(req: Request, env: Env): Promise<Response> {
@@ -469,31 +502,34 @@ export async function handleAdminHome(req: Request, env: Env): Promise<Response>
   const pageParam = parseInt(url.searchParams.get("page") || "1", 10);
   const currentPage = Math.max(1, isNaN(pageParam) ? 1 : pageParam);
   const deletedName = url.searchParams.get("deleted") || "";
+  const sortField = url.searchParams.get("sort") || "created";
+  const sortDir = url.searchParams.get("dir") === "asc" ? "asc" : "desc";
 
   const perPage = 100;
 
-  // Fetch all profile UUIDs
+  // Fetch all profile UUIDs (cheap — KV list is 1 subrequest per 1000 keys)
   const allUuids = await fetchAllProfileUUIDs(env);
 
-  // Filter by search query if provided
-  let filteredUuids = allUuids;
+  let filteredUuids: string[];
 
   if (query) {
+    // Search mode: load all profiles to filter across them, then sort
     const queryLower = query.toLowerCase();
-    const matchingUuids: string[] = [];
-
-    // Fetch all profiles and search through their JSON data
-    for (const uuid of allUuids) {
-      const profile = await env.ANCHOR_KV.get(`profile:${uuid}`, { type: "json" });
-      if (profile) {
-        const profileJson = JSON.stringify(profile).toLowerCase();
-        if (profileJson.includes(queryLower)) {
-          matchingUuids.push(uuid);
-        }
-      }
-    }
-
-    filteredUuids = matchingUuids;
+    const allProfileItems = await Promise.all(
+      allUuids.map(async (uuid) => ({
+        uuid,
+        profile: await env.ANCHOR_KV.get(`profile:${uuid}`, { type: "json" }) as any | null,
+      }))
+    );
+    const filteredItems = allProfileItems.filter(({ profile }) =>
+      JSON.stringify(profile || {}).toLowerCase().includes(queryLower)
+    );
+    const sortedItems = sortProfiles(filteredItems, sortField, sortDir);
+    filteredUuids = sortedItems.map(item => item.uuid);
+  } else {
+    // Browse mode: paginate UUIDs first, load only the current page's profiles
+    // (avoids hitting the 1000-subrequest-per-invocation limit with large profile counts)
+    filteredUuids = allUuids;
   }
 
   // Pagination metadata
@@ -504,29 +540,34 @@ export async function handleAdminHome(req: Request, env: Env): Promise<Response>
   const hasPrev = currentPage > 1;
   const hasNext = currentPage < totalPages;
 
-  // Get current page items
+  // Load profiles + metadata for current page only
   const pageUuids = filteredUuids.slice(startIndex, endIndex);
 
-  // Load profiles, emails, and audit logs for the current page
   const allData = await Promise.all(
     pageUuids.map(async (uuid) => {
-      const [profile, email, audit] = await Promise.all([
+      const [profile, email, regIp, audit] = await Promise.all([
         env.ANCHOR_KV.get(`profile:${uuid}`, { type: "json" }) as Promise<any | null>,
         env.ANCHOR_KV.get(`email:unhashed:${uuid}`),
+        env.ANCHOR_KV.get(`ip:${uuid}`),
         env.ANCHOR_KV.get(`audit:${uuid}`, { type: "json" }) as Promise<any[] | null>,
       ]);
-      return { uuid, profile, email, audit };
+      return { uuid, profile, email, regIp, audit };
     })
   );
 
+  // Sort within current page (browse mode only; search mode is already sorted)
+  const sortedPageData = query ? allData : sortProfiles(allData, sortField, sortDir);
+
   // Build table rows with metadata
-  const rows = allData
+  const rows = sortedPageData
     .map((data) => {
-      const { uuid, profile, email, audit } = data;
+      const { uuid, profile, email, regIp, audit } = data;
       const uuidShort = uuid.slice(0, 8);
       const type = profile?.["@type"] === "Organization" ? "🏢 Org" : "👤 Person";
       const name = profile?.name ? escapeHtml(profile.name) : "(unnamed)";
       const emailDisplay = formatEmailForDisplay(email);
+      const ipDisplay = regIp ? escapeHtml(regIp) : '<span style="color:#999">(expired)</span>';
+      const verifiedDisplay = profile?._emailVerified ? "✅" : '<span style="color:#999">✗</span>';
       const created = formatDate(profile?.dateCreated);
       const modified = formatDate(profile?.dateModified);
       const activity = formatAuditSummary(audit);
@@ -536,6 +577,8 @@ export async function handleAdminHome(req: Request, env: Env): Promise<Response>
   <td>${type}</td>
   <td>${name}</td>
   <td style="font-family:monospace;font-size:0.9em">${escapeHtml(emailDisplay)}</td>
+  <td style="font-family:monospace;font-size:0.9em">${ipDisplay}</td>
+  <td style="text-align:center">${verifiedDisplay}</td>
   <td>${created}</td>
   <td>${modified}</td>
   <td style="font-size:0.9em">${escapeHtml(activity)}</td>
@@ -613,11 +656,13 @@ ${allData.length > 0 ? `
   <thead>
     <tr>
       <th>UUID</th>
-      <th>Type</th>
-      <th>Name</th>
+      <th>${sortHeader("Type", "type", sortField, sortDir, query)}</th>
+      <th>${sortHeader("Name", "name", sortField, sortDir, query)}</th>
       <th>Email</th>
-      <th>Created</th>
-      <th>Modified</th>
+      <th>Reg IP</th>
+      <th>V</th>
+      <th>${sortHeader("Created", "created", sortField, sortDir, query)}</th>
+      <th>${sortHeader("Modified", "modified", sortField, sortDir, query)}</th>
       <th>Recent Activity</th>
     </tr>
   </thead>
@@ -630,11 +675,11 @@ ${rows}
 ${totalPages > 1 ? `
 <nav class="pagination">
   ${hasPrev
-    ? `<a href="/admin?${buildQueryString(query, currentPage - 1)}">← Previous</a>`
+    ? `<a href="/admin?${buildQueryString(query, currentPage - 1, sortField, sortDir)}">← Previous</a>`
     : '<span class="disabled">← Previous</span>'}
   <span>Page ${currentPage} of ${totalPages}</span>
   ${hasNext
-    ? `<a href="/admin?${buildQueryString(query, currentPage + 1)}">Next →</a>`
+    ? `<a href="/admin?${buildQueryString(query, currentPage + 1, sortField, sortDir)}">Next →</a>`
     : '<span class="disabled">Next →</span>'}
 </nav>
 ` : ''}
@@ -993,24 +1038,30 @@ export async function handleAdminEditGet(req: Request, env: Env, uuid: string): 
   const emailHash = stored?._emailHash || null;
   const backupTokenHash = stored?._backupTokenHash || null;
 
-  // Load unhashed email if available (7-day window)
-  const unhashedEmail = await env.ANCHOR_KV.get(`email:unhashed:${uuid}`);
+  // Load unhashed email, registration IP, and audit log
+  const [unhashedEmail, regIp, auditLog] = await Promise.all([
+    env.ANCHOR_KV.get(`email:unhashed:${uuid}`),
+    env.ANCHOR_KV.get(`ip:${uuid}`),
+    env.ANCHOR_KV.get(`audit:${uuid}`, { type: "json" }) as Promise<any[] | null>,
+  ]);
 
   // Entity-specific fields
   const founder = isOrg ? extractUuids((canonical as any).founder) : [];
   const foundingDate = isOrg ? ((canonical as any).foundingDate || "") : "";
   const affiliation = !isOrg ? extractUuids((canonical as any).affiliation) : [];
 
-  // Check if profile is deletable (less than 7 days old)
+  // Unverified profiles are always deletable; verified profiles are protected after 7 days
+  const isVerified = !!stored._emailVerified;
   const createdDate = canonical.dateCreated ? new Date(canonical.dateCreated) : null;
   const now = new Date();
   const ageInDays = createdDate ? (now.getTime() - createdDate.getTime()) / (1000 * 60 * 60 * 24) : 999;
-  const isDeletable = ageInDays < 7;
+  const isDeletable = !isVerified || ageInDays < 7;
 
   const successMessages: Record<string, string> = {
     saved: "Profile saved successfully.",
     no_changes: "No changes detected.",
     email_added: "Email address added successfully. Magic link login is now enabled.",
+    verified_updated: "Email verification status updated.",
   };
 
   const errorMessages: Record<string, string> = {
@@ -1079,22 +1130,44 @@ ${error ? `<div class="alert alert-error">${escapeHtml(errorMessages[error] || e
 <div class="grid" style="margin-bottom:14px">
   ${emailHash ? `
   <div class="card access-card">
-    <label>Email Access <span class="badge access">Configured</span></label>
+    <label>Email Access <span class="badge access">Configured</span>
+      ${stored?._emailVerified
+        ? '<span class="badge verified">✅ Verified</span>'
+        : '<span class="badge manual">⚠ Unverified</span>'}
+    </label>
     <div class="hint" style="margin-top:0">
       ${unhashedEmail ? `
         Email: <strong>${escapeHtml(unhashedEmail)}</strong>
         <span style="color:#666;font-size:11px">(visible for 7 days)</span>
         <br>
       ` : ""}
+      ${regIp ? `
+        Reg IP: <strong>${escapeHtml(regIp)}</strong>
+        <span style="color:#666;font-size:11px">(visible for 7 days)</span>
+        <br>
+      ` : ""}
       Hash: <code style="font-size:11px">${escapeHtml(emailHash.slice(0, 16))}...</code>
       <br>Magic link login is enabled.
     </div>
+    <form method="post" action="/admin/save/${escapeHtml(uuid)}" style="margin-top:8px">
+      ${csrf}
+      <input type="hidden" name="is_verified_update" value="1">
+      <input type="hidden" name="verified" value="${stored?._emailVerified ? '0' : '1'}">
+      <button type="submit" style="padding:6px 10px;font-size:12px">
+        ${stored?._emailVerified ? 'Mark Unverified' : 'Mark Verified'}
+      </button>
+    </form>
   </div>
   ` : `
   <div class="card danger">
-    <label>Email Access <span class="badge" style="background:#ffd6d6">Not configured</span></label>
+    <label>Email Access <span class="badge" style="background:#ffd6d6">Not configured</span>
+      ${stored?._emailVerified
+        ? '<span class="badge verified">✅ Verified</span>'
+        : '<span class="badge manual">⚠ Unverified</span>'}
+    </label>
     <div class="hint" style="margin-top:0">
       Created before email-based access was added. Add an email below to enable magic link login.
+      ${regIp ? `<br>Reg IP: <strong>${escapeHtml(regIp)}</strong> <span style="color:#666;font-size:11px">(visible for 7 days)</span>` : ""}
     </div>
     <form method="post" action="/admin/save/${escapeHtml(uuid)}" style="margin-top:10px">
       ${csrf}
@@ -1103,6 +1176,14 @@ ${error ? `<div class="alert alert-error">${escapeHtml(errorMessages[error] || e
       <input type="email" name="email" placeholder="user@example.com" required
         style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font:inherit;margin-bottom:8px">
       <button type="submit" style="padding:6px 12px;font-size:13px">Add Email</button>
+    </form>
+    <form method="post" action="/admin/save/${escapeHtml(uuid)}" style="margin-top:8px">
+      ${csrf}
+      <input type="hidden" name="is_verified_update" value="1">
+      <input type="hidden" name="verified" value="${stored?._emailVerified ? '0' : '1'}">
+      <button type="submit" style="padding:6px 10px;font-size:12px">
+        ${stored?._emailVerified ? 'Mark Unverified' : 'Mark Verified'}
+      </button>
     </form>
   </div>
   `}
@@ -1391,6 +1472,36 @@ ${claims.length === 0 ? `<div class="card" style="margin:14px 0">
   </div>
 </div>
 
+<h2 style="margin-top:32px">Access History</h2>
+${(() => {
+  if (!auditLog || auditLog.length === 0) {
+    return `<div class="card" style="margin-bottom:14px"><p style="margin:0;color:#666">No audit entries.</p></div>`;
+  }
+  const actionIcons: Record<string, string> = { create: "🆕", update: "✏️", rotate_token: "🔄", claim_deleted: "🗑️", email_verified: "✅" };
+  const auditRows = auditLog.map((entry: any) => {
+    const icon = actionIcons[entry.action] || "📝";
+    const ts = entry.timestamp ? entry.timestamp.replace("T", " ").slice(0, 19) : "—";
+    const changes = entry.changes?.length ? escapeHtml(entry.changes.join(", ")) : entry.summary ? escapeHtml(entry.summary) : "—";
+    return `<tr>
+      <td style="font-family:monospace;font-size:12px;white-space:nowrap">${escapeHtml(ts)}</td>
+      <td>${icon} ${escapeHtml(entry.action)}</td>
+      <td>${escapeHtml(entry.method || "—")}</td>
+      <td style="font-family:monospace;font-size:12px">${entry.ipHash ? escapeHtml(entry.ipHash) : "—"}</td>
+      <td style="font-size:12px;color:#555">${changes}</td>
+    </tr>`;
+  }).join("");
+  return `<div style="overflow-x:auto;margin-bottom:14px"><table style="width:100%;border-collapse:collapse;font-size:13px">
+  <thead><tr style="background:#f5f5f5">
+    <th style="text-align:left;padding:6px 8px;border-bottom:2px solid #ddd">When (UTC)</th>
+    <th style="text-align:left;padding:6px 8px;border-bottom:2px solid #ddd">Action</th>
+    <th style="text-align:left;padding:6px 8px;border-bottom:2px solid #ddd">Method</th>
+    <th style="text-align:left;padding:6px 8px;border-bottom:2px solid #ddd">IP Hash</th>
+    <th style="text-align:left;padding:6px 8px;border-bottom:2px solid #ddd">Changes / Notes</th>
+  </tr></thead>
+  <tbody>${auditRows}</tbody>
+</table></div>`;
+})()}
+
 <script>
 (function() {
   const adminToken = "${escapeHtml(getAdminSecret(env) || "")}";
@@ -1588,8 +1699,10 @@ ${isDeletable ? `
 <div style="margin-top:32px;padding:20px;border:2px solid #dc3545;border-radius:10px;background:#fff5f5">
   <h2 style="margin:0 0 8px 0;font-size:18px;color:#dc3545">⚠️ Danger Zone</h2>
   <p style="margin:0 0 12px 0;color:#721c24;font-size:14px">
-    This profile is <strong>${Math.floor(ageInDays)} days old</strong> and can be deleted.
-    Profiles older than 7 days cannot be deleted to prevent accidental loss of established identities.
+    ${!isVerified
+      ? `This profile is <strong>unverified</strong> (${Math.floor(ageInDays)} days old) — the user has never clicked a magic link. Unverified profiles can be deleted at any age.`
+      : `This profile is <strong>${Math.floor(ageInDays)} days old</strong> and can be deleted. Verified profiles older than 7 days are protected.`
+    }
   </p>
 
   <details style="margin-bottom:12px">
@@ -1603,7 +1716,7 @@ ${isDeletable ? `
   </details>
 
   <form method="post" action="/admin/delete/${escapeHtml(uuid)}"
-    onsubmit="return confirm('⚠️ DELETE PROFILE?\\n\\nThis will permanently delete:\\n- Profile: ${escapeHtml(name || uuid)}\\n- Email access\\n- All claims\\n- Audit log\\n\\nThis action CANNOT be undone.\\n\\nType DELETE in the box below to confirm.');">
+    onsubmit="return confirm('⚠️ DELETE PROFILE?\\n\\nThis will permanently delete:\\n- Profile: ${escapeHtml(name || uuid)}\\n- Email access\\n- All claims\\n- Audit log\\n\\nThis action CANNOT be undone.');">
     ${csrf}
     <button type="submit" style="background:#dc3545;color:#fff;border-color:#dc3545;font-weight:600">
       Delete Profile Permanently
@@ -1612,10 +1725,9 @@ ${isDeletable ? `
 </div>
 ` : `
 <div style="margin-top:32px;padding:16px;border:1px solid #d0d7de;border-radius:10px;background:#f6f8fa">
-  <h3 style="margin:0 0 6px 0;font-size:14px;color:#555">🔒 Profile Protection</h3>
+  <h3 style="margin:0 0 6px 0;font-size:14px;color:#555">🔒 Profile Protected</h3>
   <p style="margin:0;font-size:13px;color:#666">
-    This profile is <strong>${Math.floor(ageInDays)} days old</strong> and cannot be deleted.
-    Only profiles less than 7 days old can be deleted to prevent accidental loss of established identities.
+    This profile is verified and <strong>${Math.floor(ageInDays)} days old</strong>. Verified profiles older than 7 days cannot be deleted to prevent accidental loss of established identities.
   </p>
 </div>
 `}
@@ -1662,6 +1774,25 @@ export async function handleAdminSavePost(
   // Validate CSRF token
   if (!await validateCsrf(req, fd)) {
     return csrfError();
+  }
+
+  // Check if this is a verified status toggle
+  if (fd.get("is_verified_update") === "1") {
+    const setVerified = fd.get("verified") === "1";
+    const updated = { ...stored };
+    if (setVerified) {
+      updated._emailVerified = true;
+    } else {
+      delete updated._emailVerified;
+    }
+    await env.ANCHOR_KV.put(`profile:${uuid}`, JSON.stringify(updated));
+    await appendAuditLog(env, uuid, req, "email_verified", "admin", undefined,
+      setVerified ? "Email manually marked verified by admin" : "Email manually marked unverified by admin"
+    );
+    return new Response(null, {
+      status: 303,
+      headers: { Location: `/admin/edit/${uuid}?success=verified_updated`, "cache-control": "no-store" },
+    });
   }
 
   // Check if this is an email update request
@@ -1751,6 +1882,7 @@ export async function handleAdminSavePost(
       ...(stored._emailHash ? { _emailHash: stored._emailHash } : {}),
       ...(stored._backupTokenHash ? { _backupTokenHash: stored._backupTokenHash } : {}),
       ...(stored._email ? { _email: stored._email } : {}),
+      ...(stored._emailVerified ? { _emailVerified: stored._emailVerified } : {}),
     };
 
     await env.ANCHOR_KV.put(`profile:${uuid}`, JSON.stringify(profileWithMeta));
@@ -1885,7 +2017,8 @@ export async function handleAdminDelete(
   const stored = (await env.ANCHOR_KV.get(`profile:${uuid}`, { type: "json" })) as any | null;
   if (!stored) return new Response("Not found", { status: 404 });
 
-  // Check if profile is less than 7 days old
+  // Verified profiles are protected after 7 days; unverified profiles can always be deleted
+  const isVerified = !!stored._emailVerified;
   const createdDate = stored.dateCreated ? new Date(stored.dateCreated) : null;
   if (!createdDate) {
     return new Response("Profile has no creation date, cannot determine age", { status: 400 });
@@ -1894,8 +2027,8 @@ export async function handleAdminDelete(
   const now = new Date();
   const ageInDays = (now.getTime() - createdDate.getTime()) / (1000 * 60 * 60 * 24);
 
-  if (ageInDays >= 7) {
-    return new Response("Profile is too old to delete (>= 7 days). Only profiles less than 7 days old can be deleted.", {
+  if (isVerified && ageInDays >= 7) {
+    return new Response("Cannot delete a verified profile older than 7 days.", {
       status: 403,
       headers: { "content-type": "text/plain" }
     });
@@ -1908,6 +2041,8 @@ export async function handleAdminDelete(
     `audit:${uuid}`,
     `signup:${uuid}`,
     `created:${uuid}`,
+    `email:unhashed:${uuid}`,
+    `ip:${uuid}`,
   ];
 
   // Delete email mapping if it exists
