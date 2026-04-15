@@ -112,7 +112,7 @@ export function validateProfileUrl(urlString: string): { ok: boolean; error?: st
 
   const hostname = url.hostname.toLowerCase();
 
-  // Block localhost and loopback
+  // Block localhost and loopback (IPv4 + IPv6)
   if (hostname === 'localhost' || hostname === '0.0.0.0') {
     return { ok: false, error: "blocked_localhost" };
   }
@@ -122,12 +122,51 @@ export function validateProfileUrl(urlString: string): { ok: boolean; error?: st
     return { ok: false, error: "blocked_loopback" };
   }
 
+  // Strip brackets from IPv6 hostnames for analysis (URL parser gives "[::1]")
+  const bare = hostname.startsWith('[') && hostname.endsWith(']')
+    ? hostname.slice(1, -1)
+    : hostname;
+
+  // Block IPv6 loopback (::1)
+  if (bare === '::1') {
+    return { ok: false, error: "blocked_loopback" };
+  }
+
+  // Block IPv4-mapped IPv6 addresses (::ffff:127.0.0.1, ::ffff:10.0.0.1, etc.)
+  const v4mapped = bare.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/i);
+  if (v4mapped) {
+    // Re-check the embedded IPv4 address against the same rules below
+    const embedded = v4mapped[1];
+    if (embedded.startsWith('127.') || embedded.startsWith('10.') ||
+        embedded.startsWith('192.168.') || embedded === '169.254.169.254' ||
+        embedded.startsWith('169.254.') || embedded === '0.0.0.0') {
+      return { ok: false, error: "blocked_private_ip" };
+    }
+    const emb172 = embedded.match(/^172\.(\d+)\./);
+    if (emb172) {
+      const octet = parseInt(emb172[1], 10);
+      if (octet >= 16 && octet <= 31) {
+        return { ok: false, error: "blocked_private_ip" };
+      }
+    }
+  }
+
+  // Block IPv6 unique-local (fc00::/7 → fc.. and fd..)
+  if (bare.startsWith('fc') || bare.startsWith('fd')) {
+    return { ok: false, error: "blocked_private_ip" };
+  }
+
+  // Block IPv6 link-local (fe80::/10)
+  if (bare.startsWith('fe80:') || bare.startsWith('fe80%')) {
+    return { ok: false, error: "blocked_private_ip" };
+  }
+
   // Block AWS/GCP metadata endpoints
   if (hostname === '169.254.169.254' || hostname.startsWith('169.254.')) {
     return { ok: false, error: "blocked_metadata_endpoint" };
   }
 
-  // Block private IP ranges (10.x, 192.168.x, 172.16-31.x)
+  // Block private IPv4 ranges (10.x, 192.168.x, 172.16-31.x)
   if (hostname.startsWith('10.')) {
     return { ok: false, error: "blocked_private_ip" };
   }
