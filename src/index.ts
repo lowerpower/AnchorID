@@ -43,52 +43,7 @@ import { loadClaims } from "./claims/store";
 
 import { buildProfile, mergeSameAs } from "./domain/profile";
 import { sendEmail, hasEmailConfig } from "./email";
-
-
-export interface Env {
-  // Required: KV storage for profiles/sessions
-  ANCHOR_KV: KVNamespace;
-
-  // Admin secret (required for /admin/* routes)
-  // Must be explicitly set - admin routes are disabled without it.
-  ANCHOR_ADMIN_SECRET?: string;
-
-  // Legacy: still supported for backward compatibility
-  ANCHOR_ADMIN_TOKEN?: string;
-  ANCHOR_ADMIN_COOKIE?: string;
-
-  // Email providers (at least one required for magic links)
-  MAIL_SEND_SECRET?: string;       // mycal-style mailer secret
-  MYCAL_MAIL_ENDPOINT?: string;    // mycal-style mailer endpoint URL (required if using MAIL_SEND_SECRET)
-  RESEND_API_KEY?: string;         // Resend API (fallback)
-  EMAIL_FROM?: string;             // Sender address (required for Resend)
-  BREVO_API_KEY?: string;          // Brevo API key
-  BREVO_FROM?: string;             // Sender email for Brevo
-  BREVO_DOMAINS?: string;          // Comma-separated domains (e.g., "outlook.com,hotmail.com")
-
-  // TTL + limits
-  LOGIN_TTL_SECONDS?: string;    // default 900
-  LOGIN_RL_PER_HOUR?: string;    // default 3 (per email)
-  UPDATE_RL_PER_HOUR?: string;   // default 20 (per UUID)
-
-  // Per-IP rate limits
-  IP_RESOLVE_RL_PER_HOUR?: string; // default 300 (per IP for /resolve/<uuid> endpoint)
-  IP_CLAIMS_RL_PER_HOUR?: string;  // default 300 (per IP for /claims/<uuid> endpoint)
-  IP_LOGIN_RL_PER_HOUR?: string;   // default 10 (per IP for login attempts)
-  IP_EDIT_RL_PER_HOUR?: string;    // default 30 (per IP for edit page loads)
-  IP_UPDATE_RL_PER_HOUR?: string;  // default 60 (per IP for update submissions)
-  IP_CLAIM_RL_PER_HOUR?: string;   // default 30 (per IP for claim creation)
-  IP_VERIFY_RL_PER_HOUR?: string;  // default 20 (per IP for claim verification)
-  IP_ADMIN_LOGIN_RL_PER_HOUR?: string; // default 5 (per IP for admin login)
-
-  // Per-UUID rate limits for claims
-  CLAIM_RL_PER_HOUR?: string;      // default 10 (per UUID for claim creation)
-  VERIFY_RL_PER_HOUR?: string;     // default 20 (per UUID for claim verification)
-
-  // Optional: Enable claim verification notifications
-  // If enabled, stores email in plaintext (as _email in profile) for notifications
-  ENABLE_CLAIM_NOTIFICATIONS?: string; // "true" to enable
-}
+import type { Env } from "./env";
 
 const FOUNDER_UUID = "4ff7ed97-b78f-4ae6-9011-5af714ee241c";
 
@@ -833,7 +788,8 @@ https://anchorid.net/resolve/4ff7ed97-b78f-4ae6-9011-5af714ee241c
 
 		// Parse body to get UUID
 		const bodyText = await request.text();
-		const payload: any = JSON.parse(bodyText);
+		let payload: any;
+		try { payload = JSON.parse(bodyText); } catch { return new Response("Bad JSON", { status: 400 }); }
 		const targetUuid = String(payload.uuid || "").trim().toLowerCase();
 
 		// Check admin auth first
@@ -856,7 +812,7 @@ https://anchorid.net/resolve/4ff7ed97-b78f-4ae6-9011-5af714ee241c
 			if (session?.uuid && String(session.uuid).toLowerCase() === targetUuid) {
 				// User authenticated for their own profile - check per-UUID rate limit
 				const maxPerHour = parseInt(env.CLAIM_RL_PER_HOUR || "10", 10);
-				const rl = await incrWithTtl(env.ANCHOR_KV, `rl:claim:${targetUuid}`, 3600);
+				const rl = await incrWithTtl(env.ANCHOR_KV, `rl:claim:${targetUuid}`, 3600, maxPerHour);
 				if (rl > maxPerHour) {
 					return json({ error: "rate_limited", message: "Too many claim operations" }, 429, { "cache-control": "no-store", "retry-after": "3600" });
 				}
@@ -881,7 +837,8 @@ https://anchorid.net/resolve/4ff7ed97-b78f-4ae6-9011-5af714ee241c
 
 		// Parse body to get UUID
 		const bodyText = await request.text();
-		const payload: any = JSON.parse(bodyText);
+		let payload: any;
+		try { payload = JSON.parse(bodyText); } catch { return new Response("Bad JSON", { status: 400 }); }
 		const targetUuid = String(payload.uuid || "").trim().toLowerCase();
 
 		// Check admin auth first
@@ -904,7 +861,7 @@ https://anchorid.net/resolve/4ff7ed97-b78f-4ae6-9011-5af714ee241c
 			if (session?.uuid && String(session.uuid).toLowerCase() === targetUuid) {
 				// User authenticated for their own profile - check per-UUID rate limit
 				const maxPerHour = parseInt(env.VERIFY_RL_PER_HOUR || "20", 10);
-				const rl = await incrWithTtl(env.ANCHOR_KV, `rl:verify:${targetUuid}`, 3600);
+				const rl = await incrWithTtl(env.ANCHOR_KV, `rl:verify:${targetUuid}`, 3600, maxPerHour);
 				if (rl > maxPerHour) {
 					return json({ error: "rate_limited", message: "Too many verification attempts" }, 429, { "cache-control": "no-store", "retry-after": "3600" });
 				}
@@ -929,7 +886,8 @@ https://anchorid.net/resolve/4ff7ed97-b78f-4ae6-9011-5af714ee241c
 
 		// Parse body to get UUID
 		const bodyText = await request.text();
-		const payload: any = JSON.parse(bodyText);
+		let payload: any;
+		try { payload = JSON.parse(bodyText); } catch { return new Response("Bad JSON", { status: 400 }); }
 		const targetUuid = String(payload.uuid || "").trim().toLowerCase();
 
 		// Track auth method for audit logging
@@ -972,7 +930,7 @@ https://anchorid.net/resolve/4ff7ed97-b78f-4ae6-9011-5af714ee241c
 			if (session?.uuid && String(session.uuid).toLowerCase() === targetUuid) {
 				// User authenticated for their own profile - use moderate rate limit for deletions
 				const maxPerHour = parseInt(env.CLAIM_RL_PER_HOUR || "10", 10);
-				const rl = await incrWithTtl(env.ANCHOR_KV, `rl:claim:${targetUuid}`, 3600);
+				const rl = await incrWithTtl(env.ANCHOR_KV, `rl:claim:${targetUuid}`, 3600, maxPerHour);
 				if (rl > maxPerHour) {
 					return json({ error: "rate_limited", message: "Too many claim operations" }, 429, { "cache-control": "no-store", "retry-after": "3600" });
 				}
@@ -1843,7 +1801,7 @@ async function handleLogin(request: Request, env: Env): Promise<Response> {
 
   // Rate limit per email hash per hour
   const maxPerHour = parseInt(env.LOGIN_RL_PER_HOUR || "3", 10);
-  const rl = await incrWithTtl(env.ANCHOR_KV, `rl:login:${emailHash}`, 3600);
+  const rl = await incrWithTtl(env.ANCHOR_KV, `rl:login:${emailHash}`, 3600, maxPerHour);
   if (rl > maxPerHour) {
     if (isFormSubmit) {
       return htmlSuccess("Check Your Email", "If this email is registered, you'll receive an edit link shortly.", email);
@@ -2394,12 +2352,27 @@ ${claims.length === 0 ? `<div style="background:#f6f6f6;padding:14px;border-radi
 
       pendingDeleteClaimId = claimId;
 
-      // Populate modal with claim details
-      deleteModalClaimInfo.innerHTML = \`
-        <div style="margin-bottom:12px"><strong>Claim Type:</strong> \${claimType}</div>
-        <div style="margin-bottom:12px"><strong>URL:</strong> <code style="font-size:13px;word-break:break-all">\${claimUrl}</code></div>
-        <div style="margin-bottom:12px"><strong>Status:</strong> \${claimStatus}</div>
-      \`;
+      // Populate modal with claim details (use textContent to prevent XSS)
+      deleteModalClaimInfo.textContent = '';
+      function addDetail(label, value) {
+        const div = document.createElement('div');
+        div.style.marginBottom = '12px';
+        const strong = document.createElement('strong');
+        strong.textContent = label;
+        div.appendChild(strong);
+        if (label === 'URL:') {
+          const code = document.createElement('code');
+          code.style.cssText = 'font-size:13px;word-break:break-all';
+          code.textContent = ' ' + value;
+          div.appendChild(code);
+        } else {
+          div.appendChild(document.createTextNode(' ' + value));
+        }
+        deleteModalClaimInfo.appendChild(div);
+      }
+      addDetail('Claim Type:', claimType);
+      addDetail('URL:', claimUrl);
+      addDetail('Status:', claimStatus);
 
       // Show modal
       deleteModal.style.display = "flex";
@@ -2549,7 +2522,7 @@ async function handleUpdate(request: Request, env: Env): Promise<Response> {
 
   // Per-UUID rate limit (in addition to per-IP)
   const maxPerHour = parseInt(env.UPDATE_RL_PER_HOUR || "20", 10);
-  const rl = await incrWithTtl(env.ANCHOR_KV, `rl:update:${uuid}`, 3600);
+  const rl = await incrWithTtl(env.ANCHOR_KV, `rl:update:${uuid}`, 3600, maxPerHour);
   if (rl > maxPerHour) {
     return json({ error: "rate_limited" }, 429, { "cache-control": "no-store" });
   }
@@ -2705,9 +2678,22 @@ async function sha256Hex(input: string): Promise<string> {
   return [...new Uint8Array(hash)].map(b => b.toString(16).padStart(2, "0")).join("");
 }
 
-async function incrWithTtl(kv: KVNamespace, key: string, ttlSeconds: number): Promise<number> {
+// Increment a rate-limit counter in KV with TTL.
+// When `limit` is provided and the current count already meets or exceeds it,
+// the write is skipped — this prevents counter inflation during bursts and
+// saves KV operations under sustained attack.
+// Note: KV has no atomic increment, so concurrent requests can race at the
+// boundary. This is inherent to KV-based rate limiting; for exact enforcement
+// use Durable Objects.
+async function incrWithTtl(kv: KVNamespace, key: string, ttlSeconds: number, limit?: number): Promise<number> {
   const cur = await kv.get(key);
-  const n = (cur ? parseInt(cur, 10) : 0) + 1;
+  const currentCount = cur ? parseInt(cur, 10) : 0;
+
+  if (limit !== undefined && currentCount >= limit) {
+    return currentCount + 1;
+  }
+
+  const n = currentCount + 1;
   await kv.put(key, String(n), { expirationTtl: ttlSeconds });
   return n;
 }
@@ -2738,7 +2724,7 @@ async function checkIpRateLimit(
   const ip = getClientIp(request);
   const ipHash = await hashIp(ip);
   const key = `rl:${prefix}:${ipHash}`;
-  const count = await incrWithTtl(env.ANCHOR_KV, key, 3600);
+  const count = await incrWithTtl(env.ANCHOR_KV, key, 3600, limitPerHour);
 
   if (count > limitPerHour) {
     return json(
@@ -2798,7 +2784,7 @@ async function appendAuditLog(
 }
 
 function computeChangedFields(before: any, after: any): string[] {
-  const fields = ["name", "alternateName", "url", "description", "sameAs"];
+  const fields = ["name", "alternateName", "url", "description", "sameAs", "founder", "foundingDate", "affiliation"];
   const changed: string[] = [];
 
   for (const field of fields) {
