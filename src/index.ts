@@ -1047,6 +1047,15 @@ https://anchorid.net/resolve/4ff7ed97-b78f-4ae6-9011-5af714ee241c
       return handleUpdate(request, env);
     }
 
+    // Short resolver: /<uuid>
+    const uuidPathRe = /^\/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (uuidPathRe.test(path)) {
+      const ipLimit = parseInt(env.IP_RESOLVE_RL_PER_HOUR || "300", 10);
+      const ipRateLimited = await checkIpRateLimit(request, env, "ip:resolve", ipLimit);
+      if (ipRateLimited) return ipRateLimited;
+      return handleResolve(request, env);
+    }
+
     return new Response("Not Found", { status: 404 });
   },
 
@@ -1058,7 +1067,10 @@ https://anchorid.net/resolve/4ff7ed97-b78f-4ae6-9011-5af714ee241c
 // ------------------ Routes ------------------
 async function handleResolve(request: Request, env: Env): Promise<Response> {
   const url = new URL(request.url);
-  const uuid = url.pathname.slice("/resolve/".length).trim();
+  const uuid = (url.pathname.startsWith("/resolve/")
+    ? url.pathname.slice("/resolve/".length)
+    : url.pathname.slice(1)
+  ).trim();
 
   const uuidRe =
     /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
