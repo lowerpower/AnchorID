@@ -120,6 +120,7 @@ AnchorID/
 | `GET /privacy` | KV `page:privacy` | Privacy policy |
 | `GET /sitemap.xml` | KV `page:sitemap` | XML sitemap |
 | `GET /resolve/<uuid>` | `handleResolve()` | Canonical Person JSON-LD |
+| `GET /<uuid>` | `handleResolve()` | Short alias for `/resolve/<uuid>` |
 | `GET /claims/<uuid>` | `handleClaimsGet()` | Claims ledger (JSON or HTML) |
 
 ### Public Auth Flow
