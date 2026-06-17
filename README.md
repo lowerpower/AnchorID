@@ -9,7 +9,7 @@ https://deploy.workers.cloudflare.com/?url=https://github.com/lowerpower/AnchorI
 
 **AnchorID** is a minimal attribution resolver for people — built on UUIDs, JSON-LD, and verifiable external claims.
 
-It provides a stable, canonical attribution record (`/resolve/<uuid>`) that can be linked to websites, GitHub profiles, and other public attribution surfaces using simple, auditable proofs.
+It provides a stable, canonical attribution record (`/resolve/<uuid>`, or the shorter `/<uuid>`) that can be linked to websites, GitHub profiles, and other public attribution surfaces using simple, auditable proofs.
 
 AnchorID is designed for **longevity, decentralization, and crawlability**, not account silos or proprietary systems.
 
@@ -74,7 +74,7 @@ AnchorID exists to provide a **stable, platform-agnostic attribution anchor**: a
 At its core, AnchorID provides:
 
 * **Canonical attribution URLs**
-  `https://anchorid.net/resolve/<uuid>`
+  `https://anchorid.net/resolve/<uuid>` (or short form: `https://anchorid.net/<uuid>`)
 
 * **Machine-readable profiles** (schema.org JSON-LD)
 
@@ -90,14 +90,15 @@ You can think of it as a **permanent "about me" record** that outlives any singl
 
 ## Core Endpoints
 
-### `/resolve/<uuid>` — Canonical attribution record
+### `/resolve/<uuid>` (or `/<uuid>`) — Canonical attribution record
 
-Returns a JSON-LD `Person` object.
+Returns a JSON-LD `Person` object. Both URLs return identical responses — the short form saves characters for character-limited profile bios.
 
 Example:
 
 ```bash
 curl https://anchorid.net/resolve/4ff7ed97-b78f-4ae6-9011-5af714ee241c
+curl https://anchorid.net/4ff7ed97-b78f-4ae6-9011-5af714ee241c
 ```
 
 Includes:
@@ -134,7 +135,7 @@ All endpoints are protected with rate limiting to prevent abuse while maintainin
 
 | Endpoint | Limit | Scope | Purpose |
 |----------|-------|-------|---------|
-| `/resolve/<uuid>` | 300/hour | Per IP | Allows search engines and aggregators |
+| `/resolve/<uuid>` or `/<uuid>` | 300/hour | Per IP | Allows search engines and aggregators |
 | `/claims/<uuid>` | 300/hour | Per IP | Allows verification services |
 
 ### User Endpoints (Balanced Limits)
