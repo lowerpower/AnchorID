@@ -22,6 +22,14 @@ Each AnchorID is a schema.org `Person` object stored as JSON-LD. The canonical U
 https://anchorid.net/resolve/<uuid>
 ```
 
+A short alias is also available for character-limited contexts (bios, signatures):
+
+```
+https://anchorid.net/<uuid>
+```
+
+Both return identical JSON-LD. The `/resolve/<uuid>` form is canonical and should be used in proof files and JSON-LD `@id` fields.
+
 ### Required Fields
 
 | Field | Description |

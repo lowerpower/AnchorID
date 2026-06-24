@@ -184,6 +184,7 @@ JSON-LD using schema.org vocabulary. Specifically, a `Person` object with standa
 
 Yes. The public endpoints are:
 - `GET /resolve/<uuid>` — Returns the canonical profile (JSON-LD)
+- `GET /<uuid>` — Short alias for `/resolve/<uuid>` (same response, fewer characters)
 - `GET /claims/<uuid>` — Returns the claims ledger (JSON or HTML)
 
 Authenticated endpoints (require session token from magic link):
