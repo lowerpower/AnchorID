@@ -497,6 +497,20 @@
 
     <hr />
 
+    <h2>Can I access the resolver directly?</h2>
+
+    <p>Yes. The public read endpoints are:</p>
+
+    <ul>
+      <li><code>GET /resolve/&lt;uuid&gt;</code> — canonical profile (JSON-LD)</li>
+      <li><code>GET /&lt;uuid&gt;</code> — short alias, identical response</li>
+      <li><code>GET /claims/&lt;uuid&gt;</code> — claims ledger (JSON or HTML)</li>
+    </ul>
+
+    <p>The short form (<code>anchorid.net/&lt;uuid&gt;</code>) saves characters for profile bios and other space-constrained contexts. Both URLs return the same data.</p>
+
+    <hr />
+
     <h2>Why bother doing this now?</h2>
 
     <p>Attribution signals compound over time.</p>
