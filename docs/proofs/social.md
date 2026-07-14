@@ -100,17 +100,24 @@ AnchorID will:
 
 ## Space-Constrained Environments
 
-For platforms with strict character limits (like social media bios or short profile fields), you can use **just the UUID** instead of the full resolver URL:
+For social/public profile proofs, AnchorID searches the page for your UUID — so all three formats verify successfully. Pick based on available space:
 
-**Full URL (recommended):**
+**Full URL — 65 chars (most readable):**
 ```
 https://anchorid.net/resolve/4ff7ed97-b78f-4ae6-9011-5af714ee241c
 ```
 
-**UUID only (space-constrained):**
+**Short URL — 57 chars (good middle ground):**
+```
+https://anchorid.net/4ff7ed97-b78f-4ae6-9011-5af714ee241c
+```
+
+**UUID only — 36 chars (most compact):**
 ```
 4ff7ed97-b78f-4ae6-9011-5af714ee241c
 ```
+
+All three verify. The UUID must match the exact format (8-4-4-4-12 hex digits). Use whichever fits your space.
 
 **Examples:**
 
@@ -129,10 +136,6 @@ AnchorID: 4ff7ed97-b78f-4ae6-9011-5af714ee241c
 ```
 Developer working on distributed systems. 4ff7ed97-b78f-4ae6-9011-5af714ee241c
 ```
-
-AnchorID verification will find **either** the full resolver URL or just the UUID. The UUID must match the exact format (8-4-4-4-12 hex digits).
-
-**Note:** While the UUID-only format saves space, the full URL is more human-readable and immediately identifies the verification service. Use UUID-only only when character limits require it.
 
 ---
 
