@@ -602,7 +602,6 @@ export function buildProfile(
     ? false
     : (structurallyChanged || (!!stored && opt.bumpOnNoop));
 
-  const cleaned = stripEmptyArrays(candidate);
-  return { profile: cleaned, changed, effectiveSameAs };
+  return { profile: normalizedCandidate, changed, effectiveSameAs };
 }
 
