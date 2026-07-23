@@ -564,6 +564,10 @@ export default {
     See an example: <a href="/resolve/4ff7ed97-b78f-4ae6-9011-5af714ee241c">Mike Johnson (Founder)</a>
   </p>
 
+  <p style="margin-top: 12px; font-size: 14px;">
+    Why this exists: <a href="https://blog.mycal.net/identity-is-easy-continuity-is-hard/">Identity is easy, continuity is hard</a> — the thinking behind AnchorID, and why continuity over time is the part most identity systems ignore.
+  </p>
+
   <p style="margin-top: 32px; color: #555; font-size: 14px;">
     Already have a UUID? Try: <code>/resolve/&lt;uuid&gt;</code><br>
     <a href="/faq" style="color: #555;">Skeptical? Read the FAQ.</a>
