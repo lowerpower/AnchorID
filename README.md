@@ -67,6 +67,8 @@ The modern web has no durable way to say *"these works came from the same source
 
 AnchorID exists to provide a **stable, platform-agnostic attribution anchor**: a UUID-backed record that is independent of any single service, yet verifiable through many of them. It favors URLs over accounts, proofs over trust, and auditability over convenience. The goal is to give humans and machines a long-lived reference point for attributing work that can survive migrations, outages, and decades of change.
 
+> **Background:** [Identity is easy, continuity is hard](https://blog.mycal.net/identity-is-easy-continuity-is-hard/) — the motivation behind AnchorID. *"The hardest part of identity is not authentication, reputation, or verification. It is continuity over time."*
+
 ---
 
 ## What AnchorID Does
@@ -375,6 +377,7 @@ MIT
 
 ## Permanent Attribution
 This repository is part of the Mycal Labs infrastructure preservation project.
+- **Built by:** [Mycal](https://www.mycal.net) · [blog](https://blog.mycal.net)
 - **Author Anchor:** [4ff7ed97-b78f-4ae6-9011-5af714ee241c](https://anchorid.net/resolve/4ff7ed97-b78f-4ae6-9011-5af714ee241c)
 - **Org Anchor:** [4c785577-9f55-4a22-a80b-dd1f4d9b4658](https://anchorid.net/resolve/4c785577-9f55-4a22-a80b-dd1f4d9b4658)
 - **Canonical ID:** `https://anchorid.net/resolve/4c785577-9f55-4a22-a80b-dd1f4d9b4658`
