@@ -171,9 +171,24 @@ export function canonicalizeUrl(input: unknown): string | null {
     return null;
   }
 
-  // Force https unless you explicitly choose to allow http.
-  // Per spec: default upgrade to https.
+  // Scheme allow-list. This MUST come before any attempt to rewrite the
+  // protocol: per the WHATWG URL spec, assigning `u.protocol = "https:"` is a
+  // no-op for non-special schemes, so `javascript:`/`data:`/`vbscript:`/`file:`
+  // would otherwise survive canonicalization untouched and get published in the
+  // public JSON-LD. Only http/https identity URLs are acceptable; http is
+  // upgraded, everything else is rejected outright (including special schemes
+  // like ftp:, which must not be silently rewritten into a different identity).
+  if (u.protocol !== "https:" && u.protocol !== "http:") {
+    return null;
+  }
   u.protocol = "https:";
+
+  // Credentials must never be published in an identity record.
+  u.username = "";
+  u.password = "";
+
+  // A URL with no host is not a usable identity link.
+  if (!u.hostname) return null;
 
   // Lowercase hostname
   u.hostname = u.hostname.toLowerCase();
@@ -343,8 +358,13 @@ function buildIdentifier(uuid: string): PropertyValue {
   };
 }
 
-function sanitizeSameAsForProfileStorage(urls: string[]): string[] | undefined {
-  // sameAs should not include self-links to anchorid.net
+/**
+ * sameAs must never include self-links to anchorid.net. A link to
+ * anchorid.net/resolve/<other-uuid> would assert that this identity and another
+ * AnchorID are the same entity — exactly the identity confusion this record
+ * exists to prevent. Applies to both the stored and the published list.
+ */
+function stripSelfLinks(urls: string[]): string[] {
   const filtered = urls.filter((u) => {
     try {
       return new URL(u).hostname !== "anchorid.net";
@@ -352,7 +372,11 @@ function sanitizeSameAsForProfileStorage(urls: string[]): string[] | undefined {
       return false;
     }
   });
-  const out = dedupeAndSort(filtered);
+  return dedupeAndSort(filtered);
+}
+
+function sanitizeSameAsForProfileStorage(urls: string[]): string[] | undefined {
+  const out = stripSelfLinks(urls);
   return out.length ? out : undefined;
 }
 
@@ -493,8 +517,11 @@ export function buildProfile(
     return canonicalizeUrlList(stored?.sameAs ?? []);
   })();
 
-  // Effective (public) sameAs is manual ∪ verified
-  const effectiveSameAs = mergeSameAs(manualSameAs, verifiedUrls);
+  // Effective (public) sameAs is manual ∪ verified.
+  // This is what /resolve publishes, so it gets the same self-link filtering as
+  // the stored list — previously the filter was applied only on the storage
+  // branch, leaving the published list unfiltered.
+  const effectiveSameAs = stripSelfLinks(mergeSameAs(manualSameAs, verifiedUrls));
 
   // What do we store in profile.sameAs?
   const sameAsForStorage = opt.persistMergedSameAs ? effectiveSameAs : manualSameAs;
@@ -505,6 +532,16 @@ export function buildProfile(
   // Baseline timestamps
   const baseDateCreated = stored?.dateCreated ?? now;
   const baseDateModified = stored?.dateModified ?? now;
+
+  // Helper to drop private metadata keys (leading underscore) that are stored
+  // alongside the canonical profile but are not part of it.
+  function stripPrivateFields<T extends Record<string, unknown>>(obj: T): T {
+    const out: any = { ...obj };
+    for (const k of Object.keys(out)) {
+      if (k.startsWith("_")) delete out[k];
+    }
+    return out;
+  }
 
   // Helper to strip empty arrays
   function stripEmptyArrays<T extends Record<string, unknown>>(obj: T): T {
@@ -575,9 +612,15 @@ export function buildProfile(
   // Strip empty arrays from candidate (keep canonical output clean)
   const normalizedCandidate = stripEmptyArrays(candidate);
 
-  // Detect change compared to stored (ignore dateModified drift by aligning it for comparison)
+  // Detect change compared to stored (ignore dateModified drift by aligning it
+  // for comparison). Private metadata (_emailHash, _backupTokenHash, _email,
+  // _emailVerified) lives on the stored record but never on the canonical
+  // candidate, so it must be dropped before comparing — otherwise every save
+  // looks structurally changed and dateModified bumps on no-ops.
   const storedComparable = stored
-    ? stripEmptyArrays({ ...stored, dateModified: normalizedCandidate.dateModified })
+    ? stripEmptyArrays(
+        stripPrivateFields({ ...stored, dateModified: normalizedCandidate.dateModified })
+      )
     : null;
 
   const structurallyChanged = storedComparable
@@ -602,7 +645,9 @@ export function buildProfile(
     ? false
     : (structurallyChanged || (!!stored && opt.bumpOnNoop));
 
-  const cleaned = stripEmptyArrays(candidate);
-  return { profile: cleaned, changed, effectiveSameAs };
+  // Return the object the timestamp policy above was applied to. Re-deriving
+  // from `candidate` here would discard that policy, so dateModified would
+  // never advance on an edit.
+  return { profile: normalizedCandidate, changed, effectiveSameAs };
 }
 

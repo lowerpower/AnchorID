@@ -36,6 +36,7 @@ export interface Env {
   BREVO_DOMAINS?: string;          // Comma-separated domains (e.g., "outlook.com,hotmail.com")
 
   // TTL + limits
+  ADMIN_SESSION_TTL_SECONDS?: string; // default 43200 (12h)
   LOGIN_TTL_SECONDS?: string; // default 900
   LOGIN_RL_PER_HOUR?: string; // default 3
   UPDATE_RL_PER_HOUR?: string; // default 20
@@ -53,6 +54,9 @@ export interface Env {
   // Per-UUID rate limits for claims
   CLAIM_RL_PER_HOUR?: string;      // default 10 (per UUID for claim creation)
   VERIFY_RL_PER_HOUR?: string;     // default 20 (per UUID for claim verification)
+
+  // Optional: expose the raw KV key-enumeration endpoint at /admin/debug/kv
+  ENABLE_ADMIN_DEBUG?: string; // "true" to enable
 
   // Optional: Enable claim verification notifications
   // If enabled, stores email in plaintext (as _email in profile) for notifications

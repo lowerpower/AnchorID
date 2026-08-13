@@ -28,6 +28,8 @@ import {
   handleAdminDebugKv,
   handleAdminDelete,
   handleAdminBackup,
+  hasValidAdminSession,
+  timingSafeEqual,
 } from "./admin/handlers";
 
 
@@ -43,52 +45,15 @@ import { loadClaims } from "./claims/store";
 
 import { buildProfile, mergeSameAs } from "./domain/profile";
 import { sendEmail, hasEmailConfig } from "./email";
+import { securityHeaders, secretPageHeaders } from "./http";
+import type { Env } from "./env";
 
 
-export interface Env {
-  // Required: KV storage for profiles/sessions
-  ANCHOR_KV: KVNamespace;
+// Env lives in ./env.ts. It used to be duplicated here, which meant two
+// sources of truth for security-relevant config and forced `env as any` casts
+// at every claims call site.
+export type { Env } from "./env";
 
-  // Admin secret (required for /admin/* routes)
-  // Must be explicitly set - admin routes are disabled without it.
-  ANCHOR_ADMIN_SECRET?: string;
-
-  // Legacy: still supported for backward compatibility
-  ANCHOR_ADMIN_TOKEN?: string;
-  ANCHOR_ADMIN_COOKIE?: string;
-
-  // Email providers (at least one required for magic links)
-  MAIL_SEND_SECRET?: string;       // mycal-style mailer secret
-  MYCAL_MAIL_ENDPOINT?: string;    // mycal-style mailer endpoint URL (required if using MAIL_SEND_SECRET)
-  RESEND_API_KEY?: string;         // Resend API (fallback)
-  EMAIL_FROM?: string;             // Sender address (required for Resend)
-  BREVO_API_KEY?: string;          // Brevo API key
-  BREVO_FROM?: string;             // Sender email for Brevo
-  BREVO_DOMAINS?: string;          // Comma-separated domains (e.g., "outlook.com,hotmail.com")
-
-  // TTL + limits
-  LOGIN_TTL_SECONDS?: string;    // default 900
-  LOGIN_RL_PER_HOUR?: string;    // default 3 (per email)
-  UPDATE_RL_PER_HOUR?: string;   // default 20 (per UUID)
-
-  // Per-IP rate limits
-  IP_RESOLVE_RL_PER_HOUR?: string; // default 300 (per IP for /resolve/<uuid> endpoint)
-  IP_CLAIMS_RL_PER_HOUR?: string;  // default 300 (per IP for /claims/<uuid> endpoint)
-  IP_LOGIN_RL_PER_HOUR?: string;   // default 10 (per IP for login attempts)
-  IP_EDIT_RL_PER_HOUR?: string;    // default 30 (per IP for edit page loads)
-  IP_UPDATE_RL_PER_HOUR?: string;  // default 60 (per IP for update submissions)
-  IP_CLAIM_RL_PER_HOUR?: string;   // default 30 (per IP for claim creation)
-  IP_VERIFY_RL_PER_HOUR?: string;  // default 20 (per IP for claim verification)
-  IP_ADMIN_LOGIN_RL_PER_HOUR?: string; // default 5 (per IP for admin login)
-
-  // Per-UUID rate limits for claims
-  CLAIM_RL_PER_HOUR?: string;      // default 10 (per UUID for claim creation)
-  VERIFY_RL_PER_HOUR?: string;     // default 20 (per UUID for claim verification)
-
-  // Optional: Enable claim verification notifications
-  // If enabled, stores email in plaintext (as _email in profile) for notifications
-  ENABLE_CLAIM_NOTIFICATIONS?: string; // "true" to enable
-}
 
 const FOUNDER_UUID = "4ff7ed97-b78f-4ae6-9011-5af714ee241c";
 
@@ -104,11 +69,30 @@ function requireAdmin(request: Request, env: Env): Response | null {
     return ldjson({ error: "admin_not_configured" }, 403, { "cache-control": "no-store" });
   }
 
-  if (token !== expected) {
+  if (!timingSafeEqual(token, expected)) {
     return ldjson({ error: "unauthorized" }, 401, { "cache-control": "no-store" });
   }
 
   return null;
+}
+
+/**
+ * Admin authentication for the JSON claim endpoints. Accepts either the API
+ * bearer token or a logged-in admin session cookie, so the admin UI does not
+ * have to embed the secret in page JavaScript to call these routes.
+ *
+ * Cookie auth additionally requires a CSRF header matching the CSRF cookie:
+ * the session cookie is SameSite=Strict, but this keeps the endpoints safe
+ * without relying on that alone.
+ */
+async function isAdminRequest(request: Request, env: Env): Promise<boolean> {
+  if (requireAdmin(request, env) === null) return true;
+
+  if (!(await hasValidAdminSession(request, env))) return false;
+
+  const headerToken = (request.headers.get("x-csrf-token") || "").trim();
+  const cookieToken = getCookie(request, CSRF_COOKIE) || "";
+  return Boolean(headerToken) && timingSafeEqual(cookieToken, headerToken);
 }
 
 function canonicalSameAs(u: string): string {
@@ -147,40 +131,69 @@ function wantsHtml(request: Request): boolean {
   return accept.includes("text/html") || accept.includes("application/xhtml+xml");
 }
 
-// Get admin secret (explicit ANCHOR_ADMIN_SECRET preferred)
-function getAdminSecret(env: Env): string | null {
-  const secret = (env.ANCHOR_ADMIN_SECRET || env.ANCHOR_ADMIN_COOKIE || env.ANCHOR_ADMIN_TOKEN || "").trim();
-  return secret || null;
+/**
+ * Parse an env-provided integer, falling back to `fallback` when unset or
+ * malformed. Previously a bad value produced NaN, and `NaN > limit` is false —
+ * which silently disabled the rate limit it was meant to configure.
+ */
+function intFromEnv(value: string | undefined, fallback: number): number {
+  const n = parseInt(value ?? "", 10);
+  return Number.isFinite(n) && n >= 0 ? n : fallback;
 }
 
-function requireAdminCookie(request: Request, env: Env): Response | null {
-  const expected = getAdminSecret(env);
+/** Re-issue a request with an already-consumed body so a handler can re-read it. */
+function forwardWithBody(request: Request, bodyText: string): Request {
+  return new Request(request.url, {
+    method: request.method,
+    headers: request.headers,
+    body: bodyText,
+  });
+}
 
-  // Admin routes are completely disabled if no secret is configured
-  if (!expected) {
-    return new Response(
-      "Admin interface disabled. Set ANCHOR_ADMIN_SECRET to enable.",
-      { status: 403, headers: { "content-type": "text/plain" } }
-    );
+type ClaimAuthResult =
+  | { ok: true; isAdmin: boolean; bodyText: string; targetUuid: string }
+  | { ok: false; response: Response };
+
+/**
+ * Shared authorization for /claim, /claim/verify and /claim/delete.
+ *
+ * Reads and parses the body once (malformed JSON is a 400, not an unhandled
+ * exception), then authorizes either as admin or as the owner of the target
+ * profile. Callers apply their own per-UUID rate limits for non-admins.
+ */
+async function authorizeClaimRequest(request: Request, env: Env): Promise<ClaimAuthResult> {
+  const bodyText = await request.text();
+
+  const oversized = oversizedBody(bodyText);
+  if (oversized) return { ok: false, response: oversized };
+
+  let payload: any;
+  try {
+    payload = JSON.parse(bodyText);
+  } catch {
+    return { ok: false, response: json({ error: "invalid_json" }, 400, { "cache-control": "no-store" }) };
+  }
+  if (!payload || typeof payload !== "object") {
+    return { ok: false, response: json({ error: "invalid_json" }, 400, { "cache-control": "no-store" }) };
   }
 
-  const cookie = request.headers.get("cookie") || "";
-  const m = cookie.match(/(?:^|;\s*)anchor_admin=([^;]+)/);
-  const token = m ? decodeURIComponent(m[1]) : "";
+  const targetUuid = String(payload.uuid || "").trim().toLowerCase();
 
-  if (token !== expected) {
-    return new Response(null, { status: 303, headers: { Location: "/admin/login" } });
+  if (await isAdminRequest(request, env)) {
+    return { ok: true, isAdmin: true, bodyText, targetUuid };
   }
-  return null;
-}
 
-function setAdminCookie(env: Env): string {
-  const secret = getAdminSecret(env) || "";
-  return `anchor_admin=${encodeURIComponent(secret)}; Path=/; HttpOnly; Secure; SameSite=Strict`;
-}
+  const authHeader = request.headers.get("authorization") || "";
+  const sessionToken = authHeader.replace(/^Bearer\s+/i, "").trim();
 
-function clearAdminCookie(): string {
-  return `anchor_admin=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Strict`;
+  if (sessionToken && targetUuid) {
+    const session = (await env.ANCHOR_KV.get(`login:${sessionToken}`, { type: "json" })) as any | null;
+    if (session?.uuid && String(session.uuid).toLowerCase() === targetUuid) {
+      return { ok: true, isAdmin: false, bodyText, targetUuid };
+    }
+  }
+
+  return { ok: false, response: new Response("Unauthorized", { status: 401 }) };
 }
 
 function wantsPostForm(request: Request): boolean {
@@ -207,21 +220,36 @@ function checkUrlLength(url: URL): Response | null {
   return null;
 }
 
+function tooLargeResponse(): Response {
+  return new Response("Request body too large", {
+    status: 413,
+    headers: { "content-type": "text/plain", ...securityHeaders() },
+  });
+}
+
+/**
+ * Fast rejection based on the content-length header.
+ *
+ * This is only an early-out: a chunked request omits the header entirely, so
+ * the authoritative check happens after the body is read, via
+ * `oversizedBody()` at each read site.
+ */
 async function checkRequestSize(request: Request, maxSize: number = MAX_JSON_SIZE): Promise<Response | null> {
   const contentLength = request.headers.get("content-length");
 
-  // If content-length header is present and exceeds limit, reject immediately
   if (contentLength) {
     const size = parseInt(contentLength, 10);
     if (!isNaN(size) && size > maxSize) {
-      return new Response("Request body too large", {
-        status: 413,
-        headers: { "content-type": "text/plain", ...securityHeaders() }
-      });
+      return tooLargeResponse();
     }
   }
 
   return null;
+}
+
+/** Authoritative size check for an already-read body. */
+function oversizedBody(body: string, maxSize: number = MAX_JSON_SIZE): Response | null {
+  return body.length > maxSize ? tooLargeResponse() : null;
 }
 
 // Health check endpoint
@@ -300,6 +328,22 @@ async function purgeUnverifiedProfiles(env: Env): Promise<void> {
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
+    // Last-resort guard: any unhandled throw in a handler would otherwise
+    // surface as a platform-level exception rather than a controlled response.
+    try {
+      return await route(request, env);
+    } catch (e: any) {
+      console.error("Unhandled request error:", e?.stack || String(e));
+      return json({ error: "internal_error" }, 500, { "cache-control": "no-store" });
+    }
+  },
+
+  async scheduled(_event: ScheduledEvent, env: Env, _ctx: ExecutionContext): Promise<void> {
+    await purgeUnverifiedProfiles(env);
+  },
+};
+
+async function route(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
     const path = url.pathname;
 
@@ -359,7 +403,7 @@ export default {
     const mDelete = path.match(/^\/admin\/delete\/([0-9a-f-]{36})$/i);
     if (mDelete && request.method === "POST") return handleAdminDelete(request, env, mDelete[1].toLowerCase());
 
-    if (path === "/admin/backup" && request.method === "GET") return handleAdminBackup(request, env);
+    if (path === "/admin/backup" && request.method === "POST") return handleAdminBackup(request, env);
 
     // Homepage
     if (path === "/" || path === "/index.html") {
@@ -634,6 +678,7 @@ export default {
           "content-type": "application/xml; charset=utf-8",
           "cache-control":
             "public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800",
+          ...securityHeaders(),
         },
       });
     }
@@ -649,6 +694,7 @@ export default {
           "content-type": "text/plain; charset=utf-8",
           "cache-control":
             "public, max-age=86400, s-maxage=604800",
+          ...securityHeaders(),
         },
       });
     }
@@ -664,6 +710,7 @@ export default {
           "content-type": "text/plain; charset=utf-8",
           "cache-control":
             "public, max-age=86400, s-maxage=604800",
+          ...securityHeaders(),
         },
       });
     }
@@ -680,6 +727,7 @@ https://anchorid.net/resolve/4ff7ed97-b78f-4ae6-9011-5af714ee241c
             "content-type": "text/plain; charset=utf-8",
             "cache-control":
               "public, max-age=86400, s-maxage=604800",
+          ...securityHeaders(),
           },
         }
       );
@@ -831,181 +879,75 @@ https://anchorid.net/resolve/4ff7ed97-b78f-4ae6-9011-5af714ee241c
 	// Token-gated: add/update claim (admin or user for own profile)
 	if (path === "/claim" && request.method === "POST") {
 		// Per-IP rate limit (checked first to prevent abuse)
-		const ipLimit = parseInt(env.IP_CLAIM_RL_PER_HOUR || "30", 10);
-		const ipRateLimited = await checkIpRateLimit(request, env, "ip:claim", ipLimit);
+		const ipRateLimited = await checkIpRateLimit(request, env, "ip:claim", intFromEnv(env.IP_CLAIM_RL_PER_HOUR, 30));
 		if (ipRateLimited) return ipRateLimited;
 
-		// Parse body to get UUID
-		const bodyText = await request.text();
-		const payload: any = JSON.parse(bodyText);
-		const targetUuid = String(payload.uuid || "").trim().toLowerCase();
+		const auth = await authorizeClaimRequest(request, env);
+		if (!auth.ok) return auth.response;
 
-		// Check admin auth first
-		const adminDenied = requireAdmin(request, env);
-		if (!adminDenied) {
-			// Admin has access to all profiles (skip per-UUID rate limit for admins)
-			return handlePostClaim(new Request(request.url, {
-				method: request.method,
-				headers: request.headers,
-				body: bodyText,
-			}), env as any);
-		}
-
-		// Not admin - check if user session for own profile
-		const authHeader = request.headers.get("authorization") || "";
-		const sessionToken = authHeader.replace(/^Bearer\s+/i, "").trim();
-
-		if (sessionToken) {
-			const session = (await env.ANCHOR_KV.get(`login:${sessionToken}`, { type: "json" })) as any | null;
-			if (session?.uuid && String(session.uuid).toLowerCase() === targetUuid) {
-				// User authenticated for their own profile - check per-UUID rate limit
-				const maxPerHour = parseInt(env.CLAIM_RL_PER_HOUR || "10", 10);
-				const rl = await incrWithTtl(env.ANCHOR_KV, `rl:claim:${targetUuid}`, 3600);
-				if (rl > maxPerHour) {
-					return json({ error: "rate_limited", message: "Too many claim operations" }, 429, { "cache-control": "no-store", "retry-after": "3600" });
-				}
-
-				return handlePostClaim(new Request(request.url, {
-					method: request.method,
-					headers: request.headers,
-					body: bodyText,
-				}), env as any);
+		// Per-UUID rate limit (admins are exempt)
+		if (!auth.isAdmin) {
+			const rl = await incrWithTtl(env.ANCHOR_KV, `rl:claim:${auth.targetUuid}`, 3600);
+			if (rl > intFromEnv(env.CLAIM_RL_PER_HOUR, 10)) {
+				return json({ error: "rate_limited", message: "Too many claim operations" }, 429, { "cache-control": "no-store", "retry-after": "3600" });
 			}
 		}
 
-		return new Response("Unauthorized", { status: 401 });
+		return handlePostClaim(forwardWithBody(request, auth.bodyText), env);
 	}
 
 	// Token-gated: verify claim (admin or user for own profile)
 	if (path === "/claim/verify" && request.method === "POST") {
 		// Per-IP rate limit (checked first to prevent abuse)
-		const ipLimit = parseInt(env.IP_VERIFY_RL_PER_HOUR || "20", 10);
-		const ipRateLimited = await checkIpRateLimit(request, env, "ip:verify", ipLimit);
+		const ipRateLimited = await checkIpRateLimit(request, env, "ip:verify", intFromEnv(env.IP_VERIFY_RL_PER_HOUR, 20));
 		if (ipRateLimited) return ipRateLimited;
 
-		// Parse body to get UUID
-		const bodyText = await request.text();
-		const payload: any = JSON.parse(bodyText);
-		const targetUuid = String(payload.uuid || "").trim().toLowerCase();
+		const auth = await authorizeClaimRequest(request, env);
+		if (!auth.ok) return auth.response;
 
-		// Check admin auth first
-		const adminDenied = requireAdmin(request, env);
-		if (!adminDenied) {
-			// Admin has access to all profiles (skip per-UUID rate limit for admins)
-			return handlePostClaimVerify(new Request(request.url, {
-				method: request.method,
-				headers: request.headers,
-				body: bodyText,
-			}), env as any);
-		}
-
-		// Not admin - check if user session for own profile
-		const authHeader = request.headers.get("authorization") || "";
-		const sessionToken = authHeader.replace(/^Bearer\s+/i, "").trim();
-
-		if (sessionToken) {
-			const session = (await env.ANCHOR_KV.get(`login:${sessionToken}`, { type: "json" })) as any | null;
-			if (session?.uuid && String(session.uuid).toLowerCase() === targetUuid) {
-				// User authenticated for their own profile - check per-UUID rate limit
-				const maxPerHour = parseInt(env.VERIFY_RL_PER_HOUR || "20", 10);
-				const rl = await incrWithTtl(env.ANCHOR_KV, `rl:verify:${targetUuid}`, 3600);
-				if (rl > maxPerHour) {
-					return json({ error: "rate_limited", message: "Too many verification attempts" }, 429, { "cache-control": "no-store", "retry-after": "3600" });
-				}
-
-				return handlePostClaimVerify(new Request(request.url, {
-					method: request.method,
-					headers: request.headers,
-					body: bodyText,
-				}), env as any);
+		if (!auth.isAdmin) {
+			const rl = await incrWithTtl(env.ANCHOR_KV, `rl:verify:${auth.targetUuid}`, 3600);
+			if (rl > intFromEnv(env.VERIFY_RL_PER_HOUR, 20)) {
+				return json({ error: "rate_limited", message: "Too many verification attempts" }, 429, { "cache-control": "no-store", "retry-after": "3600" });
 			}
 		}
 
-		return new Response("Unauthorized", { status: 401 });
+		return handlePostClaimVerify(forwardWithBody(request, auth.bodyText), env);
 	}
 
 	// Token-gated: delete claim (admin or user for own profile)
 	if (path === "/claim/delete" && request.method === "POST") {
 		// Per-IP rate limit (same as claim creation to prevent deletion spam)
-		const ipLimit = parseInt(env.IP_CLAIM_RL_PER_HOUR || "30", 10);
-		const ipRateLimited = await checkIpRateLimit(request, env, "ip:claim", ipLimit);
+		const ipRateLimited = await checkIpRateLimit(request, env, "ip:claim", intFromEnv(env.IP_CLAIM_RL_PER_HOUR, 30));
 		if (ipRateLimited) return ipRateLimited;
 
-		// Parse body to get UUID
-		const bodyText = await request.text();
-		const payload: any = JSON.parse(bodyText);
-		const targetUuid = String(payload.uuid || "").trim().toLowerCase();
+		const auth = await authorizeClaimRequest(request, env);
+		if (!auth.ok) return auth.response;
 
-		// Track auth method for audit logging
-		let authMethod: "admin" | "session_token" = "session_token";
-
-		// Check admin auth first
-		const adminDenied = requireAdmin(request, env);
-		if (!adminDenied) {
-			authMethod = "admin";
-			// Admin has access to all profiles (skip per-UUID rate limit for admins)
-			const response = await handlePostClaimDelete(new Request(request.url, {
-				method: request.method,
-				headers: request.headers,
-				body: bodyText,
-			}), env as any);
-
-			// Add audit log if deletion was successful
-			if (response.ok) {
-				const result: any = await response.clone().json();
-				await appendAuditLog(
-					env,
-					targetUuid,
-					request,
-					"claim_deleted",
-					authMethod,
-					[],
-					`Deleted ${result.deletedClaim?.type} claim for ${result.deletedClaim?.url}`
-				);
-			}
-
-			return response;
-		}
-
-		// Not admin - check if user session for own profile
-		const authHeader = request.headers.get("authorization") || "";
-		const sessionToken = authHeader.replace(/^Bearer\s+/i, "").trim();
-
-		if (sessionToken) {
-			const session = (await env.ANCHOR_KV.get(`login:${sessionToken}`, { type: "json" })) as any | null;
-			if (session?.uuid && String(session.uuid).toLowerCase() === targetUuid) {
-				// User authenticated for their own profile - use moderate rate limit for deletions
-				const maxPerHour = parseInt(env.CLAIM_RL_PER_HOUR || "10", 10);
-				const rl = await incrWithTtl(env.ANCHOR_KV, `rl:claim:${targetUuid}`, 3600);
-				if (rl > maxPerHour) {
-					return json({ error: "rate_limited", message: "Too many claim operations" }, 429, { "cache-control": "no-store", "retry-after": "3600" });
-				}
-
-				const response = await handlePostClaimDelete(new Request(request.url, {
-					method: request.method,
-					headers: request.headers,
-					body: bodyText,
-				}), env as any);
-
-				// Add audit log if deletion was successful
-				if (response.ok) {
-					const result: any = await response.clone().json();
-					await appendAuditLog(
-						env,
-						targetUuid,
-						request,
-						"claim_deleted",
-						authMethod,
-						[],
-						`Deleted ${result.deletedClaim?.type} claim for ${result.deletedClaim?.url}`
-					);
-				}
-
-				return response;
+		if (!auth.isAdmin) {
+			const rl = await incrWithTtl(env.ANCHOR_KV, `rl:claim:${auth.targetUuid}`, 3600);
+			if (rl > intFromEnv(env.CLAIM_RL_PER_HOUR, 10)) {
+				return json({ error: "rate_limited", message: "Too many claim operations" }, 429, { "cache-control": "no-store", "retry-after": "3600" });
 			}
 		}
 
-		return new Response("Unauthorized", { status: 401 });
+		const response = await handlePostClaimDelete(forwardWithBody(request, auth.bodyText), env);
+
+		// Add audit log if deletion was successful
+		if (response.ok) {
+			const result: any = await response.clone().json();
+			await appendAuditLog(
+				env,
+				auth.targetUuid,
+				request,
+				"claim_deleted",
+				auth.isAdmin ? "admin" : "session_token",
+				[],
+				`Deleted ${result.deletedClaim?.type} claim for ${result.deletedClaim?.url}`
+			);
+		}
+
+		return response;
 	}
 
     // Resolver (v1): /resolve/<uuid>
@@ -1061,12 +1003,7 @@ https://anchorid.net/resolve/4ff7ed97-b78f-4ae6-9011-5af714ee241c
     }
 
     return new Response("Not Found", { status: 404 });
-  },
-
-  async scheduled(_event: ScheduledEvent, env: Env, _ctx: ExecutionContext): Promise<void> {
-    await purgeUnverifiedProfiles(env);
-  },
-};
+}
 
 // ------------------ Routes ------------------
 async function handleResolve(request: Request, env: Env): Promise<Response> {
@@ -1311,6 +1248,7 @@ async function handleSignupPage(request: Request, env: Env): Promise<Response> {
   const headers: Record<string, string> = {
     "content-type": "text/html; charset=utf-8",
     "cache-control": "no-store",
+    ...securityHeaders(),
   };
   if (needsSet) {
     headers["set-cookie"] = setCsrfCookie(csrfToken);
@@ -1318,6 +1256,13 @@ async function handleSignupPage(request: Request, env: Env): Promise<Response> {
 
   return new Response(html, { headers });
 }
+
+// Single response used for every /create outcome so the page cannot be used to
+// test whether an address is already registered.
+const SIGNUP_RESPONSE_TITLE = "Check Your Email";
+const SIGNUP_RESPONSE_BODY =
+  "If this email can be registered, you'll receive a setup link shortly. " +
+  "If you already have an AnchorID, use the login page to request an edit link.";
 
 // POST /signup - Create new profile (public)
 async function handleSignup(request: Request, env: Env): Promise<Response> {
@@ -1357,12 +1302,9 @@ async function handleSignup(request: Request, env: Env): Promise<Response> {
   // Check if email already registered
   const existingUuid = await env.ANCHOR_KV.get(`email:${emailHash}`);
   if (existingUuid) {
-    // Don't reveal if email exists - send "check your email" message either way
-    return htmlSuccess(
-      "Check Your Email",
-      "If this email is not already registered, you'll receive a setup link shortly. If you already have an AnchorID, use the login page to request an edit link.",
-      email
-    );
+    // Identical response to the success path below — a different message here
+    // is an account-existence oracle.
+    return htmlSuccess(SIGNUP_RESPONSE_TITLE, SIGNUP_RESPONSE_BODY, email);
   }
 
   // Create new profile
@@ -1426,11 +1368,7 @@ async function handleSignup(request: Request, env: Env): Promise<Response> {
     "If you did not request this, you can ignore this email.",
   ].join("\n"));
 
-  return htmlSuccess(
-    "Check Your Email",
-    "We've sent you a setup link. Click it to complete your AnchorID and receive your backup recovery token.",
-    email
-  );
+  return htmlSuccess(SIGNUP_RESPONSE_TITLE, SIGNUP_RESPONSE_BODY, email);
 }
 
 // GET /setup?token=...&uuid=... - Complete signup and show backup token
@@ -1445,9 +1383,10 @@ async function handleSetupPage(request: Request, env: Env): Promise<Response> {
     return new Response("Missing token or uuid", { status: 400 });
   }
 
-  // Validate token
+  // Validate token. Must be a setup token specifically — an ordinary
+  // magic-link session should not reach the backup-token disclosure page.
   const session = await env.ANCHOR_KV.get(`login:${token}`, { type: "json" }) as any | null;
-  if (!session?.uuid || session.uuid !== uuid) {
+  if (!session?.uuid || String(session.uuid).toLowerCase() !== uuid || !session.isSetup) {
     return new Response("Link expired or invalid", { status: 410 });
   }
 
@@ -1632,6 +1571,9 @@ window.addEventListener('beforeunload', function(e) {
     headers: {
       "content-type": "text/html; charset=utf-8",
       "cache-control": "no-store",
+      // This page renders the plaintext backup token and is reached via a URL
+      // containing the setup token — no-referrer keeps that out of Referer.
+      ...secretPageHeaders(),
     },
   });
 }
@@ -1805,6 +1747,7 @@ function handleBackupLogin(e) {
   const headers: Record<string, string> = {
     "content-type": "text/html; charset=utf-8",
     "cache-control": "no-store",
+    ...securityHeaders(),
   };
   if (needsSet) {
     headers["set-cookie"] = setCsrfCookie(csrfToken);
@@ -2518,8 +2461,8 @@ async function submitForm(e){
   const headers: Record<string, string> = {
     "content-type": "text/html; charset=utf-8",
     "cache-control": "no-store",
-    "x-content-type-options": "nosniff",
-    "referrer-policy": "no-referrer",
+    // Renders the live session token and is reached via a URL containing it.
+    ...secretPageHeaders(),
   };
   if (needsCsrfCookie) {
     headers["set-cookie"] = setCsrfCookie(csrfToken);
@@ -2537,9 +2480,16 @@ async function handleUpdate(request: Request, env: Env): Promise<Response> {
   const ipRateLimited = await checkIpRateLimit(request, env, "ip:update", ipLimit);
   if (ipRateLimited) return ipRateLimited;
 
-  const body = (await request.json().catch(() => null)) as
-    | { token?: string; _csrf?: string; patch?: any }
-    | null;
+  const rawBody = await request.text();
+  const oversized = oversizedBody(rawBody);
+  if (oversized) return oversized;
+
+  let body: { token?: string; _csrf?: string; patch?: any } | null = null;
+  try {
+    body = JSON.parse(rawBody);
+  } catch {
+    body = null;
+  }
 
   const token = (body?.token || "").trim();
   const csrfFromBody = (body?._csrf || "").trim();
@@ -2645,7 +2595,9 @@ function getCsrfToken(request: Request): string | null {
 }
 
 function setCsrfCookie(token: string): string {
-  return `${CSRF_COOKIE}=${encodeURIComponent(token)}; Path=/; Secure; SameSite=Strict`;
+  // HttpOnly: no client script reads this cookie — the token is delivered to
+  // forms in a hidden field, so keeping it out of JS costs nothing.
+  return `${CSRF_COOKIE}=${encodeURIComponent(token)}; Path=/; HttpOnly; Secure; SameSite=Strict`;
 }
 
 function ensureCsrfToken(request: Request): { token: string; needsSet: boolean } {
@@ -2669,17 +2621,6 @@ function validateCsrfFromJson(request: Request, csrfFromBody: string): boolean {
 
 function isUuid(s: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(s);
-}
-
-// Security headers applied to all responses
-function securityHeaders(): Record<string, string> {
-  return {
-    "x-content-type-options": "nosniff",
-    "x-frame-options": "DENY",
-    "referrer-policy": "strict-origin-when-cross-origin",
-    "permissions-policy": "interest-cohort=()",
-    "content-security-policy": "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; base-uri 'self'; form-action 'self'",
-  };
 }
 
 function json(obj: unknown, status = 200, extraHeaders: Record<string, string> = {}) {
@@ -2721,6 +2662,23 @@ async function sha256Hex(input: string): Promise<string> {
   return [...new Uint8Array(hash)].map(b => b.toString(16).padStart(2, "0")).join("");
 }
 
+/**
+ * Increment a counter in KV.
+ *
+ * KNOWN LIMITATION — this is a non-atomic get→increment→put over an eventually
+ * consistent store, so it is abuse-dampening, not a security control:
+ *
+ *  - Concurrent requests all read the same value and all write value+1, so a
+ *    burst of parallel requests advances the counter by 1 rather than by N.
+ *  - KV reads are edge-cached, so counters can be read stale across colos.
+ *
+ * Do not rely on this for anything that must hold under an active attacker —
+ * in particular the admin-login limiter. See docs/threat-model.md. Fixing it
+ * properly needs a Durable Object or the Workers rate-limiting binding.
+ *
+ * Note the tests exercise this under miniflare, whose KV is strongly
+ * consistent, so they pass regardless of the above.
+ */
 async function incrWithTtl(kv: KVNamespace, key: string, ttlSeconds: number): Promise<number> {
   const cur = await kv.get(key);
   const n = (cur ? parseInt(cur, 10) : 0) + 1;

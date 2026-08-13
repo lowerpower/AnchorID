@@ -16,10 +16,12 @@
 
 import type { Env } from "../env";
 import type { Claim } from "./types";
+import { securityHeaders } from "../http";
 import { nowIso, isUuid, normalizeUrl, normalizeIdentityUrl, loadClaims, saveClaims, upsertClaim } from "./store";
 import {
   claimIdForWebsite,
   claimIdForGitHub,
+  parseGitHubProfile,
   claimIdForDns,
   claimIdForPublic,
   buildWellKnownProof,
@@ -38,16 +40,6 @@ function resolverUrlFor(uuid: string): string {
   return `https://anchorid.net/resolve/${uuid}`;
 }
 
-// Security headers for all responses
-function securityHeaders(): Record<string, string> {
-  return {
-    "x-content-type-options": "nosniff",
-    "x-frame-options": "DENY",
-    "referrer-policy": "strict-origin-when-cross-origin",
-    "permissions-policy": "interest-cohort=()",
-    "content-security-policy": "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; base-uri 'self'; form-action 'self'",
-  };
-}
 
 
 export async function handleGetClaims(
@@ -200,7 +192,10 @@ export async function handlePostClaim(request: Request,   env: Env): Promise<Res
   const payload: any = await request.json().catch(() => null);
   if (!payload) return new Response("Bad JSON", { status: 400 });
 
-  const uuid = String(payload.uuid || "").trim();
+  // Lowercase to match the router's authorization check and the resolver's key
+  // form — otherwise a mixed-case UUID writes to claims:<MixedCase>, which
+  // /resolve never reads.
+  const uuid = String(payload.uuid || "").trim().toLowerCase();
   const type = String(payload.type || "").trim();
   // normalize FIRST, before building ids or proofs (except for public/social, which needs special handling)
   const url = (type === "public" || type === "social") ? String(payload.url || "").trim() : normalizeIdentityUrl(String(payload.url || ""));
@@ -216,25 +211,48 @@ export async function handlePostClaim(request: Request,   env: Env): Promise<Res
   let claim: Claim;
 
   if (type === "website") {
+    // The proof only demonstrates control of the host, so the claim must be
+    // stored as the host — not as an arbitrary path/query the .well-known file
+    // says nothing about.
+    const validation = validateProfileUrl(url);
+    if (!validation.ok) {
+      return new Response(`Invalid URL: ${validation.error}`, { status: 400 });
+    }
+    const host = validation.url!.hostname.toLowerCase();
+    const canonicalUrl = `https://${host}`;
 
-    const id = claimIdForWebsite(url);
-    const proof = buildWellKnownProof(url, resolverUrl);
+    const id = claimIdForWebsite(canonicalUrl);
+    const proof = buildWellKnownProof(canonicalUrl, resolverUrl);
     claim = {
       id,
       type: "website",
-      url,
+      url: canonicalUrl,
       status: "self_asserted",
       proof,
       createdAt: now,
       updatedAt: now,
     };
   } else if (type === "github") {
-    const id = claimIdForGitHub(url);
-    const proof = buildGitHubReadmeProof(url, resolverUrl);
+    // Must actually be a github.com profile URL. The proof is fetched from
+    // that user's README, so accepting any host would publish a verified
+    // sameAs for a domain the claimant does not control.
+    const parsed = parseGitHubProfile(url);
+    if (!parsed) {
+      return new Response(
+        "Invalid GitHub profile URL. Expected https://github.com/<username>",
+        { status: 400 }
+      );
+    }
+
+    const proof = buildGitHubReadmeProof(parsed.canonicalUrl, resolverUrl);
+    if (!proof) {
+      return new Response("Invalid GitHub profile URL", { status: 400 });
+    }
+
     claim = {
-      id,
+      id: claimIdForGitHub(parsed.canonicalUrl),
       type: "github",
-      url,
+      url: parsed.canonicalUrl,
       status: "self_asserted",
       proof,
       createdAt: now,
@@ -265,8 +283,14 @@ export async function handlePostClaim(request: Request,   env: Env): Promise<Res
     const id = claimIdForDns(qname);
     const proof = buildDnsProof(qname, uuid);
 
-    // Use the base domain as the url for display
-    const displayUrl = domain.startsWith("_anchorid.") ? domain.slice(10) : domain;
+    // Store an absolute URL. A bare domain fails `new URL()` in
+    // canonicalizeUrl, so verified DNS claims were silently dropped from the
+    // published sameAs — discarding the strongest proof type in the system.
+    const baseDomain = domain.startsWith("_anchorid.") ? domain.slice(10) : domain;
+    if (!baseDomain || !baseDomain.includes(".")) {
+      return new Response("Invalid domain", { status: 400 });
+    }
+    const displayUrl = `https://${baseDomain}`;
 
     claim = {
       id,

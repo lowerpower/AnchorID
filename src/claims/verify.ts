@@ -25,15 +25,44 @@ export function claimIdForWebsite(url: string): string {
   }
 }
 
-export function claimIdForGitHub(url: string): string {
+/** GitHub login rules: alphanumeric or single hyphens, max 39 chars. */
+const GITHUB_LOGIN_RE = /^[a-z\d](?:[a-z\d]|-(?=[a-z\d])){0,38}$/i;
+
+/**
+ * Extract the GitHub username from a profile URL.
+ *
+ * Returns null unless the URL is actually on github.com. Previously only
+ * `pathname[0]` was used and the hostname was ignored entirely, so a claim on
+ * `https://any-host.example/<name>` was "proven" by the README of
+ * `github.com/<name>` — letting anyone publish a verified sameAs pointing at a
+ * domain they do not control.
+ */
+export function parseGitHubProfile(url: string): { user: string; canonicalUrl: string } | null {
+  let u: URL;
   try {
-    const u = new URL(url);
-    const parts = u.pathname.split("/").filter(Boolean);
-    const user = (parts[0] || "").toLowerCase();
-    return user ? `github:${user}` : `github:${url}`;
+    u = new URL(url);
   } catch {
-    return `github:${url}`;
+    return null;
   }
+
+  if (u.protocol !== "https:" && u.protocol !== "http:") return null;
+
+  const host = u.hostname.toLowerCase();
+  if (host !== "github.com" && host !== "www.github.com") return null;
+
+  const parts = u.pathname.split("/").filter(Boolean);
+  const user = (parts[0] || "").toLowerCase();
+  if (!user || !GITHUB_LOGIN_RE.test(user)) return null;
+
+  // Reject deep links (repos, gists, settings) — this claim is about a profile.
+  if (parts.length > 1) return null;
+
+  return { user, canonicalUrl: `https://github.com/${user}` };
+}
+
+export function claimIdForGitHub(url: string): string {
+  const parsed = parseGitHubProfile(url);
+  return parsed ? `github:${parsed.user}` : `github:${url}`;
 }
 
 export function claimIdForDns(qname: string): string {
@@ -53,19 +82,19 @@ export function buildWellKnownProof(domainOrUrl: string, resolverUrl: string): C
   };
 }
 
-export function buildGitHubReadmeProof(githubProfileUrl: string, resolverUrl: string): ClaimProof {
-  let user = "";
-  try {
-    const u = new URL(githubProfileUrl);
-    const parts = u.pathname.split("/").filter(Boolean);
-    user = (parts[0] || "").toLowerCase();
-  } catch {}
+export function buildGitHubReadmeProof(githubProfileUrl: string, resolverUrl: string): ClaimProof | null {
+  const parsed = parseGitHubProfile(githubProfileUrl);
+  if (!parsed) return null;
 
-  const raw = user
-    ? `https://raw.githubusercontent.com/${user}/${user}/main/README.md`
-    : githubProfileUrl;
-
-  return { kind: "github_readme", url: raw, mustContain: resolverUrl };
+  const { user } = parsed;
+  return {
+    kind: "github_readme",
+    url: `https://raw.githubusercontent.com/${user}/${user}/main/README.md`,
+    // Profile READMEs live on whichever branch the repo defaults to; try the
+    // other common default rather than silently failing master-based repos.
+    fallbackUrls: [`https://raw.githubusercontent.com/${user}/${user}/master/README.md`],
+    mustContain: resolverUrl,
+  };
 }
 
 export function buildDnsProof(qname: string, uuid: string): ClaimProof {
@@ -96,6 +125,53 @@ export function parseFediverseHandle(input: string): string | null {
  * Validate URL for SSRF protection
  * Blocks localhost, private IPs, and cloud metadata endpoints
  */
+/** Parse a dotted-quad IPv4 literal, or null if it isn't one. */
+function parseIpv4(host: string): number[] | null {
+  const m = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (!m) return null;
+  const octets = m.slice(1).map((o) => parseInt(o, 10));
+  return octets.every((o) => o >= 0 && o <= 255) ? octets : null;
+}
+
+function isPrivateIpv4(o: number[]): boolean {
+  const [a, b] = o;
+  if (a === 0) return true;                       // 0.0.0.0/8
+  if (a === 10) return true;                      // private
+  if (a === 127) return true;                     // loopback
+  if (a === 169 && b === 254) return true;        // link-local + cloud metadata
+  if (a === 172 && b >= 16 && b <= 31) return true;
+  if (a === 192 && b === 168) return true;
+  if (a === 192 && b === 0) return true;          // 192.0.0.0/24 protocol assignments
+  if (a === 100 && b >= 64 && b <= 127) return true; // CGNAT 100.64.0.0/10
+  if (a === 198 && (b === 18 || b === 19)) return true; // benchmarking
+  if (a >= 224) return true;                      // multicast + reserved
+  return false;
+}
+
+/**
+ * Reject IPv6 literals wholesale.
+ *
+ * Public identity profiles are not served from bare IPv6 literals, and
+ * enumerating the unsafe ranges (::1, ::ffff:127.0.0.1, fc00::/7, fe80::/10,
+ * ::) correctly is easy to get subtly wrong. A blanket reject is the safer
+ * default here.
+ */
+function isIpv6Literal(host: string): boolean {
+  return host.startsWith("[") || host.includes(":");
+}
+
+/** Internal-only TLDs that should never be fetched. */
+const BLOCKED_SUFFIXES = [".internal", ".local", ".localhost", ".localdomain", ".home.arpa"];
+
+/**
+ * Validate a URL before any outbound fetch (SSRF guard).
+ *
+ * Note this cannot stop DNS rebinding or a public name that resolves to a
+ * private address — Workers gives no hook between resolution and connect. On
+ * the production edge, RFC1918 and loopback are not routable from a Worker,
+ * which covers the residual risk; this check is what stops the direct attempts
+ * and anything reachable via redirect.
+ */
 export function validateProfileUrl(urlString: string): { ok: boolean; error?: string; url?: URL } {
   let url: URL;
 
@@ -112,35 +188,41 @@ export function validateProfileUrl(urlString: string): { ok: boolean; error?: st
 
   const hostname = url.hostname.toLowerCase();
 
-  // Block localhost and loopback
-  if (hostname === 'localhost' || hostname === '0.0.0.0') {
+  if (!hostname) return { ok: false, error: "invalid_url" };
+
+  if (isIpv6Literal(hostname)) {
+    return { ok: false, error: "blocked_private_ip" };
+  }
+
+  if (hostname === 'localhost' || hostname === 'localhost.localdomain') {
     return { ok: false, error: "blocked_localhost" };
   }
 
-  // Block 127.x.x.x
-  if (hostname.startsWith('127.')) {
-    return { ok: false, error: "blocked_loopback" };
+  if (BLOCKED_SUFFIXES.some((s) => hostname.endsWith(s))) {
+    return { ok: false, error: "blocked_internal_host" };
   }
 
-  // Block AWS/GCP metadata endpoints
-  if (hostname === '169.254.169.254' || hostname.startsWith('169.254.')) {
+  // Cloud metadata services addressed by name
+  if (hostname === 'metadata.google.internal' || hostname === 'metadata') {
     return { ok: false, error: "blocked_metadata_endpoint" };
   }
 
-  // Block private IP ranges (10.x, 192.168.x, 172.16-31.x)
-  if (hostname.startsWith('10.')) {
-    return { ok: false, error: "blocked_private_ip" };
-  }
-  if (hostname.startsWith('192.168.')) {
-    return { ok: false, error: "blocked_private_ip" };
-  }
-  // 172.16.0.0 - 172.31.255.255
-  const match172 = hostname.match(/^172\.(\d+)\./);
-  if (match172) {
-    const octet = parseInt(match172[1], 10);
-    if (octet >= 16 && octet <= 31) {
+  const ipv4 = parseIpv4(hostname);
+  if (ipv4) {
+    if (ipv4[0] === 169 && ipv4[1] === 254) {
+      return { ok: false, error: "blocked_metadata_endpoint" };
+    }
+    if (ipv4[0] === 127) {
+      return { ok: false, error: "blocked_loopback" };
+    }
+    if (isPrivateIpv4(ipv4)) {
       return { ok: false, error: "blocked_private_ip" };
     }
+  }
+
+  // A hostname with no dot is a bare/internal name (e.g. "intranet").
+  if (!hostname.includes(".")) {
+    return { ok: false, error: "blocked_internal_host" };
   }
 
   return { ok: true, url };
@@ -160,10 +242,29 @@ export function claimIdForPublic(url: string): string {
 // Backward compatibility: keep old name as alias
 export const claimIdForSocial = claimIdForPublic;
 
+/**
+ * Strip query and fragment from a profile URL.
+ *
+ * The proof is an unanchored substring search over the fetched page, so a
+ * retained query string let any site that reflects a parameter "prove" a
+ * claim — e.g. https://victim.example/search?q=<resolver-url>. A profile page
+ * is identified by its path; the query is never part of that identity.
+ */
+export function stripQueryAndFragment(inputUrl: string): string {
+  try {
+    const u = new URL(inputUrl);
+    u.search = "";
+    u.hash = "";
+    return u.toString();
+  } catch {
+    return inputUrl;
+  }
+}
+
 export function buildPublicProof(inputUrl: string, resolverUrl: string): ClaimProof {
   return {
     kind: "profile_page",
-    url: inputUrl,
+    url: stripQueryAndFragment(inputUrl),
     mustContain: resolverUrl,
   };
 }
@@ -171,16 +272,100 @@ export function buildPublicProof(inputUrl: string, resolverUrl: string): ClaimPr
 // Backward compatibility: keep old name as alias
 export const buildSocialProof = buildPublicProof;
 
-async function fetchText(url: string): Promise<{ ok: boolean; status: number; text: string }> {
-  const r = await fetch(url, {
-    method: "GET",
-    headers: {
-      "user-agent": "AnchorID-ClaimVerifier/1.0",
-      accept: "text/plain,text/*;q=0.9,*/*;q=0.1",
-    },
-  });
-  const text = await r.text();
-  return { ok: r.ok, status: r.status, text };
+const PROOF_FETCH_TIMEOUT_MS = 5000;
+const PROOF_MAX_BYTES = 256 * 1024;
+const PROOF_MAX_REDIRECTS = 3;
+
+/** Read at most `maxBytes` from a response body, then stop. */
+async function readCapped(response: Response, maxBytes: number): Promise<string> {
+  if (!response.body) return "";
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  try {
+    while (total < maxBytes) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (value) {
+        chunks.push(value);
+        total += value.length;
+      }
+    }
+  } finally {
+    await reader.cancel().catch(() => {});
+  }
+
+  const buf = new Uint8Array(Math.min(total, maxBytes));
+  let offset = 0;
+  for (const c of chunks) {
+    if (offset >= buf.length) break;
+    const slice = c.subarray(0, buf.length - offset);
+    buf.set(slice, offset);
+    offset += slice.length;
+  }
+  return new TextDecoder().decode(buf);
+}
+
+/**
+ * Fetch a proof document with SSRF, redirect, timeout and size protection.
+ *
+ * Every hop is re-validated: `redirect: "manual"` means an allowed host cannot
+ * bounce us to a private address or downgrade to http. The previous
+ * implementation used the platform default (follow) with no validation at
+ * fetch time at all.
+ */
+async function safeFetchText(
+  url: string
+): Promise<{ ok: boolean; status: number; text: string; error?: string }> {
+  let current = url;
+
+  for (let hop = 0; hop <= PROOF_MAX_REDIRECTS; hop++) {
+    const check = validateProfileUrl(current);
+    if (!check.ok) {
+      return { ok: false, status: 0, text: "", error: check.error || "blocked_url" };
+    }
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), PROOF_FETCH_TIMEOUT_MS);
+
+    let r: Response;
+    try {
+      r = await fetch(current, {
+        method: "GET",
+        redirect: "manual",
+        signal: controller.signal,
+        headers: {
+          "user-agent": "AnchorID-ClaimVerifier/1.0",
+          accept: "text/plain,text/*;q=0.9,*/*;q=0.1",
+        },
+      });
+    } catch (e: any) {
+      clearTimeout(timer);
+      const aborted = e?.name === "AbortError";
+      return { ok: false, status: 0, text: "", error: aborted ? "timeout" : "fetch_error" };
+    }
+
+    try {
+      if (r.status >= 300 && r.status < 400) {
+        const location = r.headers.get("location");
+        if (!location) return { ok: false, status: r.status, text: "", error: "redirect_no_location" };
+        // Resolve relative redirects against the current URL, then re-validate.
+        try {
+          current = new URL(location, current).toString();
+        } catch {
+          return { ok: false, status: r.status, text: "", error: "redirect_invalid" };
+        }
+        continue;
+      }
+
+      const text = await readCapped(r, PROOF_MAX_BYTES);
+      return { ok: r.ok, status: r.status, text };
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  return { ok: false, status: 0, text: "", error: "too_many_redirects" };
 }
 
 // DNS TXT record normalization per spec
@@ -512,21 +697,44 @@ export async function verifyClaim(
 https://anchorid.net/resolve/4ff7ed97-b78f-4ae6-9011-5af714ee241c
 `;
     } else {
-      // Normal case: fetch from external URL
-      const result = await fetchText(claim.proof.url);
-      if (!result.ok) return { status: "failed", failReason: `fetch_failed:${result.status}` };
-      text = result.text;
+      // Normal case: fetch from external URL. Try the primary proof URL, then
+      // any declared fallbacks (e.g. master vs main for GitHub READMEs).
+      const candidates = [claim.proof.url, ...((claim.proof as any).fallbackUrls || [])];
+      let lastFailure = "proof_not_found";
+      let fetched = false;
+      text = "";
+
+      for (const candidate of candidates) {
+        const result = await safeFetchText(candidate);
+        if (result.ok) {
+          text = result.text;
+          fetched = true;
+          break;
+        }
+        lastFailure = result.error
+          ? `fetch_blocked:${result.error}`
+          : `fetch_failed:${result.status}`;
+      }
+
+      if (!fetched) return { status: "failed", failReason: lastFailure };
     }
 
     // First check for full resolver URL
     if (text.includes(claim.proof.mustContain)) return { status: "verified" };
 
-    // For social/public profile proofs, also accept UUID-only (space-constrained environments)
+    // For public profile proofs, also accept a UUID-only marker for
+    // space-constrained bios. It must appear in a deliberate form — a bare UUID
+    // anywhere on the page (a comment, a paste, a log line) is not a claim of
+    // ownership, and matching one made any page mentioning the UUID "verify".
     if (claim.proof.kind === "profile_page") {
-      // Extract UUID from resolver URL (format: https://anchorid.net/resolve/UUID)
       const uuidMatch = claim.proof.mustContain.match(/([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})/i);
-      if (uuidMatch && text.toLowerCase().includes(uuidMatch[1].toLowerCase())) {
-        return { status: "verified" };
+      if (uuidMatch) {
+        const uuid = uuidMatch[1].toLowerCase();
+        const haystack = text.toLowerCase();
+        const markers = [`urn:uuid:${uuid}`, `anchorid=${uuid}`, `anchorid:${uuid}`];
+        if (markers.some((m) => haystack.includes(m))) {
+          return { status: "verified" };
+        }
       }
     }
 

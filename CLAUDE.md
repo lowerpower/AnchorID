@@ -75,7 +75,8 @@ See `docs/security-testing.md` for detailed testing guide and manual verificatio
 AnchorID/
 ├── src/
 │   ├── index.ts                 # Main router, all HTTP handlers
-│   ├── env.ts                   # Environment type definitions
+│   ├── env.ts                   # Environment type definitions (single source of truth)
+│   ├── http.ts                  # Shared security headers
 │   ├── domain/
 │   │   └── profile/
 │   │       └── anchorid_profile.ts  # Core profile logic (buildProfile, canonicalizeUrl, mergeSameAs)
@@ -97,11 +98,14 @@ AnchorID/
 │   ├── why-anchorid-is-deliberately-boring.md  # Design philosophy
 │   └── wrangler-kv-gotchas.md   # KV notes
 ├── test/
-│   └── index.spec.ts            # Tests
+│   ├── index.spec.ts            # Smoke tests
+│   ├── security.spec.ts         # Auth, CSRF, rate limit, input validation
+│   ├── regressions.spec.ts      # Security-audit regression locks
+│   └── load.spec.ts             # Load / abuse tests
 ├── CLAUDE.md                    # This file
 ├── README.md                    # Public readme
 ├── todo.md                      # MVP checklist
-├── wrangler.json                # Cloudflare Workers config
+├── wrangler.jsonc               # Cloudflare Workers config (single config; .toml removed)
 └── package.json
 ```
 
@@ -147,6 +151,7 @@ AnchorID/
 | `GET /admin/edit/<uuid>` | `handleAdminEdit()` | Edit profile, add email, delete profile |
 | `POST /admin/edit/<uuid>` | `handleAdminEditPost()` | Save profile, supports email addition |
 | `POST /admin/delete/<uuid>` | `handleAdminDelete()` | Delete profile (only if < 7 days old) |
+| `POST /admin/backup` | `handleAdminBackup()` | Full KV dump (POST + CSRF; was GET) |
 
 ### API Routes (Bearer auth)
 | Route | Handler | Description | Auth |
@@ -199,6 +204,7 @@ npx wrangler kv key put --remote --binding ANCHOR_KV "page:sitemap" --path ./src
 | `email:<sha256>` | UUID lookup by email hash | Permanent |
 | `email:unhashed:<uuid>` | Plaintext email for admin spam detection | 7 days |
 | `ip:<uuid>` | Registration IP address for admin spam detection | 7 days |
+| `adminsess:<token>` | Admin session (cookie value is this opaque id, never the secret) | 12 h |
 | `login:<token>` | Magic link session `{uuid, emailHash?, isSetup?, backupAccess?}` | 15 min |
 | `signup:<uuid>` | Backup token (plaintext, one-time display) | 5 min |
 | `created:<uuid>` | Backup token for admin flow | 60 sec |
@@ -229,6 +235,8 @@ npx wrangler kv key put --remote --binding ANCHOR_KV "page:sitemap" --path ./src
 | `BREVO_API_KEY` | — | Brevo email API key (secret) |
 | `BREVO_FROM` | — | Sender address for Brevo (required if using Brevo) |
 | `BREVO_DOMAINS` | — | Comma-separated domains for Brevo routing (e.g., "outlook.com,hotmail.com") |
+| `ADMIN_SESSION_TTL_SECONDS` | 43200 | Admin session cookie lifetime (12h) |
+| `ENABLE_ADMIN_DEBUG` | — | "true" to expose `/admin/debug/kv` (off by default) |
 | `LOGIN_TTL_SECONDS` | 900 | Magic link token lifetime |
 | `LOGIN_RL_PER_HOUR` | 3 | Max login emails per email/hour |
 | `UPDATE_RL_PER_HOUR` | 20 | Max updates per UUID/hour |
@@ -300,7 +308,9 @@ Claim states: `self_asserted` → `verified` or `failed`
 
 ## Auth Mechanisms
 
-1. **Admin cookie** — Set via `/admin/login`, guards `/admin/*` routes
+1. **Admin session cookie** — Set via `/admin/login`. Holds an opaque random session id
+   resolved through KV (`adminsess:<token>`), **not** the admin secret. Expires and is
+   revoked server-side on logout. Guards `/admin/*` routes.
 2. **Admin bearer token** — `Authorization: Bearer <ANCHOR_ADMIN_TOKEN>` for API endpoints (full access)
 3. **User session token** — `Authorization: Bearer <session_token>` for claim API endpoints (own profile only)
 4. **Magic link tokens** — One-time tokens in KV, consumed on save, also used as session tokens

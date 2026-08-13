@@ -12,6 +12,8 @@ import {
   withAdminAuth,
   withSessionAuth,
   withAdminCookie,
+  withAdminSession,
+  withAdminSessionAndCsrf,
   generateRandomIP,
   generateUniqueIPs,
   isRateLimited,
@@ -448,13 +450,29 @@ describe('Security: Authentication & Authorization', () => {
       expect(response.headers.get('Location')).toContain('/admin/login');
     });
 
-    it('accepts valid admin cookie', async () => {
+    it('accepts a valid admin session cookie', async () => {
       const req = createTestRequest('https://anchorid.net/admin', {
-        headers: withAdminCookie(env),
+        headers: await withAdminSession(),
+        redirect: 'manual',
       });
 
       const response = await SELF.fetch(req);
       expect(response.status).toBe(200);
+      // Assert we actually landed on the admin page rather than following a
+      // redirect to /admin/login (which also returns 200).
+      expect(await response.text()).not.toContain('Admin Login');
+    });
+
+    it('rejects a cookie containing the admin secret rather than a session id', async () => {
+      // The cookie used to *be* the secret. That must no longer authenticate.
+      const req = createTestRequest('https://anchorid.net/admin', {
+        headers: withAdminCookie(env),
+        redirect: 'manual',
+      });
+
+      const response = await SELF.fetch(req);
+      expect(response.status).toBe(303);
+      expect(response.headers.get('Location')).toContain('/admin/login');
     });
   });
 });
@@ -570,7 +588,7 @@ describe('Security: CSRF Protection', () => {
 
     const req = createTestRequest('https://anchorid.net/admin/new', {
       method: 'POST',
-      headers: withAdminCookie(env),
+      headers: await withAdminSession(),
       body: formData,
     });
 

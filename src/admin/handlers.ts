@@ -15,6 +15,7 @@
  */
 
 import type { Env } from "../env";
+import { securityHeaders } from "../http";
 import { buildProfile, mergeSameAs } from "../domain/profile";
 import { loadClaims } from "../claims/store";
 import { formatErrorHtml } from "../claims/errors";
@@ -30,12 +31,74 @@ function getCookie(request: Request, name: string): string | null {
   return m ? decodeURIComponent(m[1]) : null;
 }
 
-function setCookie(name: string, value: string): string {
-  return `${name}=${encodeURIComponent(value)}; Path=/; HttpOnly; Secure; SameSite=Strict`;
+function setCookie(name: string, value: string, maxAgeSeconds?: number): string {
+  const age = maxAgeSeconds ? `; Max-Age=${maxAgeSeconds}` : "";
+  return `${name}=${encodeURIComponent(value)}; Path=/; HttpOnly; Secure; SameSite=Strict${age}`;
 }
 
 function clearCookie(name: string): string {
   return `${name}=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Strict`;
+}
+
+/**
+ * Constant-time string comparison, for anything compared against a secret.
+ * Returns false on length mismatch (length is not itself sensitive here — all
+ * our secrets are fixed-length generated tokens).
+ */
+export function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let result = 0;
+  for (let i = 0; i < a.length; i++) {
+    result |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return result === 0;
+}
+
+// ------------------ Admin sessions ------------------
+//
+// The admin cookie used to carry ANCHOR_ADMIN_SECRET verbatim, which made the
+// cookie a permanent, non-revocable copy of the API bearer token. It now holds
+// an opaque random session id resolved through KV, so it expires, can be
+// revoked on logout, and is never compared against the secret.
+
+const ADMIN_SESSION_PREFIX = "adminsess:";
+
+function adminSessionTtl(env: Env): number {
+  const n = parseInt(env.ADMIN_SESSION_TTL_SECONDS || "", 10);
+  return Number.isFinite(n) && n > 0 ? n : 43200; // 12h
+}
+
+function randomToken(bytes: number): string {
+  const arr = new Uint8Array(bytes);
+  crypto.getRandomValues(arr);
+  return btoa(String.fromCharCode(...arr))
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/g, "");
+}
+
+async function createAdminSession(env: Env): Promise<{ token: string; ttl: number }> {
+  const token = randomToken(32);
+  const ttl = adminSessionTtl(env);
+  await env.ANCHOR_KV.put(
+    `${ADMIN_SESSION_PREFIX}${token}`,
+    JSON.stringify({ createdAt: new Date().toISOString() }),
+    { expirationTtl: ttl }
+  );
+  return { token, ttl };
+}
+
+async function destroyAdminSession(request: Request, env: Env): Promise<void> {
+  const token = getCookie(request, COOKIE_NAME);
+  if (token) await env.ANCHOR_KV.delete(`${ADMIN_SESSION_PREFIX}${token}`);
+}
+
+/** True if the request carries a valid admin session cookie. */
+export async function hasValidAdminSession(request: Request, env: Env): Promise<boolean> {
+  const token = getCookie(request, COOKIE_NAME);
+  if (!token) return false;
+  const session = await env.ANCHOR_KV.get(`${ADMIN_SESSION_PREFIX}${token}`);
+  return session !== null;
 }
 
 // ------------------ CSRF Protection ------------------
@@ -54,8 +117,9 @@ function getCsrfToken(request: Request): string | null {
 }
 
 function setCsrfCookie(token: string): string {
-  // Not HttpOnly so it can be read by JS if needed, but SameSite=Strict for CSRF protection
-  return `${CSRF_COOKIE_NAME}=${encodeURIComponent(token)}; Path=/; Secure; SameSite=Strict`;
+  // HttpOnly: the token reaches forms via a hidden field and reaches fetch()
+  // via a rendered JS constant, so no client script needs to read the cookie.
+  return `${CSRF_COOKIE_NAME}=${encodeURIComponent(token)}; Path=/; HttpOnly; Secure; SameSite=Strict`;
 }
 
 function clearCsrfCookie(): string {
@@ -91,7 +155,9 @@ function csrfError(): Response {
 }
 
 // Ensures CSRF cookie is set, returns token
-function ensureCsrfToken(request: Request): { token: string; needsSet: boolean } {
+type CsrfState = { token: string; needsSet: boolean };
+
+function ensureCsrfToken(request: Request): CsrfState {
   const existing = getCsrfToken(request);
   if (existing) {
     return { token: existing, needsSet: false };
@@ -107,7 +173,7 @@ function getAdminSecret(env: Env): string | null {
   return secret || null;
 }
 
-export function requireAdminCookie(request: Request, env: Env): Response | null {
+export async function requireAdminCookie(request: Request, env: Env): Promise<Response | null> {
   const expected = getAdminSecret(env);
 
   // Admin routes are completely disabled if no secret is configured
@@ -118,8 +184,7 @@ export function requireAdminCookie(request: Request, env: Env): Response | null 
     );
   }
 
-  const token = getCookie(request, COOKIE_NAME) || "";
-  if (token !== expected) {
+  if (!(await hasValidAdminSession(request, env))) {
     return new Response(null, { status: 303, headers: { Location: "/admin/login" } });
   }
   return null;
@@ -212,6 +277,7 @@ function htmlResponse(html: string, status = 200, extra: Record<string, string> 
     headers: {
       "content-type": "text/html; charset=utf-8",
       "cache-control": "no-store",
+      ...securityHeaders(),
       ...extra,
     },
   });
@@ -220,25 +286,29 @@ function htmlResponse(html: string, status = 200, extra: Record<string, string> 
 // HTML response that ensures CSRF cookie is set
 function htmlResponseWithCsrf(
   html: string,
-  request: Request,
+  csrf: CsrfState,
   status = 200,
   extraHeaders: Record<string, string> = {}
 ): Response {
-  const { token, needsSet } = ensureCsrfToken(request);
   const headers: Record<string, string> = {
     "content-type": "text/html; charset=utf-8",
     "cache-control": "no-store",
+    ...securityHeaders(),
     ...extraHeaders,
   };
-  if (needsSet) {
-    headers["set-cookie"] = setCsrfCookie(token);
+  if (csrf.needsSet) {
+    headers["set-cookie"] = setCsrfCookie(csrf.token);
   }
   return new Response(html, { status, headers });
 }
 
-// Helper to inject CSRF hidden input into forms
-function csrfInput(request: Request): string {
-  const { token } = ensureCsrfToken(request);
+// Helper to inject CSRF hidden input into forms.
+//
+// Takes the token rather than the Request: calling ensureCsrfToken() separately
+// for the form body and for the Set-Cookie header generated two *different*
+// tokens on a cold visit (no cookie yet), so the first admin POST after
+// clearing cookies always failed CSRF validation.
+function csrfInputFor(token: string): string {
   return `<input type="hidden" name="_csrf" value="${escapeHtml(token)}">`;
 }
 
@@ -293,7 +363,9 @@ export async function handleAdminLoginPage(req: Request, env: Env): Promise<Resp
     );
   }
 
-  const csrf = csrfInput(req);
+  const csrfState = ensureCsrfToken(req);
+
+  const csrf = csrfInputFor(csrfState.token);
   const html = `<!doctype html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>AnchorID Admin Login</title></head>
@@ -305,7 +377,7 @@ export async function handleAdminLoginPage(req: Request, env: Env): Promise<Resp
   <button type="submit">Login</button>
 </form>
 </body></html>`;
-  return htmlResponseWithCsrf(html, req);
+  return htmlResponseWithCsrf(html, csrfState);
 }
 
 export async function handleAdminLoginPost(req: Request, env: Env): Promise<Response> {
@@ -326,7 +398,12 @@ export async function handleAdminLoginPost(req: Request, env: Env): Promise<Resp
 
   const token = String(fd.get("token") || "").trim();
 
-  if (token !== expected) return new Response("Unauthorized", { status: 401 });
+  if (!timingSafeEqual(token, expected)) {
+    return new Response("Unauthorized", { status: 401 });
+  }
+
+  // Mint an opaque session id — the cookie must never carry the secret itself.
+  const { token: sessionToken, ttl } = await createAdminSession(env);
 
   // Generate new CSRF token on login for session isolation
   const newCsrf = generateCsrfToken();
@@ -334,7 +411,7 @@ export async function handleAdminLoginPost(req: Request, env: Env): Promise<Resp
   return new Response(null, {
     status: 303,
     headers: [
-      ["set-cookie", setCookie(COOKIE_NAME, expected)],
+      ["set-cookie", setCookie(COOKIE_NAME, sessionToken, ttl)],
       ["set-cookie", setCsrfCookie(newCsrf)],
       ["Location", "/admin"],
       ["cache-control", "no-store"],
@@ -343,7 +420,7 @@ export async function handleAdminLoginPost(req: Request, env: Env): Promise<Resp
 }
 
 export async function handleAdminLogoutPost(req: Request, env: Env): Promise<Response> {
-  const denied = requireAdminCookie(req, env);
+  const denied = await requireAdminCookie(req, env);
   if (denied) return denied;
 
   // Parse form data for CSRF validation
@@ -351,6 +428,9 @@ export async function handleAdminLogoutPost(req: Request, env: Env): Promise<Res
   if (!await validateCsrf(req, fd)) {
     return csrfError();
   }
+
+  // Revoke server-side so the cookie is dead even if it was captured.
+  await destroyAdminSession(req, env);
 
   return new Response(null, {
     status: 303,
@@ -491,10 +571,12 @@ function formatAuditSummary(audit: any[] | null): string {
 }
 
 export async function handleAdminHome(req: Request, env: Env): Promise<Response> {
-  const denied = requireAdminCookie(req, env);
+  const denied = await requireAdminCookie(req, env);
   if (denied) return denied;
 
-  const csrf = csrfInput(req);
+  const csrfState = ensureCsrfToken(req);
+
+  const csrf = csrfInputFor(csrfState.token);
 
   // Parse query parameters
   const url = new URL(req.url);
@@ -626,7 +708,8 @@ ${deletedName ? `<div class="alert alert-success">✓ Profile deleted: <strong>$
 <div class="backup-section">
   <h2>📥 Database Backup</h2>
   <p>Download a complete backup of all profiles, claims, and audit logs.</p>
-  <form method="get" action="/admin/backup" style="margin:0">
+  <form method="post" action="/admin/backup" style="margin:0">
+    ${csrf}
     <button type="submit">Download Full Backup</button>
     <span class="hint">JSON format · ${total} profile${total !== 1 ? 's' : ''}</span>
   </form>
@@ -690,12 +773,12 @@ ${totalPages > 1 ? `
 </form>
 </body></html>`;
 
-  return htmlResponseWithCsrf(html, req);
+  return htmlResponseWithCsrf(html, csrfState);
 }
 
 // GET /admin/new
 export async function handleAdminNewGet(req: Request, env: Env): Promise<Response> {
-  const denied = requireAdminCookie(req, env);
+  const denied = await requireAdminCookie(req, env);
   if (denied) return denied;
 
   const url = new URL(req.url);
@@ -705,7 +788,9 @@ export async function handleAdminNewGet(req: Request, env: Env): Promise<Respons
   const prefillName = url.searchParams.get("name") || "";
   const prefillUrl = url.searchParams.get("url") || "";
 
-  const csrf = csrfInput(req);
+  const csrfState = ensureCsrfToken(req);
+
+  const csrf = csrfInputFor(csrfState.token);
 
   const errorMessages: Record<string, string> = {
     invalid_email: "Please enter a valid email address.",
@@ -789,12 +874,12 @@ ${error ? `<div class="alert alert-error">${escapeHtml(errorMessages[error] || e
 </form>
 </body></html>`;
 
-  return htmlResponseWithCsrf(html, req);
+  return htmlResponseWithCsrf(html, csrfState);
 }
 
 // POST /admin/new
 export async function handleAdminNewPost(req: Request, env: Env): Promise<Response> {
-  const denied = requireAdminCookie(req, env);
+  const denied = await requireAdminCookie(req, env);
   if (denied) return denied;
 
   const fd = await req.formData();
@@ -884,7 +969,7 @@ export async function handleAdminNewPost(req: Request, env: Env): Promise<Respon
 
 // GET /admin/created/<uuid> - Shows backup token ONCE after creation
 export async function handleAdminCreatedGet(req: Request, env: Env, uuid: string): Promise<Response> {
-  const denied = requireAdminCookie(req, env);
+  const denied = await requireAdminCookie(req, env);
   if (denied) return denied;
 
   if (!isUuid(uuid)) return new Response("Invalid UUID", { status: 400 });
@@ -971,10 +1056,17 @@ function downloadToken() {
   return htmlResponse(html);
 }
 
+// Raw KV key enumeration. Marked "temporary" since it was added and offers
+// nothing /admin does not already show, so it is now off unless explicitly
+// enabled via ENABLE_ADMIN_DEBUG.
 export async function handleAdminDebugKv(req: Request, env: Env): Promise<Response> {
 
-  const denied = requireAdminCookie(req, env);
+  const denied = await requireAdminCookie(req, env);
   if (denied) return denied;
+
+  if (env.ENABLE_ADMIN_DEBUG !== "true") {
+    return new Response("Not found", { status: 404, headers: { "content-type": "text/plain" } });
+  }
 
   const list = await env.ANCHOR_KV.list({ prefix: "profile:", limit: 100 });
 
@@ -989,7 +1081,7 @@ export async function handleAdminDebugKv(req: Request, env: Env): Promise<Respon
 }
 
 export async function handleAdminEditGet(req: Request, env: Env, uuid: string): Promise<Response> {
-  const denied = requireAdminCookie(req, env);
+  const denied = await requireAdminCookie(req, env);
   if (denied) return denied;
 
   if (!isUuid(uuid)) return new Response("Invalid UUID", { status: 400 });
@@ -1002,7 +1094,9 @@ export async function handleAdminEditGet(req: Request, env: Env, uuid: string): 
   const success = url.searchParams.get("success") || "";
   const error = url.searchParams.get("error") || "";
 
-  const csrf = csrfInput(req);
+  const csrfState = ensureCsrfToken(req);
+
+  const csrf = csrfInputFor(csrfState.token);
 
   const claims = await loadClaims(env, uuid);
   const verifiedUrls = claims.filter((c) => c.status === "verified").map((c) => c.url);
@@ -1218,10 +1312,19 @@ ${error ? `<div class="alert alert-error">${escapeHtml(errorMessages[error] || e
     View <code>/resolve</code>
   </a>
 
-  <button class="card" type="button"
-    onclick="navigator.clipboard.writeText('${origin}/resolve/${escapeHtml(uuid)}')">
+  <button class="card" type="button" id="copyResolveUrlBtn"
+    data-resolve-path="/resolve/${escapeHtml(uuid)}">
     Copy resolve URL
   </button>
+  <script>
+  (function() {
+    var btn = document.getElementById("copyResolveUrlBtn");
+    if (!btn) return;
+    btn.addEventListener("click", function() {
+      navigator.clipboard.writeText(location.origin + btn.getAttribute("data-resolve-path"));
+    });
+  })();
+  </script>
 
   <a class="card" href="/claims/${escapeHtml(uuid)}" target="_blank">
     View <code>/claims</code>
@@ -1504,7 +1607,10 @@ ${(() => {
 
 <script>
 (function() {
-  const adminToken = "${escapeHtml(getAdminSecret(env) || "")}";
+  // The admin secret is deliberately NOT rendered into this page. These
+  // endpoints authenticate via the HttpOnly admin session cookie (sent
+  // automatically on same-origin fetch) plus this CSRF token.
+  const csrfToken = "${escapeHtml(csrfState.token)}";
 
   // Update form hints based on claim type
   document.getElementById("claimType").addEventListener("change", function() {
@@ -1551,7 +1657,7 @@ ${(() => {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": "Bearer " + adminToken
+          "X-CSRF-Token": csrfToken
         },
         body: JSON.stringify(payload)
       });
@@ -1585,7 +1691,7 @@ ${(() => {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "Authorization": "Bearer " + adminToken
+            "X-CSRF-Token": csrfToken
           },
           body: JSON.stringify({ uuid, id: claimId })
         });
@@ -1667,7 +1773,7 @@ ${(() => {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": "Bearer " + adminToken
+          "X-CSRF-Token": csrfToken
         },
         body: JSON.stringify({ uuid: pendingDeleteUuid, claimId: pendingDeleteClaimId })
       });
@@ -1715,14 +1821,34 @@ ${isDeletable ? `
     </ul>
   </details>
 
-  <form method="post" action="/admin/delete/${escapeHtml(uuid)}"
-    onsubmit="return confirm('⚠️ DELETE PROFILE?\\n\\nThis will permanently delete:\\n- Profile: ${escapeHtml(name || uuid)}\\n- Email access\\n- All claims\\n- Audit log\\n\\nThis action CANNOT be undone.');">
+  <form method="post" action="/admin/delete/${escapeHtml(uuid)}" id="deleteProfileForm"
+    data-profile-name="${escapeHtml(name || uuid)}">
     ${csrf}
     <button type="submit" style="background:#dc3545;color:#fff;border-color:#dc3545;font-weight:600">
       Delete Profile Permanently
     </button>
   </form>
 </div>
+<script>
+(function() {
+  // Confirmation is wired up here rather than in an inline onsubmit attribute.
+  // HTML attribute values are entity-decoded before the JS is parsed, so an
+  // HTML-escaped apostrophe in the profile name (&#39;) would turn back into a
+  // real quote and break out of the confirm() string literal.
+  var form = document.getElementById("deleteProfileForm");
+  if (!form) return;
+  form.addEventListener("submit", function(e) {
+    var profileName = form.getAttribute("data-profile-name") || "";
+    var ok = confirm(
+      "\\u26A0\\uFE0F DELETE PROFILE?\\n\\nThis will permanently delete:\\n" +
+      "- Profile: " + profileName + "\\n" +
+      "- Email access\\n- All claims\\n- Audit log\\n\\n" +
+      "This action CANNOT be undone."
+    );
+    if (!ok) e.preventDefault();
+  });
+})();
+</script>
 ` : `
 <div style="margin-top:32px;padding:16px;border:1px solid #d0d7de;border-radius:10px;background:#f6f8fa">
   <h3 style="margin:0 0 6px 0;font-size:14px;color:#555">🔒 Profile Protected</h3>
@@ -1752,7 +1878,7 @@ ${isDeletable ? `
 
 </body></html>`;
 
-  return htmlResponseWithCsrf(html, req);
+  return htmlResponseWithCsrf(html, csrfState);
 }
 
 
@@ -1761,7 +1887,7 @@ export async function handleAdminSavePost(
   env: Env,
   uuid: string
 ): Promise<Response> {
-  const denied = requireAdminCookie(req, env);
+  const denied = await requireAdminCookie(req, env);
   if (denied) return denied;
 
   if (!isUuid(uuid)) return new Response("Invalid UUID", { status: 400 });
@@ -1910,7 +2036,7 @@ export async function handleAdminRotateToken(
   env: Env,
   uuid: string
 ): Promise<Response> {
-  const denied = requireAdminCookie(req, env);
+  const denied = await requireAdminCookie(req, env);
   if (denied) return denied;
 
   if (!isUuid(uuid)) return new Response("Invalid UUID", { status: 400 });
@@ -2003,7 +2129,7 @@ export async function handleAdminDelete(
   env: Env,
   uuid: string
 ): Promise<Response> {
-  const denied = requireAdminCookie(req, env);
+  const denied = await requireAdminCookie(req, env);
   if (denied) return denied;
 
   if (!isUuid(uuid)) return new Response("Invalid UUID", { status: 400 });
@@ -2064,10 +2190,19 @@ export async function handleAdminDelete(
   });
 }
 
-// GET /admin/backup - Download complete database backup as JSON
+// POST /admin/backup - Download complete database backup as JSON
+//
+// POST + CSRF rather than GET: this dumps every profile, including _emailHash,
+// _backupTokenHash and any stored plaintext _email, so it must not be
+// reachable by navigation, prefetch, or an embedded <img>/<iframe>.
 export async function handleAdminBackup(req: Request, env: Env): Promise<Response> {
-  const denied = requireAdminCookie(req, env);
+  const denied = await requireAdminCookie(req, env);
   if (denied) return denied;
+
+  const fd = await req.formData();
+  if (!await validateCsrf(req, fd)) {
+    return csrfError();
+  }
 
   // Fetch all profile UUIDs
   const uuids = await fetchAllProfileUUIDs(env);
