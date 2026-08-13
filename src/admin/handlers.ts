@@ -15,6 +15,7 @@
  */
 
 import type { Env } from "../env";
+import { kvTtlFromEnv } from "../env";
 import { securityHeaders } from "../http";
 import { buildProfile, mergeSameAs } from "../domain/profile";
 import { loadClaims } from "../claims/store";
@@ -64,8 +65,9 @@ export function timingSafeEqual(a: string, b: string): boolean {
 const ADMIN_SESSION_PREFIX = "adminsess:";
 
 function adminSessionTtl(env: Env): number {
-  const n = parseInt(env.ADMIN_SESSION_TTL_SECONDS || "", 10);
-  return Number.isFinite(n) && n > 0 ? n : 43200; // 12h
+  // Clamped to KV's 60s floor: a value of 1-59 would otherwise make the session
+  // put throw and turn every valid admin login into a 500.
+  return kvTtlFromEnv(env.ADMIN_SESSION_TTL_SECONDS, 43200); // default 12h
 }
 
 function randomToken(bytes: number): string {

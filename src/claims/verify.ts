@@ -15,6 +15,7 @@
  */
 
 import type { Claim, ClaimProof, ClaimStatus } from "./types";
+import { clampKvTtl } from "../env";
 
 export function claimIdForWebsite(url: string): string {
   try {
@@ -607,6 +608,11 @@ async function queryDnsTxtCached(
     // Failure: 2 minutes
     cacheTtlSeconds = 2 * 60;
   }
+
+  // Clamp to KV's 60s floor. result.ttl comes from the claimant's own DNS
+  // record, so a TTL of 1-59 would make every cache write throw (swallowed
+  // below) and silently defeat caching for that domain.
+  cacheTtlSeconds = clampKvTtl(cacheTtlSeconds);
 
   // Store in cache
   const expiresAt = now + (cacheTtlSeconds * 1000);

@@ -47,6 +47,7 @@ import { buildProfile, mergeSameAs } from "./domain/profile";
 import { sendEmail, hasEmailConfig } from "./email";
 import { securityHeaders, secretPageHeaders } from "./http";
 import type { Env } from "./env";
+import { intFromEnv, kvTtlFromEnv } from "./env";
 
 
 // Env lives in ./env.ts. It used to be duplicated here, which meant two
@@ -129,16 +130,6 @@ function upsertSubjectOf(entity: any, claimsUrl: string) {
 function wantsHtml(request: Request): boolean {
   const accept = request.headers.get("accept") || "";
   return accept.includes("text/html") || accept.includes("application/xhtml+xml");
-}
-
-/**
- * Parse an env-provided integer, falling back to `fallback` when unset or
- * malformed. Previously a bad value produced NaN, and `NaN > limit` is false —
- * which silently disabled the rate limit it was meant to configure.
- */
-function intFromEnv(value: string | undefined, fallback: number): number {
-  const n = parseInt(value ?? "", 10);
-  return Number.isFinite(n) && n >= 0 ? n : fallback;
 }
 
 /** Re-issue a request with an already-consumed body so a handler can re-read it. */
@@ -1338,7 +1329,7 @@ async function handleSignup(request: Request, env: Env): Promise<Response> {
 
   // Generate edit token for email
   const editToken = randomTokenUrlSafe(32);
-  const ttl = parseInt(env.LOGIN_TTL_SECONDS || "900", 10);
+  const ttl = kvTtlFromEnv(env.LOGIN_TTL_SECONDS, 900);
 
   // Store everything
   await Promise.all([
@@ -1820,7 +1811,7 @@ async function handleLogin(request: Request, env: Env): Promise<Response> {
   }
 
   const token = randomTokenUrlSafe(32);
-  const ttl = parseInt(env.LOGIN_TTL_SECONDS || "900", 10);
+  const ttl = kvTtlFromEnv(env.LOGIN_TTL_SECONDS, 900);
   await env.ANCHOR_KV.put(`login:${token}`, JSON.stringify({ uuid, emailHash }), { expirationTtl: ttl });
 
   const link = `${new URL(request.url).origin}/edit?token=${encodeURIComponent(token)}`;

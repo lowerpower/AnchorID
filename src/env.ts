@@ -63,3 +63,41 @@ export interface Env {
   ENABLE_CLAIM_NOTIFICATIONS?: string; // "true" to enable
 }
 
+// ------------------ Config parsing ------------------
+
+/**
+ * Workers KV rejects `expirationTtl` below 60 seconds with a 400.
+ *
+ * Anything that derives a TTL from configuration or from a remote response has
+ * to respect this floor, or the `put` throws at runtime — which, for a value
+ * that looks like a harmless tuning knob, turns into a hard failure on the
+ * request path that writes the key.
+ */
+export const MIN_KV_TTL_SECONDS = 60;
+
+/** Clamp any TTL to KV's accepted minimum. */
+export function clampKvTtl(seconds: number): number {
+  return Math.max(Math.floor(seconds), MIN_KV_TTL_SECONDS);
+}
+
+/**
+ * Parse an env-provided integer, falling back when unset or malformed.
+ *
+ * Bare `parseInt` yields NaN on a bad value, and `NaN > limit` is false — which
+ * silently disabled whichever rate limit it was meant to configure.
+ */
+export function intFromEnv(value: string | undefined, fallback: number): number {
+  const n = parseInt(value ?? "", 10);
+  return Number.isFinite(n) && n >= 0 ? n : fallback;
+}
+
+/**
+ * Parse an env-provided KV TTL. Falls back when unset/malformed, then clamps to
+ * KV's minimum so a misconfigured value degrades to a short TTL instead of
+ * throwing on every write.
+ */
+export function kvTtlFromEnv(value: string | undefined, fallback: number): number {
+  const n = parseInt(value ?? "", 10);
+  return clampKvTtl(Number.isFinite(n) && n > 0 ? n : fallback);
+}
+

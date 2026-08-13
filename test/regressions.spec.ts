@@ -14,6 +14,7 @@ import {
 import { canonicalizeUrl, buildProfile } from '../src/domain/profile';
 import { validateProfileUrl, parseGitHubProfile, stripQueryAndFragment } from '../src/claims/verify';
 import { claimsKey, upsertClaim } from '../src/claims/store';
+import { clampKvTtl, kvTtlFromEnv, intFromEnv } from '../src/env';
 
 /**
  * Regression tests for the security audit fixes.
@@ -413,6 +414,51 @@ describe('security headers', () => {
       expect(res.headers.get('content-security-policy')).toBeTruthy();
       expect(res.headers.get('x-frame-options')).toBe('DENY');
     }
+  });
+});
+
+// ------------------------------------------------------------------
+// KV TTL floor — a sub-minimum TTL must not throw on the request path
+// ------------------------------------------------------------------
+describe('KV TTL clamping', () => {
+  it('documents the constraint: KV rejects expirationTtl below 60', async () => {
+    await expect(
+      env.ANCHOR_KV.put('ttlprobe:low', 'x', { expirationTtl: 30 })
+    ).rejects.toThrow(/at least 60/i);
+  });
+
+  it('clamps sub-minimum values instead of passing them through', () => {
+    expect(clampKvTtl(1)).toBe(60);
+    expect(clampKvTtl(59)).toBe(60);
+    expect(clampKvTtl(60)).toBe(60);
+    expect(clampKvTtl(3600)).toBe(3600);
+  });
+
+  it('kvTtlFromEnv clamps a misconfigured value rather than throwing later', () => {
+    // ADMIN_SESSION_TTL_SECONDS=30 would otherwise make the session put throw
+    // and turn every valid admin login into a 500.
+    expect(kvTtlFromEnv('30', 43200)).toBe(60);
+    expect(kvTtlFromEnv('1', 43200)).toBe(60);
+    // Unset / malformed / non-positive fall back to the default.
+    expect(kvTtlFromEnv(undefined, 43200)).toBe(43200);
+    expect(kvTtlFromEnv('not-a-number', 900)).toBe(900);
+    expect(kvTtlFromEnv('0', 900)).toBe(900);
+    expect(kvTtlFromEnv('-5', 900)).toBe(900);
+    // Valid values pass through.
+    expect(kvTtlFromEnv('7200', 43200)).toBe(7200);
+  });
+
+  it('a sub-minimum TTL written through the clamp is accepted by KV', async () => {
+    await expect(
+      env.ANCHOR_KV.put('ttlprobe:clamped', 'x', { expirationTtl: clampKvTtl(30) })
+    ).resolves.toBeUndefined();
+  });
+
+  it('intFromEnv keeps 0 meaningful for rate limits but rejects NaN', () => {
+    expect(intFromEnv('0', 30)).toBe(0);
+    expect(intFromEnv('bogus', 30)).toBe(30);
+    expect(intFromEnv(undefined, 30)).toBe(30);
+    expect(intFromEnv('15', 30)).toBe(15);
   });
 });
 
