@@ -179,6 +179,18 @@ describe('validateProfileUrl SSRF guard', () => {
     'https://2130706433/x',          // decimal-encoded 127.0.0.1
     'https://0177.0.0.1/x',          // octal-encoded 127.0.0.1
     'http://example.com/x',          // must be https
+
+    // Trailing-dot (fully-qualified) forms. url.hostname keeps the root label
+    // for named hosts, so these slipped past the suffix denylist and the
+    // exact-match checks while resolving to the same host.
+    'https://localhost./x',
+    'https://metadata.google.internal./x',
+    'https://jenkins.internal./x',
+    'https://printer.local./x',
+    'https://intranet./x',
+    'https://127.0.0.1./x',
+    'https://169.254.169.254./x',
+    'https://10.0.0.1../x',
   ];
 
   for (const url of blocked) {
@@ -427,6 +439,48 @@ describe('admin secret exposure', () => {
     expect(secret).toBeTruthy();
     expect(html).not.toContain(secret as string);
     expect(html).not.toContain('adminToken');
+  });
+
+  it('rejects a session issued against a different (rotated) admin secret', async () => {
+    // Under the old cookie-as-secret scheme, rotating ANCHOR_ADMIN_SECRET
+    // invalidated every cookie instantly. Opaque sessions must preserve that
+    // property, or rotating after a suspected exposure leaves the attacker
+    // logged in until the TTL expires.
+    const staleToken = `test-stale-session-${crypto.randomUUID()}`;
+    await setKV(
+      `adminsess:${staleToken}`,
+      JSON.stringify({
+        createdAt: new Date().toISOString(),
+        secret: 'fingerprint-of-a-previous-secret',
+      }),
+      3600
+    );
+
+    const res = await SELF.fetch(createTestRequest('https://anchorid.net/admin', {
+      headers: { Cookie: `anchor_admin=${staleToken}` },
+      redirect: 'manual',
+      ip: '198.51.100.62',
+    }));
+
+    expect(res.status).toBe(303);
+    expect(res.headers.get('Location')).toContain('/admin/login');
+  });
+
+  it('rejects a session record with no secret binding at all', async () => {
+    const legacyToken = `test-legacy-session-${crypto.randomUUID()}`;
+    await setKV(
+      `adminsess:${legacyToken}`,
+      JSON.stringify({ createdAt: new Date().toISOString() }),
+      3600
+    );
+
+    const res = await SELF.fetch(createTestRequest('https://anchorid.net/admin', {
+      headers: { Cookie: `anchor_admin=${legacyToken}` },
+      redirect: 'manual',
+      ip: '198.51.100.63',
+    }));
+
+    expect(res.status).toBe(303);
   });
 
   it('does not place a profile name inside an inline event-handler attribute', async () => {

@@ -186,7 +186,11 @@ export function validateProfileUrl(urlString: string): { ok: boolean; error?: st
     return { ok: false, error: "must_be_https" };
   }
 
-  const hostname = url.hostname.toLowerCase();
+  // Strip trailing dots before every check. A fully-qualified name keeps its
+  // root label in url.hostname ("metadata.google.internal." / "localhost."),
+  // which would slip past both the suffix denylist and the exact-match checks
+  // below while still resolving to the same host.
+  const hostname = url.hostname.toLowerCase().replace(/\.+$/, "");
 
   if (!hostname) return { ok: false, error: "invalid_url" };
 

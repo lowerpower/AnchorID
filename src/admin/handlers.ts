@@ -77,12 +77,28 @@ function randomToken(bytes: number): string {
     .replace(/=+$/g, "");
 }
 
+/**
+ * Fingerprint of the admin secret a session was issued against.
+ *
+ * Sessions are bound to this so that rotating ANCHOR_ADMIN_SECRET revokes every
+ * outstanding session immediately. Under the old cookie-as-secret scheme that
+ * happened for free; without this binding, changing the secret after a
+ * suspected exposure would leave existing sessions valid until their TTL,
+ * which would make incident response worse rather than better.
+ */
+export async function adminSecretFingerprint(env: Env): Promise<string> {
+  return (await sha256Hex(getAdminSecret(env) || "")).slice(0, 32);
+}
+
 async function createAdminSession(env: Env): Promise<{ token: string; ttl: number }> {
   const token = randomToken(32);
   const ttl = adminSessionTtl(env);
   await env.ANCHOR_KV.put(
     `${ADMIN_SESSION_PREFIX}${token}`,
-    JSON.stringify({ createdAt: new Date().toISOString() }),
+    JSON.stringify({
+      createdAt: new Date().toISOString(),
+      secret: await adminSecretFingerprint(env),
+    }),
     { expirationTtl: ttl }
   );
   return { token, ttl };
@@ -97,8 +113,15 @@ async function destroyAdminSession(request: Request, env: Env): Promise<void> {
 export async function hasValidAdminSession(request: Request, env: Env): Promise<boolean> {
   const token = getCookie(request, COOKIE_NAME);
   if (!token) return false;
-  const session = await env.ANCHOR_KV.get(`${ADMIN_SESSION_PREFIX}${token}`);
-  return session !== null;
+
+  const session = (await env.ANCHOR_KV.get(`${ADMIN_SESSION_PREFIX}${token}`, {
+    type: "json",
+  })) as { secret?: string } | null;
+  if (!session) return false;
+
+  // Reject sessions issued against a different (rotated) admin secret.
+  if (typeof session.secret !== "string") return false;
+  return timingSafeEqual(session.secret, await adminSecretFingerprint(env));
 }
 
 // ------------------ CSRF Protection ------------------

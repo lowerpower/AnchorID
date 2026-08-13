@@ -343,10 +343,21 @@ export async function createAdminSession(): Promise<string> {
   const token = `test-admin-session-${crypto.randomUUID()}`;
   await env.ANCHOR_KV.put(
     `adminsess:${token}`,
-    JSON.stringify({ createdAt: new Date().toISOString() }),
+    JSON.stringify({
+      createdAt: new Date().toISOString(),
+      // Sessions are bound to the secret they were issued against.
+      secret: await adminSecretFingerprint(),
+    }),
     { expirationTtl: 3600 }
   );
   return token;
+}
+
+/** Mirrors adminSecretFingerprint() in src/admin/handlers.ts. */
+export async function adminSecretFingerprint(): Promise<string> {
+  const secret =
+    env.ANCHOR_ADMIN_SECRET || (env as any).ANCHOR_ADMIN_COOKIE || env.ANCHOR_ADMIN_TOKEN || '';
+  return (await sha256Hex(secret.trim())).slice(0, 32);
 }
 
 export async function withAdminSession(
