@@ -696,13 +696,11 @@ export function profilePageHasUuidMarker(mustContain: string, text: string): boo
 
   const uuid = uuidMatch[1].toLowerCase();
   const haystack = text.toLowerCase();
-  const markers = [
-    `urn:uuid:${uuid}`,
-    `anchorid=${uuid}`,
-    `anchorid:${uuid}`,
-    `anchorid.net/${uuid}`,
-  ];
-  return markers.some((m) => haystack.includes(m));
+  if (haystack.includes(`urn:uuid:${uuid}`)) return true;
+  if (haystack.includes(`anchorid.net/${uuid}`)) return true;
+  // Labeled form, e.g. "AnchorID: <uuid>" — the documented forum-signature
+  // format writes a space after the colon, so tolerate optional whitespace.
+  return new RegExp(`anchorid[:=][ \\t]*${uuid}`).test(haystack);
 }
 
 export async function verifyClaim(

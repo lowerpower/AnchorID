@@ -301,6 +301,8 @@ describe('public profile proof UUID markers', () => {
     expect(profilePageHasUuidMarker(mustContain, `urn:uuid:${uuid}`)).toBe(true);
     expect(profilePageHasUuidMarker(mustContain, `anchorid=${uuid}`)).toBe(true);
     expect(profilePageHasUuidMarker(mustContain, `anchorid:${uuid}`)).toBe(true);
+    // The documented forum-signature format has a space after the colon.
+    expect(profilePageHasUuidMarker(mustContain, `AnchorID: ${uuid}`)).toBe(true);
   });
 
   it('still rejects a bare UUID with no marker', () => {
