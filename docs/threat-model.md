@@ -272,6 +272,35 @@ If claims appear incorrect:
 
 ---
 
+## Known Limitation: Rate Limiting Is Not a Security Boundary
+
+All rate limiting is implemented as a counter in Workers KV (`incrWithTtl` in
+`src/index.ts`). Two properties of KV make these limits **abuse-dampening
+measures, not enforceable controls**:
+
+1. **The increment is not atomic.** It is a read, then a write. N concurrent
+   requests all read the same value and all write `value + 1`, so a burst of
+   parallel requests advances the counter by one rather than by N. Every limit
+   in the system — per-IP, per-UUID, per-email — can be exceeded this way.
+2. **Reads are eventually consistent.** KV reads are edge-cached and writes
+   propagate globally over seconds. An attacker spreading requests across
+   colos sees stale counters.
+
+Consequences to plan around:
+
+- **The admin-login limiter (`IP_ADMIN_LOGIN_RL_PER_HOUR`, default 5/hour) must
+  not be treated as brute-force protection.** The security of the admin
+  interface rests entirely on `ANCHOR_ADMIN_SECRET` having enough entropy.
+  Use a long random secret.
+- Per-email magic-link limits reduce accidental mail volume; they do not
+  prevent a determined attacker from generating more.
+- The automated tests run against miniflare, whose KV *is* strongly consistent.
+  They verify the limiting logic, not its behaviour under production KV.
+
+Fixing this properly requires atomic state — a Durable Object per limit key, or
+the Cloudflare Workers rate-limiting binding. That is deferred until abuse
+justifies the added moving parts.
+
 ## Future Considerations
 
 Potential improvements not currently implemented:

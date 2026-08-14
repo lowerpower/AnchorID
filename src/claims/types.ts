@@ -17,14 +17,20 @@
 export type ClaimStatus = "self_asserted" | "verified" | "failed";
 
 export type ClaimProof =
-  | { kind: "well_known"; url: string; mustContain: string }
-  | { kind: "github_readme"; url: string; mustContain: string }
+  | { kind: "well_known"; url: string; mustContain: string; fallbackUrls?: string[] }
+  | { kind: "github_readme"; url: string; mustContain: string; fallbackUrls?: string[] }
   | { kind: "dns_txt"; qname: string; expectedToken: string }
-  | { kind: "profile_page"; url: string; mustContain: string };
+  | { kind: "profile_page"; url: string; mustContain: string; fallbackUrls?: string[] };
+
+/**
+ * "social" is the legacy name for "public" and still appears in stored records
+ * and in accepted API input, so it stays in the union for back-compat.
+ */
+export type ClaimType = "website" | "github" | "dns" | "public" | "social";
 
 export type Claim = {
   id: string;
-  type: "website" | "github" | "dns" | "public";
+  type: ClaimType;
   url: string;
   status: ClaimStatus;
   proof: ClaimProof;

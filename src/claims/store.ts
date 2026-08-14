@@ -41,7 +41,9 @@ export function normalizeUrl(u: string): string {
 }
 
 export function claimsKey(uuid: string): string {
-  return `claims:${uuid}`;
+  // Always lowercase: /resolve lowercases before reading, so a mixed-case write
+  // would land in a key the resolver never looks at.
+  return `claims:${uuid.toLowerCase()}`;
 }
 
 export async function loadClaims(env: Env, uuid: string): Promise<Claim[]> {
@@ -68,6 +70,17 @@ export function upsertClaim(list: Claim[], claim: Claim): Claim[] {
       createdAt: list[idx].createdAt || claim.createdAt,
       updatedAt: claim.updatedAt,
     };
+
+    // Re-asserting a claim resets it to self_asserted. The incoming object has
+    // no verifiedAt/lastCheckedAt/failReason keys, so a plain spread would keep
+    // the previous values — leaving a self_asserted claim advertising a
+    // verifiedAt timestamp on the public ledger.
+    if (claim.status === "self_asserted") {
+      delete merged.verifiedAt;
+      delete merged.lastCheckedAt;
+      delete merged.failReason;
+    }
+
     const copy = [...list];
     copy[idx] = merged;
     return copy;
