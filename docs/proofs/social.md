@@ -93,14 +93,14 @@ After adding your AnchorID to the public page, click the "Verify" button next to
 
 AnchorID will:
 1. Fetch the public page
-2. Search for your resolver URL **OR** just your UUID
+2. Search for your resolver URL, short URL, or a labeled UUID marker
 3. Mark the claim as **verified** if found ✅
 
 ---
 
 ## Space-Constrained Environments
 
-For social/public profile proofs, AnchorID searches the page for your UUID — so all three formats verify successfully. Pick based on available space:
+For social/public profile proofs, AnchorID accepts three formats. Pick based on available space:
 
 **Full URL — 65 chars (most readable):**
 ```
@@ -112,19 +112,19 @@ https://anchorid.net/resolve/4ff7ed97-b78f-4ae6-9011-5af714ee241c
 https://anchorid.net/4ff7ed97-b78f-4ae6-9011-5af714ee241c
 ```
 
-**UUID only — 36 chars (most compact):**
+**Labeled UUID — 46 chars (most compact):**
 ```
-4ff7ed97-b78f-4ae6-9011-5af714ee241c
+AnchorID: 4ff7ed97-b78f-4ae6-9011-5af714ee241c
 ```
 
-All three verify. The UUID must match the exact format (8-4-4-4-12 hex digits). Use whichever fits your space.
+All three verify. A bare UUID with no label or URL around it does **not** verify — a page merely mentioning a UUID is not a claim of ownership, so the UUID must appear in one of these deliberate forms. Use whichever fits your space.
 
 **Examples:**
 
 **Twitter bio (limited space):**
 ```
 Software developer | Open source contributor
-Identity: 4ff7ed97-b78f-4ae6-9011-5af714ee241c
+AnchorID: 4ff7ed97-b78f-4ae6-9011-5af714ee241c
 ```
 
 **Forum signature (limited space):**
@@ -134,7 +134,7 @@ AnchorID: 4ff7ed97-b78f-4ae6-9011-5af714ee241c
 
 **GitHub bio (160 chars):**
 ```
-Developer working on distributed systems. 4ff7ed97-b78f-4ae6-9011-5af714ee241c
+Developer working on distributed systems. anchorid.net/4ff7ed97-b78f-4ae6-9011-5af714ee241c
 ```
 
 ---
@@ -209,17 +209,18 @@ Make sure the handle format is correct:
 - ❌ Incorrect: `@user` (missing instance)
 - ❌ Incorrect: `instance.social/@user` (use full URL or @user@instance format)
 
-### Can I use just the UUID instead of the full URL?
+### Can I use something shorter than the full URL?
 
-**Yes!** For space-constrained environments (Twitter bios, forum signatures, etc.), you can use just your UUID:
+**Yes.** For space-constrained environments (Twitter bios, forum signatures, etc.), you can use the short URL or a labeled UUID:
 
 ```
-4ff7ed97-b78f-4ae6-9011-5af714ee241c
+anchorid.net/4ff7ed97-b78f-4ae6-9011-5af714ee241c
+AnchorID: 4ff7ed97-b78f-4ae6-9011-5af714ee241c
 ```
 
-AnchorID verification will find **either** the full resolver URL or just the UUID in your profile content.
+A bare UUID with no label or URL around it does **not** verify — a page merely mentioning a UUID is not a claim of ownership.
 
-**Note:** The full URL (`https://anchorid.net/resolve/your-uuid`) is recommended when space permits, as it's more human-readable and immediately identifies the verification service. Use UUID-only only when character limits require it.
+**Note:** The full URL (`https://anchorid.net/resolve/your-uuid`) is recommended when space permits, as it's more human-readable and immediately identifies the verification service. Use the shorter forms only when character limits require it.
 
 ---
 

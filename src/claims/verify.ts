@@ -321,7 +321,7 @@ async function readCapped(response: Response, maxBytes: number): Promise<string>
  */
 async function safeFetchText(
   url: string
-): Promise<{ ok: boolean; status: number; text: string; error?: string }> {
+): Promise<{ ok: boolean; status: number; text: string; error?: string; finalUrl?: string }> {
   let current = url;
 
   for (let hop = 0; hop <= PROOF_MAX_REDIRECTS; hop++) {
@@ -364,7 +364,7 @@ async function safeFetchText(
       }
 
       const text = await readCapped(r, PROOF_MAX_BYTES);
-      return { ok: r.ok, status: r.status, text };
+      return { ok: r.ok, status: r.status, text, finalUrl: current };
     } finally {
       clearTimeout(timer);
     }
@@ -690,8 +690,35 @@ async function verifyDnsClaim(
  * mentioning the UUID "verify". The documented short URL
  * anchorid.net/<uuid> (with or without scheme) counts as deliberate.
  */
+const UUID_RE = /([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})/i;
+
+/**
+ * True if a proof URL itself contains the claim's UUID (raw or
+ * percent-decoded).
+ *
+ * A match found on such a page proves nothing: an echo service or debug
+ * endpoint that reflects its request path into the response would "contain"
+ * any marker we put in the URL — e.g. https://echo.example/anchorid.net/<uuid>
+ * — without the claimant having added anything to the page. The marker must
+ * come from page content, so a proof URL carrying it is rejected outright.
+ */
+export function urlReflectsProofUuid(url: string, mustContain: string): boolean {
+  const uuidMatch = mustContain.match(UUID_RE);
+  if (!uuidMatch) return false;
+
+  const uuid = uuidMatch[1].toLowerCase();
+  const lower = url.toLowerCase();
+  if (lower.includes(uuid)) return true;
+  try {
+    return decodeURIComponent(lower).includes(uuid);
+  } catch {
+    // Malformed percent-encoding in a proof URL — treat as suspect.
+    return true;
+  }
+}
+
 export function profilePageHasUuidMarker(mustContain: string, text: string): boolean {
-  const uuidMatch = mustContain.match(/([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})/i);
+  const uuidMatch = mustContain.match(UUID_RE);
   if (!uuidMatch) return false;
 
   const uuid = uuidMatch[1].toLowerCase();
@@ -736,8 +763,21 @@ https://anchorid.net/resolve/4ff7ed97-b78f-4ae6-9011-5af714ee241c
       text = "";
 
       for (const candidate of candidates) {
+        // Reject a proof URL that carries the marker itself (before and after
+        // redirects) — a path-echoing endpoint would reflect it into the body.
+        if (claim.proof.kind === "profile_page" && urlReflectsProofUuid(candidate, claim.proof.mustContain)) {
+          return { status: "failed", failReason: "proof_url_contains_marker" };
+        }
+
         const result = await safeFetchText(candidate);
         if (result.ok) {
+          if (
+            claim.proof.kind === "profile_page" &&
+            result.finalUrl &&
+            urlReflectsProofUuid(result.finalUrl, claim.proof.mustContain)
+          ) {
+            return { status: "failed", failReason: "proof_url_contains_marker" };
+          }
           text = result.text;
           fetched = true;
           break;

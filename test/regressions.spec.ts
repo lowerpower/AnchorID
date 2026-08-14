@@ -12,7 +12,7 @@ import {
 } from './helpers';
 
 import { canonicalizeUrl, buildProfile } from '../src/domain/profile';
-import { validateProfileUrl, parseGitHubProfile, stripQueryAndFragment, profilePageHasUuidMarker } from '../src/claims/verify';
+import { validateProfileUrl, parseGitHubProfile, stripQueryAndFragment, profilePageHasUuidMarker, urlReflectsProofUuid } from '../src/claims/verify';
 import { claimsKey, upsertClaim } from '../src/claims/store';
 import { clampKvTtl, kvTtlFromEnv, intFromEnv } from '../src/env';
 
@@ -310,6 +310,17 @@ describe('public profile proof UUID markers', () => {
     // not a claim of ownership.
     expect(profilePageHasUuidMarker(mustContain, `random mention of ${uuid} in text`)).toBe(false);
     expect(profilePageHasUuidMarker(mustContain, 'no uuid here at all')).toBe(false);
+  });
+
+  it('rejects a proof URL that itself carries the marker', () => {
+    // An echo service reflecting its request path would "contain" any marker
+    // we put in the URL, so the marker must come from page content instead.
+    expect(urlReflectsProofUuid(`https://echo.example/anything/anchorid.net/${uuid}`, mustContain)).toBe(true);
+    expect(urlReflectsProofUuid(`https://echo.example/x/https://anchorid.net/resolve/${uuid}`, mustContain)).toBe(true);
+    // Percent-encoded UUID in the path must not slip through.
+    expect(urlReflectsProofUuid(`https://echo.example/%34ff7ed97-b78f-4ae6-9011-5af714ee241c`, mustContain)).toBe(true);
+    // An ordinary profile URL is unaffected.
+    expect(urlReflectsProofUuid('https://noauthority.social/@mycal', mustContain)).toBe(false);
   });
 });
 
