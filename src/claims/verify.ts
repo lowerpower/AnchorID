@@ -682,6 +682,29 @@ async function verifyDnsClaim(
   return { status: "failed", failReason: "proof_not_found" };
 }
 
+/**
+ * Marker forms accepted on a public profile page in place of the full
+ * resolver URL, for space-constrained bios. The UUID must appear in a
+ * deliberate form — a bare UUID anywhere on the page (a comment, a paste, a
+ * log line) is not a claim of ownership, and matching one made any page
+ * mentioning the UUID "verify". The documented short URL
+ * anchorid.net/<uuid> (with or without scheme) counts as deliberate.
+ */
+export function profilePageHasUuidMarker(mustContain: string, text: string): boolean {
+  const uuidMatch = mustContain.match(/([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})/i);
+  if (!uuidMatch) return false;
+
+  const uuid = uuidMatch[1].toLowerCase();
+  const haystack = text.toLowerCase();
+  const markers = [
+    `urn:uuid:${uuid}`,
+    `anchorid=${uuid}`,
+    `anchorid:${uuid}`,
+    `anchorid.net/${uuid}`,
+  ];
+  return markers.some((m) => haystack.includes(m));
+}
+
 export async function verifyClaim(
   claim: Claim,
   kv?: KVNamespace,
@@ -732,20 +755,10 @@ https://anchorid.net/resolve/4ff7ed97-b78f-4ae6-9011-5af714ee241c
     // First check for full resolver URL
     if (text.includes(claim.proof.mustContain)) return { status: "verified" };
 
-    // For public profile proofs, also accept a UUID-only marker for
-    // space-constrained bios. It must appear in a deliberate form — a bare UUID
-    // anywhere on the page (a comment, a paste, a log line) is not a claim of
-    // ownership, and matching one made any page mentioning the UUID "verify".
-    if (claim.proof.kind === "profile_page") {
-      const uuidMatch = claim.proof.mustContain.match(/([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})/i);
-      if (uuidMatch) {
-        const uuid = uuidMatch[1].toLowerCase();
-        const haystack = text.toLowerCase();
-        const markers = [`urn:uuid:${uuid}`, `anchorid=${uuid}`, `anchorid:${uuid}`];
-        if (markers.some((m) => haystack.includes(m))) {
-          return { status: "verified" };
-        }
-      }
+    // For public profile proofs, also accept a UUID marker for
+    // space-constrained bios (see profilePageHasUuidMarker).
+    if (claim.proof.kind === "profile_page" && profilePageHasUuidMarker(claim.proof.mustContain, text)) {
+      return { status: "verified" };
     }
 
     return { status: "failed", failReason: "proof_not_found" };

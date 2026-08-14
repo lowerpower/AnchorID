@@ -12,7 +12,7 @@ import {
 } from './helpers';
 
 import { canonicalizeUrl, buildProfile } from '../src/domain/profile';
-import { validateProfileUrl, parseGitHubProfile, stripQueryAndFragment } from '../src/claims/verify';
+import { validateProfileUrl, parseGitHubProfile, stripQueryAndFragment, profilePageHasUuidMarker } from '../src/claims/verify';
 import { claimsKey, upsertClaim } from '../src/claims/store';
 import { clampKvTtl, kvTtlFromEnv, intFromEnv } from '../src/env';
 
@@ -281,6 +281,33 @@ describe('public profile proof URL scope', () => {
     expect(claims[0].proof.url).toBe('https://example.com/search');
     expect(claims[0].proof.url).not.toContain('?');
     await clearAllTestData();
+  });
+});
+
+describe('public profile proof UUID markers', () => {
+  const uuid = '4ff7ed97-b78f-4ae6-9011-5af714ee241c';
+  const mustContain = `https://anchorid.net/resolve/${uuid}`;
+
+  it('accepts the documented short URL, with or without scheme', () => {
+    // /privacy, /proofs and /proofs-social all document anchorid.net/<uuid>
+    // as an accepted proof form — tightening the bare-UUID match must not
+    // break it.
+    expect(profilePageHasUuidMarker(mustContain, `bio: https://anchorid.net/${uuid}`)).toBe(true);
+    expect(profilePageHasUuidMarker(mustContain, `bio: anchorid.net/${uuid}`)).toBe(true);
+    expect(profilePageHasUuidMarker(mustContain, `AnchorID.net/${uuid.toUpperCase()}`)).toBe(true);
+  });
+
+  it('accepts the deliberate marker forms', () => {
+    expect(profilePageHasUuidMarker(mustContain, `urn:uuid:${uuid}`)).toBe(true);
+    expect(profilePageHasUuidMarker(mustContain, `anchorid=${uuid}`)).toBe(true);
+    expect(profilePageHasUuidMarker(mustContain, `anchorid:${uuid}`)).toBe(true);
+  });
+
+  it('still rejects a bare UUID with no marker', () => {
+    // A page merely mentioning the UUID (a comment, a paste, a log line) is
+    // not a claim of ownership.
+    expect(profilePageHasUuidMarker(mustContain, `random mention of ${uuid} in text`)).toBe(false);
+    expect(profilePageHasUuidMarker(mustContain, 'no uuid here at all')).toBe(false);
   });
 });
 
