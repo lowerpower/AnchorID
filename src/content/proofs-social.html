@@ -276,7 +276,7 @@
           "name": "Can I use something shorter than the full resolver URL?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Yes. For space-constrained environments (Twitter bios, forum signatures, character-limited fields), you can use the short URL 'anchorid.net/4ff7ed97-b78f-4ae6-9011-5af714ee241c' or the labeled form 'AnchorID: 4ff7ed97-b78f-4ae6-9011-5af714ee241c' instead of the full URL 'https://anchorid.net/resolve/4ff7ed97-b78f-4ae6-9011-5af714ee241c'. A bare UUID with no label or URL around it does not verify - any page merely mentioning a UUID is not a claim of ownership, so the UUID must appear in one of these deliberate forms. This still makes verification possible in contexts where full URLs don't fit: git commit messages, code comments, metadata fields, and any character-limited space."
+            "text": "Yes. For space-constrained environments (Twitter bios, forum signatures, character-limited fields), you can use the short URL 'anchorid.net/4ff7ed97-b78f-4ae6-9011-5af714ee241c', the labeled form 'AnchorID: 4ff7ed97-b78f-4ae6-9011-5af714ee241c', or the compact form 'aid:4ff7ed97-b78f-4ae6-9011-5af714ee241c' instead of the full URL 'https://anchorid.net/resolve/4ff7ed97-b78f-4ae6-9011-5af714ee241c'. A bare UUID with no label or URL around it does not verify - any page merely mentioning a UUID is not a claim of ownership, so the UUID must appear in one of these deliberate forms. This still makes verification possible in contexts where full URLs don't fit: git commit messages, code comments, metadata fields, and any character-limited space."
           }
         },
         {
@@ -468,11 +468,13 @@ Canonical identity: https://anchorid.net/resolve/4ff7ed97-b78f-4ae6-9011-5af714e
       <pre><code>https://anchorid.net/resolve/4ff7ed97-b78f-4ae6-9011-5af714ee241c</code></pre>
       <p style="margin-top:12px"><strong>Short URL — 57 chars (good middle ground):</strong></p>
       <pre><code>https://anchorid.net/4ff7ed97-b78f-4ae6-9011-5af714ee241c</code></pre>
-      <p style="margin-top:12px"><strong>Labeled UUID — 46 chars (most compact):</strong></p>
+      <p style="margin-top:12px"><strong>Labeled UUID — 46 chars:</strong></p>
       <pre><code>AnchorID: 4ff7ed97-b78f-4ae6-9011-5af714ee241c</code></pre>
+      <p style="margin-top:12px"><strong>Compact form — 40 chars (most compact):</strong></p>
+      <pre><code>aid:4ff7ed97-b78f-4ae6-9011-5af714ee241c</code></pre>
     </div>
 
-    <p>All three verify. A bare UUID with no label or URL around it does <strong>not</strong> verify — a page merely mentioning a UUID is not a claim of ownership, so the UUID must appear in one of these deliberate forms. Use whichever fits your space.</p>
+    <p>All four verify. A bare UUID with no label or URL around it does <strong>not</strong> verify — a page merely mentioning a UUID is not a claim of ownership, so the UUID must appear in one of these deliberate forms. Use whichever fits your space.</p>
 
     <p><strong>Examples:</strong></p>
 
@@ -553,9 +555,10 @@ https://news.ycombinator.com/user?id=username</code></pre>
     </ul>
 
     <h3>Can I use something shorter than the full URL?</h3>
-    <p><strong>Yes.</strong> For space-constrained environments (Twitter bios, forum signatures, etc.), you can use the short URL or a labeled UUID:</p>
+    <p><strong>Yes.</strong> For space-constrained environments (Twitter bios, forum signatures, etc.), you can use the short URL, a labeled UUID, or the compact <code>aid:</code> form:</p>
     <pre><code>anchorid.net/4ff7ed97-b78f-4ae6-9011-5af714ee241c
-AnchorID: 4ff7ed97-b78f-4ae6-9011-5af714ee241c</code></pre>
+AnchorID: 4ff7ed97-b78f-4ae6-9011-5af714ee241c
+aid:4ff7ed97-b78f-4ae6-9011-5af714ee241c</code></pre>
     <p>A bare UUID with no label or URL around it does <strong>not</strong> verify — a page merely mentioning a UUID is not a claim of ownership.</p>
     <p><strong>Note:</strong> The full URL (<code>https://anchorid.net/resolve/your-uuid</code>) is recommended when space permits, as it's more human-readable and immediately identifies the verification service. Use the shorter forms only when character limits require it.</p>
 

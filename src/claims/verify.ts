@@ -727,7 +727,10 @@ export function profilePageHasUuidMarker(mustContain: string, text: string): boo
   if (haystack.includes(`anchorid.net/${uuid}`)) return true;
   // Labeled form, e.g. "AnchorID: <uuid>" — the documented forum-signature
   // format writes a space after the colon, so tolerate optional whitespace.
-  return new RegExp(`anchorid[:=][ \\t]*${uuid}`).test(haystack);
+  if (new RegExp(`anchorid[:=][ \\t]*${uuid}`).test(haystack)) return true;
+  // Compact scheme-style form for the tightest character limits: "aid:<uuid>".
+  // The \b keeps "paid:<uuid>" / "said:<uuid>" from matching.
+  return new RegExp(`\\baid:[ \\t]*${uuid}`).test(haystack);
 }
 
 export async function verifyClaim(

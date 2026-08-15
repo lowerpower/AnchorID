@@ -112,12 +112,17 @@ https://anchorid.net/resolve/4ff7ed97-b78f-4ae6-9011-5af714ee241c
 https://anchorid.net/4ff7ed97-b78f-4ae6-9011-5af714ee241c
 ```
 
-**Labeled UUID — 46 chars (most compact):**
+**Labeled UUID — 46 chars:**
 ```
 AnchorID: 4ff7ed97-b78f-4ae6-9011-5af714ee241c
 ```
 
-All three verify. A bare UUID with no label or URL around it does **not** verify — a page merely mentioning a UUID is not a claim of ownership, so the UUID must appear in one of these deliberate forms. Use whichever fits your space.
+**Compact form — 40 chars (most compact):**
+```
+aid:4ff7ed97-b78f-4ae6-9011-5af714ee241c
+```
+
+All four verify. A bare UUID with no label or URL around it does **not** verify — a page merely mentioning a UUID is not a claim of ownership, so the UUID must appear in one of these deliberate forms. Use whichever fits your space.
 
 **Examples:**
 
@@ -211,11 +216,12 @@ Make sure the handle format is correct:
 
 ### Can I use something shorter than the full URL?
 
-**Yes.** For space-constrained environments (Twitter bios, forum signatures, etc.), you can use the short URL or a labeled UUID:
+**Yes.** For space-constrained environments (Twitter bios, forum signatures, etc.), you can use the short URL, a labeled UUID, or the compact `aid:` form:
 
 ```
 anchorid.net/4ff7ed97-b78f-4ae6-9011-5af714ee241c
 AnchorID: 4ff7ed97-b78f-4ae6-9011-5af714ee241c
+aid:4ff7ed97-b78f-4ae6-9011-5af714ee241c
 ```
 
 A bare UUID with no label or URL around it does **not** verify — a page merely mentioning a UUID is not a claim of ownership.

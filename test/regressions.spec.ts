@@ -305,6 +305,14 @@ describe('public profile proof UUID markers', () => {
     expect(profilePageHasUuidMarker(mustContain, `AnchorID: ${uuid}`)).toBe(true);
   });
 
+  it('accepts the compact aid: form', () => {
+    expect(profilePageHasUuidMarker(mustContain, `aid:${uuid}`)).toBe(true);
+    expect(profilePageHasUuidMarker(mustContain, `bio text Aid: ${uuid} more text`)).toBe(true);
+    // "aid" embedded in another word is not a marker.
+    expect(profilePageHasUuidMarker(mustContain, `paid:${uuid}`)).toBe(false);
+    expect(profilePageHasUuidMarker(mustContain, `said:${uuid}`)).toBe(false);
+  });
+
   it('still rejects a bare UUID with no marker', () => {
     // A page merely mentioning the UUID (a comment, a paste, a log line) is
     // not a claim of ownership.
