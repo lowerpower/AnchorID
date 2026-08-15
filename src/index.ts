@@ -528,7 +528,7 @@ async function route(request: Request, env: Env): Promise<Response> {
           "Website verification via .well-known/anchorid.txt",
           "DNS verification via TXT records",
           "GitHub profile verification",
-          "Public profile verification",
+          "Public profile verification (resolver URL, short URL, or aid:<uuid> marker in a bio)",
           "Cryptographic proof of platform control",
           "Public claims ledger",
           "Email-based magic link authentication"
@@ -604,7 +604,8 @@ async function route(request: Request, env: Env): Promise<Response> {
   </p>
 
   <p style="margin-top: 32px; color: #555; font-size: 14px;">
-    Already have a UUID? Try: <code>/resolve/&lt;uuid&gt;</code><br>
+    Already have a UUID? Try: <code>/resolve/&lt;uuid&gt;</code> (or the short form <code>/&lt;uuid&gt;</code>)<br>
+    In a bio, <code>anchorid.net/&lt;uuid&gt;</code>, <code>AnchorID: &lt;uuid&gt;</code>, or <code>aid:&lt;uuid&gt;</code> all verify as <a href="/proofs/social" style="color: #555;">public profile proofs</a>.<br>
     <a href="/faq" style="color: #555;">Skeptical? Read the FAQ.</a>
   </p>
 
