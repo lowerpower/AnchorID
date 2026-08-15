@@ -28,7 +28,7 @@ A short alias is also available for character-limited contexts (bios, signatures
 https://anchorid.net/<uuid>
 ```
 
-Both return identical JSON-LD. The `/resolve/<uuid>` form is canonical and should be used in proof files and JSON-LD `@id` fields.
+Both return identical JSON-LD. The `/resolve/<uuid>` form is canonical and should be used in proof files and JSON-LD `@id` fields. For public profile proofs only, the compact marker `aid:<uuid>` is also recognized (it is a marker, not a resolvable URL).
 
 ### Required Fields
 
@@ -133,6 +133,18 @@ https://anchorid.net/claims/<uuid>
 - Proof: Add your resolve URL to your GitHub profile README
 - The README must be in a repo matching your username (`username/username`)
 - Verification: AnchorID fetches the raw README and checks for the URL
+
+**DNS Claim**
+- Proof: Add a TXT record at `_anchorid.domain.com` with value `anchorid=urn:uuid:<uuid>`
+- Verification: AnchorID queries DNS over HTTPS and checks for the token
+
+**Public Profile Claim**
+- Proof: Add your AnchorID to the bio/description of any public HTTPS page
+  (Mastodon/Fediverse, forums, etc.)
+- Accepted forms: the full resolve URL, the short URL `anchorid.net/<uuid>`,
+  the labeled `AnchorID: <uuid>`, or the compact `aid:<uuid>`
+- A bare UUID with no label or URL around it does not verify
+- Verification: AnchorID fetches the page and checks for one of the accepted forms
 
 ### Claim States
 
