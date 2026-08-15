@@ -105,8 +105,20 @@ Rate limits are enforced in KV with automatic TTL expiration (1 hour).
 **Threat**: Attacker creates claims for domains or accounts they don't control.
 
 **Mitigations**:
-- Website claims require placing a file at `/.well-known/anchorid.txt` on the domain
-- GitHub claims require the resolve URL in the profile README
+- Website claims require placing a file at `/.well-known/anchorid.txt` on the domain,
+  and are stored as the bare host — the proof says nothing about arbitrary paths
+- GitHub claims require the resolve URL in the profile README, and the submitted URL
+  must actually be a `github.com/<username>` profile (the proof is fetched from that
+  user's README, so any other host would be unproven)
+- Public profile claims require a **deliberate marker** in the page content: the full
+  resolve URL, the short URL `anchorid.net/<uuid>`, the labeled `AnchorID: <uuid>`,
+  the compact `aid:<uuid>`, or `urn:uuid:<uuid>`. A bare UUID anywhere on a page
+  (a comment, a paste, a log line) is not accepted — incidental mention is not a
+  claim of ownership
+- Public profile proof URLs are stripped of query and fragment before fetching, and
+  any proof URL that itself contains the claim's UUID (raw or percent-encoded) is
+  rejected — otherwise an echo endpoint that reflects its query or path into the
+  response would "verify" without the claimant controlling the page
 - Verification fetches proof from the authoritative source
 - Claims are marked `pending` until verification succeeds
 - Failed verifications are recorded in the claims ledger
@@ -114,6 +126,9 @@ Rate limits are enforced in KV with automatic TTL expiration (1 hour).
 **Residual Risk**:
 - Temporary domain control (expired domain takeover) could create false claims
 - Compromised GitHub accounts could verify false claims
+- A page with attacker-injectable public content (comment sections, wikis) can carry
+  a deliberate marker planted by a third party; the marker rules raise the bar from
+  "mentions the UUID" to "displays an explicit AnchorID reference", not to zero
 - These are time-bounded: subsequent verification would fail after access is lost
 
 ---
