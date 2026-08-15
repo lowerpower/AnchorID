@@ -28,7 +28,10 @@ To create your own AnchorID:
    Prove ownership of your surfaces by placing verification files:  
    - Website: create `/.well-known/anchorid.txt` containing only your resolver URL  
    - DNS: add a TXT record `_anchorid.yourdomain.com`  
-   - GitHub: embed the resolver URL in your profile README
+   - GitHub: embed the resolver URL in your profile README  
+   - Public profile: add your resolver URL to any public bio — the short URL
+     `anchorid.net/<uuid>`, labeled `AnchorID: <uuid>`, or compact `aid:<uuid>`
+     forms also verify
 
 4. **Embed the AnchorID in your content**  
    Add this line to your site's HTML head or JSON-LD:
@@ -194,6 +197,19 @@ AnchorID supports **self-asserted claims** that can be **verified automatically*
 
 * **GitHub profile**
   Proof via GitHub profile README (`username/username` repo)
+
+* **Public profile**
+  Proof via any public HTTPS page (Mastodon/Fediverse bio, forum signature, etc.)
+  containing your resolver URL or one of the accepted short forms:
+
+  ```
+  https://anchorid.net/resolve/<uuid>
+  anchorid.net/<uuid>
+  AnchorID: <uuid>
+  aid:<uuid>
+  ```
+
+  A bare UUID with no label or URL around it does not verify.
 
 Each claim includes:
 
