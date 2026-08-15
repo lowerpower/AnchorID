@@ -154,6 +154,18 @@ You can manage claims directly from your profile edit page:
 
 DNS verification uses DNS-over-HTTPS and may take a few minutes to propagate.
 
+### How do I verify a public profile (Mastodon, forums, etc.)?
+
+1. Add a public profile claim from your edit page (a profile URL or Fediverse handle like `@user@instance.social`)
+2. Add your AnchorID to the page's bio or description, in any of these forms:
+   - Full URL: `https://anchorid.net/resolve/<your-uuid>`
+   - Short URL: `anchorid.net/<your-uuid>`
+   - Labeled: `AnchorID: <your-uuid>`
+   - Compact: `aid:<your-uuid>`
+3. Click "Verify" on your claim in the edit page
+
+A bare UUID with no label or URL around it does not verify — a page merely mentioning a UUID is not a claim of ownership.
+
 ### What if verification fails?
 
 The claim is marked as `failed` in your claims ledger. You can try again after fixing the issue. Common problems:
