@@ -13,6 +13,8 @@ AnchorID includes comprehensive security tests to verify the system can handle h
 - **Input validation** and sanitization
 - **Load testing** under sustained and concurrent requests
 - **Distributed attack** simulation
+- **Regression locks** for findings from the security audit (admin sessions, SSRF,
+  URL canonicalization, claim proof rules)
 
 ---
 
@@ -34,6 +36,12 @@ npm test test/security.spec.ts
 
 ```bash
 npm test test/load.spec.ts
+```
+
+### Security-Audit Regression Locks Only
+
+```bash
+npm test test/regressions.spec.ts
 ```
 
 ### Specific Test Suite
@@ -108,6 +116,34 @@ npm test -- --grep "Distributed Attacks"
 - Graceful degradation under attack (429 responses, not crashes)
 - Consistent response times
 - Legitimate traffic works during attacks
+
+### 5. Security-Audit Regression Locks (`test/regressions.spec.ts`)
+
+**What they test**: Each finding from the security audit stays fixed. Every block
+names the flaw it locks down, so a refactor that reopens one fails loudly.
+
+**Key scenarios**:
+- Admin cookie is an opaque session, never the secret; sessions bound to the
+  secret's fingerprint (rotation revokes them); the secret never renders into
+  admin pages
+- `canonicalizeUrl` rejects non-http(s) schemes (`javascript:`, `data:`, `file:`)
+  and strips embedded credentials
+- SSRF guard (`validateProfileUrl`) blocks loopback, private/CGNAT ranges, IPv6
+  literals, metadata endpoints, internal TLDs, bare hostnames, and trailing-dot
+  FQDN bypasses
+- GitHub claims must be real `github.com/<username>` profiles
+- Public profile proofs accept only deliberate marker forms — full resolver URL,
+  short URL `anchorid.net/<uuid>`, labeled `AnchorID: <uuid>`, compact
+  `aid:<uuid>`, `urn:uuid:<uuid>` — and reject bare UUIDs and proof URLs that
+  themselves contain the UUID (reflection guard)
+- Claims keys are lowercased; re-asserted claims drop stale `verifiedAt`
+- `dateModified` advances only on real edits; KV TTLs are clamped to the 60s floor
+- Security headers (CSP, `X-Frame-Options`) present on secret-bearing pages
+
+**Expected outcomes**:
+- All marker forms verify; bare UUIDs and reflected-marker URLs do not
+- Blocked SSRF targets return validation errors, never a fetch
+- Stale or unbound admin sessions redirect to `/admin/login`
 
 ---
 
@@ -199,7 +235,7 @@ Use Cloudflare Analytics to monitor:
 
 ## Known Limitations
 
-1. **KV Eventual Consistency**: Rate limit counters use KV, which is eventually consistent. Under extreme concurrent load from the same IP, you may occasionally see `limit + 1` or `limit + 2` requests succeed before rate limiting kicks in. This is acceptable and doesn't indicate a security issue.
+1. **KV Eventual Consistency**: Rate limit counters use KV, which is eventually consistent and non-atomic — treat every limit as abuse-dampening, not a security boundary (see "Rate Limiting Is Not a Security Boundary" in threat-model.md). The tests run against miniflare, whose KV is strongly consistent, so they verify the limiting logic rather than its production behavior.
 
 2. **Test Environment**: Tests run against Cloudflare Workers' test pool, which may have different performance characteristics than production. Load tests are indicative, not definitive.
 
@@ -251,6 +287,9 @@ Before deploying changes:
 - [ ] Authentication required where expected
 - [ ] Input validation rejects malicious payloads
 - [ ] Error messages don't leak sensitive information
+- [ ] Regression locks pass (`npm test test/regressions.spec.ts`) — changes to claim
+      verification keep all documented proof forms working (full URL, short URL,
+      `AnchorID: <uuid>`, `aid:<uuid>`)
 - [ ] Manual smoke test in staging environment
 
 After deploying:
