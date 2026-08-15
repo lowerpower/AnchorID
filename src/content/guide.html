@@ -338,7 +338,7 @@
 
     <pre><code>https://anchorid.net/&lt;UUID&gt;</code></pre>
 
-    <p>Both return identical responses. Use the short form when space is tight; use the full <code>/resolve/</code> form in proof files and JSON-LD.</p>
+    <p>Both return identical responses. Use the short form when space is tight; use the full <code>/resolve/</code> form in proof files and JSON-LD. For public profile proofs only, the compact marker <code>aid:&lt;UUID&gt;</code> also verifies (it is a marker, not a resolvable URL).</p>
 
     <p>
       All other identity links (blogs, public profiles, archives, code repositories) should <strong>fan out from this resolver</strong>.
@@ -439,6 +439,12 @@ Canonical identity: https://anchorid.net/resolve/&lt;UUID&gt;</code></pre>
 
     <pre><code>Canonical identity: https://anchorid.net/resolve/&lt;UUID&gt;</code></pre>
 
+    <p>If even that doesn't fit, these shorter forms still verify as public profile proofs:</p>
+
+    <pre><code>anchorid.net/&lt;UUID&gt;
+AnchorID: &lt;UUID&gt;
+aid:&lt;UUID&gt;</code></pre>
+
     <p>Do not include raw URNs, About pages, or additional links. The resolver replaces them.</p>
 
     <h3>Platforms with multiple link slots</h3>
@@ -486,6 +492,8 @@ Canonical identity: https://anchorid.net/resolve/&lt;UUID&gt;</code></pre>
     <p>
       For any public profile page (Fediverse, forums, social media, etc.), add your resolver URL directly to your bio or description.
       AnchorID will verify ownership by fetching your public profile and confirming the URL is present.
+      The short URL (<code>anchorid.net/&lt;UUID&gt;</code>), the labeled form (<code>AnchorID: &lt;UUID&gt;</code>), and the compact
+      <code>aid:&lt;UUID&gt;</code> also verify.
     </p>
 
     <p>Supported platforms include:</p>
