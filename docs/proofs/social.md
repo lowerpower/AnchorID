@@ -93,7 +93,7 @@ After adding your AnchorID to the public page, click the "Verify" button next to
 
 AnchorID will:
 1. Fetch the public page
-2. Search for your resolver URL, short URL, or a labeled UUID marker
+2. Search for your resolver URL, short URL, or a UUID marker (`AnchorID: <uuid>` or `aid:<uuid>`)
 3. Mark the claim as **verified** if found ✅
 
 ---
