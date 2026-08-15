@@ -338,7 +338,7 @@
         {
           "@type": "HowToStep",
           "name": "Add AnchorID to profile bio",
-          "text": "Edit your social profile bio/description and add your resolver URL: https://anchorid.net/resolve/<your-uuid>",
+          "text": "Edit your social profile bio/description and add your resolver URL: https://anchorid.net/resolve/<your-uuid>. Shorter forms also verify: the short URL anchorid.net/<your-uuid>, the labeled 'AnchorID: <your-uuid>', or the compact 'aid:<your-uuid>'.",
           "url": "https://anchorid.net/proofs#social-proof"
         },
         {
@@ -540,8 +540,11 @@ Value: anchorid=urn:uuid:&lt;your-uuid&gt;</code></pre>
         <li>Fediverse handles: <code>@user@instance.social</code></li>
       </ul>
 
-      <p><strong>Add to your bio:</strong></p>
-      <pre><code>https://anchorid.net/resolve/&lt;your-uuid&gt;</code></pre>
+      <p><strong>Add to your bio</strong> (any of these forms):</p>
+      <pre><code>https://anchorid.net/resolve/&lt;your-uuid&gt;
+anchorid.net/&lt;your-uuid&gt;
+AnchorID: &lt;your-uuid&gt;
+aid:&lt;your-uuid&gt;</code></pre>
 
       <p class="small">
         <a href="/proofs/social">View detailed guide →</a>
@@ -651,7 +654,7 @@ Content-Type: application/json
 
     <pre><code>https://anchorid.net/&lt;UUID&gt;</code></pre>
 
-    <p class="small">Note: proof files must use the full <code>/resolve/&lt;UUID&gt;</code> URL — the short form is for linking only.</p>
+    <p class="small">Note: website and GitHub proof files must use the full <code>/resolve/&lt;UUID&gt;</code> URL. Public profile proofs also accept the short URL, <code>AnchorID: &lt;UUID&gt;</code>, or the compact <code>aid:&lt;UUID&gt;</code> — see the <a href="/proofs/social">public profile guide</a>.</p>
 
     <hr />
 
