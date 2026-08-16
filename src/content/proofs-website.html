@@ -195,7 +195,7 @@
             {
               "@type": "HowToStep",
               "name": "Create the proof file",
-              "text": "Create a text file named 'anchorid.txt' in the .well-known directory. The file should contain only your resolver URL: https://anchorid.net/resolve/<your-uuid>",
+              "text": "Create a text file named 'anchorid.txt' in the .well-known directory. The file should contain only your resolver URL: https://anchorid.net/resolve/<your-uuid>. The full /resolve URL is required — short forms like anchorid.net/<uuid> or aid:<uuid> are for public profile proofs only.",
               "url": "https://anchorid.net/proofs/website#setup"
             },
             {
@@ -374,7 +374,7 @@
     <p><strong>Example:</strong></p>
     <pre><code>https://anchorid.net/resolve/4ff7ed97-b78f-4ae6-9011-5af714ee241c</code></pre>
 
-    <p class="small"><strong>Note:</strong> The website claim requires the full <code>/resolve/&lt;uuid&gt;</code> URL in the proof file. The short forms (<code>anchorid.net/&lt;uuid&gt;</code>, <code>AnchorID: &lt;uuid&gt;</code>, <code>aid:&lt;uuid&gt;</code>) apply to <a href="/proofs/social">public profile proofs</a> only.</p>
+    <p class="small"><strong>Note:</strong> The website claim requires the full <code>/resolve/&lt;uuid&gt;</code> URL in the proof file. The short forms (<code>anchorid.net/&lt;uuid&gt;</code>, <code>AnchorID: &lt;uuid&gt;</code>, <code>aid:&lt;uuid&gt;</code>) apply to <a href="/proofs/social">public profile proofs</a> only — if you can't create a <code>.well-known</code> file (e.g., on a hosted platform), you can instead verify any public page on your site as a public profile claim using those forms.</p>
 
     <h3>2. Make it publicly accessible</h3>
 
