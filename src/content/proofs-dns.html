@@ -192,7 +192,7 @@
         {
           "@type": "HowToStep",
           "name": "Create a TXT record at _anchorid subdomain",
-          "text": "Add a new TXT record with Name/Host: '_anchorid', Type: 'TXT', Value: 'anchorid=urn:uuid:<your-uuid>'. This creates a record at _anchorid.example.com",
+          "text": "Add a new TXT record with Name/Host: '_anchorid', Type: 'TXT', Value: 'anchorid=urn:uuid:<your-uuid>'. This creates a record at _anchorid.example.com. The exact anchorid=urn:uuid: token is required — short forms like anchorid.net/<uuid> or aid:<uuid> are for public profile proofs only.",
           "url": "https://anchorid.net/proofs/dns#setup"
         },
         {
@@ -379,7 +379,7 @@
 
     <p>This creates a TXT record at: <code>_anchorid.example.com</code></p>
 
-    <p class="small"><strong>Note:</strong> The DNS claim requires the exact <code>anchorid=urn:uuid:&lt;uuid&gt;</code> token shown above. The short forms used in bios (<code>anchorid.net/&lt;uuid&gt;</code>, <code>AnchorID: &lt;uuid&gt;</code>, <code>aid:&lt;uuid&gt;</code>) apply to <a href="/proofs/social">public profile proofs</a> only.</p>
+    <p class="small"><strong>Note:</strong> The DNS claim requires the exact <code>anchorid=urn:uuid:&lt;uuid&gt;</code> token shown above. The short forms used in bios (<code>anchorid.net/&lt;uuid&gt;</code>, <code>AnchorID: &lt;uuid&gt;</code>, <code>aid:&lt;uuid&gt;</code>) apply to <a href="/proofs/social">public profile proofs</a> only — if you can't edit DNS records for the domain, consider the <a href="/proofs/website">website proof</a> or verifying a public page on the site as a public profile claim using those forms.</p>
 
     <h3>2. Wait for DNS to propagate</h3>
     <p>Depending on your DNS provider, this can take from a minute to an hour.</p>
