@@ -33,10 +33,19 @@ This deploys the Cloudflare Worker code to production.
 
 ### Required Secrets
 
-**Admin access token** (generate a secure random string):
+**Admin secret** (generate a secure random string, 32+ chars — this is the only
+brute-force protection on the admin interface, so it must carry the entropy):
 ```bash
-npx wrangler secret put ANCHOR_ADMIN_TOKEN
+npx wrangler secret put ANCHOR_ADMIN_SECRET
 ```
+
+`ANCHOR_ADMIN_TOKEN` is still accepted as a legacy fallback for the API bearer
+token, but `ANCHOR_ADMIN_SECRET` is preferred. Rotating the secret immediately
+revokes all admin login sessions.
+
+**Optional admin tuning** (plain vars, set in `wrangler.jsonc`, not secrets):
+- `ADMIN_SESSION_TTL_SECONDS` — admin session lifetime (default 43200 = 12h)
+- `ENABLE_ADMIN_DEBUG` — set to `"true"` to expose `/admin/debug/kv` (off by default)
 
 **Email provider** - choose at least one:
 
@@ -140,8 +149,11 @@ curl https://anchorid.workers.dev/faq
 ### Check Admin Interface
 
 1. Visit `https://anchorid.workers.dev/admin/login`
-2. Login with your `ANCHOR_ADMIN_TOKEN`
+2. Login with your `ANCHOR_ADMIN_SECRET`
 3. Verify the enhanced list view shows email/metadata table
+
+Login mints an opaque session cookie (`adminsess:` in KV, 12h TTL) — the cookie
+never contains the secret itself. Logout revokes the session server-side.
 
 ---
 
@@ -175,6 +187,14 @@ npx wrangler deployments list
 
 ## Important Notes
 
+### Admin Sessions (since 2026-08-14 security remediation)
+- The admin cookie is an opaque KV-backed session id, **not** the admin secret
+- **After deploying the remediation for the first time, admins must log in again**
+  — old secret-as-cookie values no longer authenticate
+- Rotating `ANCHOR_ADMIN_SECRET` revokes every outstanding admin session immediately
+- Wrangler config is `wrangler.jsonc` only (`wrangler.toml` was removed — it was
+  silently ignored by Wrangler)
+
 ### Email Retention Feature
 - Newly created profiles will now store plaintext emails for 7 days in `email:unhashed:{uuid}` keys
 - Emails auto-expire via KV TTL (no cleanup required)
@@ -203,10 +223,17 @@ npx wrangler deployments list
 ```bash
 # Force a new deployment
 npm run deploy
-
-# Clear cache and redeploy
-npx wrangler deploy --compatibility-date=$(date +%Y-%m-%d)
 ```
+
+Do **not** pass an ad-hoc `--compatibility-date` to force a redeploy — the
+compatibility date changes Workers runtime behavior and is pinned deliberately
+in `wrangler.jsonc`. Bump it only as an intentional, tested change.
+
+### Admin login stopped working after deploying
+- Expected once after the 2026-08-14 remediation: old cookies held the secret
+  and no longer authenticate — just log in again at `/admin/login`
+- If a rotated `ANCHOR_ADMIN_SECRET` was deployed, all sessions were revoked
+  by design; log in with the new secret
 
 ### Static pages showing old content
 ```bash
@@ -287,12 +314,16 @@ npx wrangler rollback <deployment-id>
 
 ## Security Checklist
 
-- [ ] `ANCHOR_ADMIN_TOKEN` is a strong, random string (32+ characters)
+- [ ] `ANCHOR_ADMIN_SECRET` is a strong, random string (32+ characters) — the
+      admin-login rate limiter is not brute-force protection; the secret's
+      entropy is the security boundary (see threat-model.md)
 - [ ] Email provider secrets are correctly configured
-- [ ] Rate limiting is enabled (default in code)
-- [ ] Admin interface only accessible with token
+- [ ] Rate limiting is enabled (default in code; abuse-dampening only)
+- [ ] Admin interface only accessible via login session or bearer token
 - [ ] HTTPS enforced for all endpoints
 - [ ] Audit logs enabled for profile changes
+- [ ] After first deploy of the session change: confirm an old admin cookie is
+      rejected and fresh login works
 
 ---
 
@@ -307,7 +338,10 @@ Default rate limits are configured in code:
 - Signup: 10/hour per IP
 - Updates: 20/hour per UUID, 60/hour per IP
 
-Adjust in `src/index.ts` if needed.
+Adjust via env vars in `wrangler.jsonc` (e.g. `LOGIN_RL_PER_HOUR`,
+`UPDATE_RL_PER_HOUR`, `IP_LOGIN_RL_PER_HOUR` — full list in CLAUDE.md) rather
+than editing code. Note these limits are abuse-dampening, not a security
+boundary: KV counters are non-atomic (see threat-model.md).
 
 ---
 
