@@ -154,11 +154,12 @@ Security hardening complete as of 2026-01-24:
 - [x] Email index: unsalted `sha256(email)` → peppered HMAC with lazy dual-read
       migration (`src/email-index.ts`). Deployed and `EMAIL_PEPPER` set in prod
       2026-08-17 — permanent, never rotate or remove
-- [ ] Store the `EMAIL_PEPPER` value offline (password manager / recovery-codes
-      location). Wrangler secrets are write-only; without an offline copy, an
-      account loss or rebuild breaks email login for every migrated user.
-      Keep it SEPARATE from backup dumps — the pepper only protects a leaked
-      backup if they aren't stored together
+- [x] Store the `EMAIL_PEPPER` value offline — done 2026-08-18 (pepper was rotated
+      to a stored value before any keys existed under it; verified zero
+      migrations/signups at rotation time). Wrangler secrets are write-only;
+      the offline copy is required to ever rebuild the Worker. Keep it SEPARATE
+      from backup dumps — the pepper only protects a leaked backup if they
+      aren't stored together
 - [ ] CSP: replace `script-src 'unsafe-inline'` with nonces/hashes on inline-script pages
 - [ ] Deliberately review/apply newer `compatibility_date` in `wrangler.jsonc`
       (the removed `.toml` carried 2026-01-17; `.jsonc` has 2025-09-27)
