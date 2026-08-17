@@ -774,13 +774,15 @@ describe('peppered email index', () => {
     expect(await env.ANCHOR_KV.get(`email:${otherHash}`)).toBe(uuid);
   });
 
-  it('treats a mapping to a tombstoned uuid as no match and clears it', async () => {
+  it('treats a mapping to a long-tombstoned uuid as no match and clears it', async () => {
     // A deletion/migration race can leave a mapping pointing at a deleted
     // uuid. The tombstone (written first by every deletion flow, and
-    // permanent — uuids are never reused) makes the staleness decidable, so
-    // the mapping is safely cleared and the email can register again.
+    // permanent — uuids are never reused) makes the staleness decidable:
+    // once past the grace window, the mapping is safely cleared and the
+    // email can register again.
     const deadUuid = crypto.randomUUID();
-    await env.ANCHOR_KV.put(deletedTombstoneKey(deadUuid), new Date().toISOString());
+    const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+    await env.ANCHOR_KV.put(deletedTombstoneKey(deadUuid), tenMinutesAgo);
 
     const peppered = await emailIndexHash(env as any, email);
     await env.ANCHOR_KV.put(`email:${peppered}`, deadUuid);
@@ -794,6 +796,32 @@ describe('peppered email index', () => {
     const second = await lookupEmailUuid(env as any, email);
     expect(second.uuid).toBeNull();
     expect(await env.ANCHOR_KV.get(`email:${legacy}`)).toBeNull();
+  });
+
+  it('keeps the email reserved while a fresh tombstone (deletion in progress) exists', async () => {
+    // Freeing the email the instant the tombstone appears would let a
+    // re-signup race the deletion flow's unconditional key deletes — its
+    // fresh mapping would be destroyed and the new profile's email login
+    // stranded. Within the grace window the lookup must fail closed and
+    // must not clear or migrate anything.
+    const dyingUuid = crypto.randomUUID();
+    await env.ANCHOR_KV.put(deletedTombstoneKey(dyingUuid), new Date().toISOString());
+
+    const peppered = await emailIndexHash(env as any, email);
+    await env.ANCHOR_KV.put(`email:${peppered}`, dyingUuid);
+    const first = await lookupEmailUuid(env as any, email);
+    expect(first.uuid).toBe(dyingUuid);
+    expect(await env.ANCHOR_KV.get(`email:${peppered}`)).toBe(dyingUuid);
+    await env.ANCHOR_KV.delete(`email:${peppered}`);
+
+    // Legacy form: reserved, and no migration writes for a dying uuid.
+    const legacy = await legacyEmailHash(email);
+    await env.ANCHOR_KV.put(`email:${legacy}`, dyingUuid);
+    const second = await lookupEmailUuid(env as any, email);
+    expect(second.uuid).toBe(dyingUuid);
+    expect(second.hash).toBe(legacy);
+    expect(await env.ANCHOR_KV.get(`email:${peppered}`)).toBeNull();
+    expect(await env.ANCHOR_KV.get(emailPointerKey(dyingUuid))).toBeNull();
   });
 
   it('deletion derives both index hashes from the stored plaintext email', async () => {

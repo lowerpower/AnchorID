@@ -96,8 +96,23 @@ export function deletedTombstoneKey(uuid: string): string {
   return `deleted:${uuid.toLowerCase()}`;
 }
 
-async function isDeleted(env: Env, uuid: string): Promise<boolean> {
-  return (await env.ANCHOR_KV.get(deletedTombstoneKey(uuid))) !== null;
+/**
+ * While a tombstone is younger than this, the deletion flow's unconditional
+ * key deletes may still be running or propagating; freeing the email during
+ * that window would let a fresh signup's mapping be destroyed by those
+ * deletes. The flows themselves finish in seconds and KV propagation is
+ * bounded by ~a minute, so five minutes is comfortably past both.
+ */
+const TOMBSTONE_GRACE_MS = 5 * 60 * 1000;
+
+type TombstoneState = "none" | "deleting" | "dead";
+
+async function tombstoneState(env: Env, uuid: string): Promise<TombstoneState> {
+  const v = await env.ANCHOR_KV.get(deletedTombstoneKey(uuid));
+  if (v === null) return "none";
+  const t = Date.parse(v);
+  if (Number.isFinite(t) && Date.now() - t < TOMBSTONE_GRACE_MS) return "deleting";
+  return "dead";
 }
 
 export async function lookupEmailUuid(
@@ -109,10 +124,18 @@ export async function lookupEmailUuid(
 
   const uuid = await env.ANCHOR_KV.get(`email:${hash}`);
   if (uuid) {
-    if (await isDeleted(env, uuid)) {
-      // The uuid is tombstoned: this mapping is an orphan from a
-      // deletion/migration race. Clearing it is safe (uuids are never
-      // reused) and frees the email to register again.
+    const tomb = await tombstoneState(env, uuid);
+    if (tomb === "deleting") {
+      // Deletion in progress: keep the email reserved (fail closed) until
+      // the grace period passes, so a re-signup can't race the deletion
+      // flow's unconditional key deletes. No reconcile either — nothing may
+      // be recreated for a dying uuid.
+      return { uuid, hash };
+    }
+    if (tomb === "dead") {
+      // The uuid is tombstoned and past the grace period: this mapping is an
+      // orphan from a deletion/migration race. Clearing it is safe (uuids
+      // are never reused) and frees the email to register again.
       await env.ANCHOR_KV.delete(`email:${hash}`).catch(() => {});
       return { uuid: null, hash };
     }
@@ -152,8 +175,14 @@ export async function lookupEmailUuid(
   const legacyUuid = await env.ANCHOR_KV.get(`email:${legacy}`);
   if (!legacyUuid) return { uuid: null, hash };
 
-  if (await isDeleted(env, legacyUuid)) {
-    // Tombstoned uuid — stale legacy mapping; safe to clear (see above).
+  const legacyTomb = await tombstoneState(env, legacyUuid);
+  if (legacyTomb === "deleting") {
+    // Deletion in progress — reserve the email, and definitely don't
+    // migrate keys for a dying uuid.
+    return { uuid: legacyUuid, hash: legacy };
+  }
+  if (legacyTomb === "dead") {
+    // Tombstoned past grace — stale legacy mapping; safe to clear.
     await env.ANCHOR_KV.delete(`email:${legacy}`).catch(() => {});
     return { uuid: null, hash };
   }
@@ -181,11 +210,15 @@ export async function lookupEmailUuid(
     await env.ANCHOR_KV.delete(`email:${legacy}`);
     migrated = true;
 
-    // Deletion may have raced us between the profile check above and these
-    // writes. The tombstone is written first by every deletion flow and this
-    // is a cold read of a fresh key (origin, not edge cache), so it decides
-    // the race: if the uuid is dead, undo the index we just recreated.
-    if (await isDeleted(env, legacyUuid)) {
+    // Deletion may have raced us between the tombstone check above and these
+    // writes. This re-check is best-effort, NOT authoritative: KV can serve
+    // the earlier read's cached miss for this same key, so a same-colo race
+    // inside the cache window slips through. That residual is bounded
+    // staleness, not permanent damage — the tombstone-aware branches above
+    // clear a recreated mapping on any later lookup that sees the tombstone.
+    // Making this exact requires a serialization point (a Durable Object),
+    // which the threat model deliberately defers. See threat-model.md.
+    if ((await tombstoneState(env, legacyUuid)) !== "none") {
       await env.ANCHOR_KV.delete(emailPointerKey(legacyUuid));
       await env.ANCHOR_KV.delete(`email:${hash}`);
       return { uuid: null, hash };

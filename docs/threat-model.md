@@ -328,6 +328,18 @@ Fixing this properly requires atomic state — a Durable Object per limit key, o
 the Cloudflare Workers rate-limiting binding. That is deferred until abuse
 justifies the added moving parts.
 
+The same KV property bounds the **email index** (`src/email-index.ts`): the
+peppered-hash migration, profile deletion, and signup each write several keys
+non-atomically. The design converges rather than serializes — deletion writes a
+permanent `deleted:<uuid>` tombstone first, tombstones carry a grace window
+that keeps an email reserved until deletion's key deletes have landed, and
+every lookup repairs what it can prove stale. The residual is **bounded
+staleness**: within roughly a KV cache window (~1 minute), a same-colo race
+between a migration and a deletion can briefly resurrect a mapping to a
+deleted uuid; the next lookup that sees the tombstone clears it. No state is
+permanently wrong and no email is permanently stranded. Making these paths
+exact would need the same Durable Object serialization deferred above.
+
 ## Future Considerations
 
 Potential improvements not currently implemented:
