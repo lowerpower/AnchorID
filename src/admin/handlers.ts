@@ -16,7 +16,7 @@
 
 import type { Env } from "../env";
 import { kvTtlFromEnv } from "../env";
-import { lookupEmailUuid } from "../email-index";
+import { lookupEmailUuid, emailPointerKey } from "../email-index";
 import { securityHeaders } from "../http";
 import { buildProfile, mergeSameAs } from "../domain/profile";
 import { loadClaims } from "../claims/store";
@@ -2197,6 +2197,14 @@ export async function handleAdminDelete(
   if (stored._emailHash) {
     keysToDelete.push(`email:${stored._emailHash}`);
   }
+
+  // A migrated email is indexed under the hash in the pointer key, which
+  // diverges from the frozen _emailHash — delete both candidates.
+  const emailPointer = await env.ANCHOR_KV.get(emailPointerKey(uuid));
+  if (emailPointer) {
+    keysToDelete.push(`email:${emailPointer}`);
+  }
+  keysToDelete.push(emailPointerKey(uuid));
 
   // Delete all keys in parallel
   await Promise.all(keysToDelete.map(key => env.ANCHOR_KV.delete(key)));

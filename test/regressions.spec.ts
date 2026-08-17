@@ -7,6 +7,7 @@ import {
   createLoginSession,
   withAdminAuth,
   withAdminSession,
+  withAdminSessionAndCsrf,
   getKVJson,
   setKV,
 } from './helpers';
@@ -15,7 +16,7 @@ import { canonicalizeUrl, buildProfile } from '../src/domain/profile';
 import { validateProfileUrl, parseGitHubProfile, stripQueryAndFragment, profilePageHasUuidMarker, urlReflectsProofUuid } from '../src/claims/verify';
 import { claimsKey, upsertClaim } from '../src/claims/store';
 import { clampKvTtl, kvTtlFromEnv, intFromEnv } from '../src/env';
-import { emailIndexHash, legacyEmailHash, lookupEmailUuid } from '../src/email-index';
+import { emailIndexHash, legacyEmailHash, lookupEmailUuid, emailPointerKey } from '../src/email-index';
 
 /**
  * Regression tests for the security audit fixes.
@@ -635,12 +636,14 @@ describe('peppered email index', () => {
 
     expect(found).toBe(uuid);
     expect(hash).not.toBe(legacyHash);
-    // New key written, legacy key deleted, profile._emailHash kept in sync
-    // (deletion/purge paths derive the index key from _emailHash).
+    // New key written, pointer records the current hash, legacy key deleted.
+    // The profile document must NOT be rewritten: a stale read on the login
+    // path written back would revert concurrent profile edits.
     expect(await env.ANCHOR_KV.get(`email:${hash}`)).toBe(uuid);
+    expect(await env.ANCHOR_KV.get(emailPointerKey(uuid))).toBe(hash);
     expect(await env.ANCHOR_KV.get(`email:${legacyHash}`)).toBeNull();
     const profile = await getKVJson(`profile:${uuid}`);
-    expect(profile._emailHash).toBe(hash);
+    expect(profile._emailHash).toBe(legacyHash);
   });
 
   it('login through a legacy key succeeds and migrates it', async () => {
@@ -656,14 +659,41 @@ describe('peppered email index', () => {
 
     const peppered = await emailIndexHash(env as any, email);
     expect(await env.ANCHOR_KV.get(`email:${peppered}`)).toBe(uuid);
+    expect(await env.ANCHOR_KV.get(emailPointerKey(uuid))).toBe(peppered);
     expect(await env.ANCHOR_KV.get(`email:${legacyHash}`)).toBeNull();
   });
 
-  it('reconciles an interrupted migration on a primary hit', async () => {
-    // Simulate a Worker termination right after the peppered key was written:
-    // both keys exist, but _emailHash still holds the legacy hash. Without
-    // reconciliation, deletion/purge (which clean up via _emailHash) would
-    // remove only the legacy key and orphan the peppered one.
+  it('profile deletion cleans up a migrated (pointer-indexed) email key', async () => {
+    // After migration the live index key diverges from the frozen
+    // _emailHash. Deletion must remove the key named by the pointer, or the
+    // orphaned peppered mapping would block the email from re-registering.
+    const { uuid } = await createMockProfile({ email });
+    await lookupEmailUuid(env as any, email); // migrate
+    const peppered = await emailIndexHash(env as any, email);
+    expect(await env.ANCHOR_KV.get(`email:${peppered}`)).toBe(uuid);
+
+    const { headers, csrfToken } = await withAdminSessionAndCsrf();
+    const fd = new FormData();
+    fd.append('_csrf', csrfToken);
+    const res = await SELF.fetch(createTestRequest(`https://anchorid.net/admin/delete/${uuid}`, {
+      method: 'POST',
+      headers,
+      body: fd,
+      redirect: 'manual',
+      ip: '198.51.100.72',
+    }));
+
+    expect(res.status).toBe(303);
+    expect(await env.ANCHOR_KV.get(`profile:${uuid}`)).toBeNull();
+    expect(await env.ANCHOR_KV.get(`email:${peppered}`)).toBeNull();
+    expect(await env.ANCHOR_KV.get(emailPointerKey(uuid))).toBeNull();
+  });
+
+  it('reconciles a migration interrupted before the pointer write', async () => {
+    // Termination right after the peppered key was written: both index keys
+    // exist, no pointer. Reconcile must record the pointer (so deletion can
+    // find the peppered key) and clear the legacy key — without ever writing
+    // the profile document.
     const { uuid, emailHash: legacyHash } = await createMockProfile({ email });
     const peppered = await emailIndexHash(env as any, email);
     await env.ANCHOR_KV.put(`email:${peppered}`, uuid);
@@ -672,29 +702,25 @@ describe('peppered email index', () => {
 
     expect(found).toBe(uuid);
     expect(hash).toBe(peppered);
-    const profile = await getKVJson(`profile:${uuid}`);
-    expect(profile._emailHash).toBe(peppered);
+    expect(await env.ANCHOR_KV.get(emailPointerKey(uuid))).toBe(peppered);
     expect(await env.ANCHOR_KV.get(`email:${legacyHash}`)).toBeNull();
+    const profile = await getKVJson(`profile:${uuid}`);
+    expect(profile._emailHash).toBe(legacyHash); // untouched
   });
 
-  it('reconciles a migration interrupted after the profile patch', async () => {
-    // Termination between the profile patch and the legacy delete leaves
-    // _emailHash already current but both index keys alive. The mismatch
-    // guard alone would skip this state, leaving the reversible legacy key
-    // forever — reconcile must clear it without touching _emailHash.
+  it('reconciles a migration interrupted before the legacy delete', async () => {
+    // Termination after the pointer write: pointer already current but the
+    // reversible legacy key lingers. Reconcile must clear it.
     const { uuid, emailHash: legacyHash } = await createMockProfile({ email });
     const peppered = await emailIndexHash(env as any, email);
     await env.ANCHOR_KV.put(`email:${peppered}`, uuid);
-    const profile = await getKVJson(`profile:${uuid}`);
-    profile._emailHash = peppered; // patch already happened
-    await env.ANCHOR_KV.put(`profile:${uuid}`, JSON.stringify(profile));
+    await env.ANCHOR_KV.put(emailPointerKey(uuid), peppered);
 
     const { uuid: found } = await lookupEmailUuid(env as any, email);
 
     expect(found).toBe(uuid);
     expect(await env.ANCHOR_KV.get(`email:${legacyHash}`)).toBeNull();
-    const after = await getKVJson(`profile:${uuid}`);
-    expect(after._emailHash).toBe(peppered);
+    expect(await env.ANCHOR_KV.get(emailPointerKey(uuid))).toBe(peppered);
   });
 
   it('never deletes a primary mapping on a missing-profile read', async () => {

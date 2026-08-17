@@ -48,7 +48,7 @@ import { sendEmail, hasEmailConfig } from "./email";
 import { securityHeaders, secretPageHeaders } from "./http";
 import type { Env } from "./env";
 import { intFromEnv, kvTtlFromEnv } from "./env";
-import { emailIndexHash, lookupEmailUuid } from "./email-index";
+import { emailIndexHash, lookupEmailUuid, emailPointerKey } from "./email-index";
 
 
 // Env lives in ./env.ts. It used to be duplicated here, which meant two
@@ -314,6 +314,11 @@ async function purgeUnverifiedProfiles(env: Env): Promise<void> {
       `email:unhashed:${uuid}`, `ip:${uuid}`,
     ];
     if (stored._emailHash) keysToDelete.push(`email:${stored._emailHash}`);
+    // A migrated email is indexed under the hash in the pointer key, which
+    // diverges from the frozen _emailHash — delete both candidates.
+    const emailPointer = await env.ANCHOR_KV.get(emailPointerKey(uuid));
+    if (emailPointer) keysToDelete.push(`email:${emailPointer}`);
+    keysToDelete.push(emailPointerKey(uuid));
     await Promise.all(keysToDelete.map(k => env.ANCHOR_KV.delete(k)));
   }
 }
