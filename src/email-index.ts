@@ -78,13 +78,35 @@ export async function lookupEmailUuid(
 
   const uuid = await env.ANCHOR_KV.get(`email:${hash}`);
   if (uuid) {
-    if (await env.ANCHOR_KV.get(`profile:${uuid}`)) return { uuid, hash };
-    // Stale mapping — the profile is gone but the index entry survived (e.g.
-    // a partially-failed migration left a key that profile deletion, which
-    // derives its cleanup from _emailHash, never removed). Left in place it
-    // would block this email from ever registering again.
-    await env.ANCHOR_KV.delete(`email:${hash}`).catch(() => {});
-    return { uuid: null, hash };
+    const stored = (await env.ANCHOR_KV.get(`profile:${uuid}`, { type: "json" })) as any | null;
+    if (!stored) {
+      // Stale mapping — the profile is gone but the index entry survived
+      // (e.g. an interrupted migration left a key that profile deletion,
+      // which derives its cleanup from _emailHash, never removed). Left in
+      // place it would block this email from ever registering again.
+      await env.ANCHOR_KV.delete(`email:${hash}`).catch(() => {});
+      return { uuid: null, hash };
+    }
+
+    // Reconcile an interrupted migration. A Worker termination between the
+    // new-key write and the profile patch / legacy delete never reaches the
+    // rollback below, leaving _emailHash on the old hash and the legacy key
+    // alive — and deletion/purge clean up via _emailHash. Finish the job
+    // whenever a primary hit sees the mismatch.
+    const oldHash = typeof stored._emailHash === "string" ? stored._emailHash : null;
+    if (oldHash && oldHash !== hash) {
+      try {
+        stored._emailHash = hash;
+        await env.ANCHOR_KV.put(`profile:${uuid}`, JSON.stringify(stored));
+        // Only remove the old key if it still points at this profile.
+        const mapped = await env.ANCHOR_KV.get(`email:${oldHash}`);
+        if (mapped === uuid) await env.ANCHOR_KV.delete(`email:${oldHash}`);
+      } catch (e) {
+        console.error("email index reconcile failed:", e);
+      }
+    }
+
+    return { uuid, hash };
   }
 
   const pepper = (env.EMAIL_PEPPER || "").trim();
@@ -109,6 +131,7 @@ export async function lookupEmailUuid(
   // from re-registering. On any failure, roll back to the fully-legacy
   // state so the next lookup retries from scratch.
   let profilePatched = false;
+  let migrated = false;
   try {
     await env.ANCHOR_KV.put(`email:${hash}`, legacyUuid);
 
@@ -119,6 +142,7 @@ export async function lookupEmailUuid(
     }
 
     await env.ANCHOR_KV.delete(`email:${legacy}`);
+    migrated = true;
   } catch (e) {
     console.error("email index migration failed, rolling back:", e);
     try {
@@ -132,5 +156,8 @@ export async function lookupEmailUuid(
     }
   }
 
-  return { uuid: legacyUuid, hash };
+  // Report the hash the email is actually indexed under: callers persist it
+  // (_emailHash, new index writes), so returning the peppered hash after a
+  // rollback would strand the still-live legacy key.
+  return { uuid: legacyUuid, hash: migrated ? hash : legacy };
 }

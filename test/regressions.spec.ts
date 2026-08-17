@@ -659,6 +659,24 @@ describe('peppered email index', () => {
     expect(await env.ANCHOR_KV.get(`email:${legacyHash}`)).toBeNull();
   });
 
+  it('reconciles an interrupted migration on a primary hit', async () => {
+    // Simulate a Worker termination right after the peppered key was written:
+    // both keys exist, but _emailHash still holds the legacy hash. Without
+    // reconciliation, deletion/purge (which clean up via _emailHash) would
+    // remove only the legacy key and orphan the peppered one.
+    const { uuid, emailHash: legacyHash } = await createMockProfile({ email });
+    const peppered = await emailIndexHash(env as any, email);
+    await env.ANCHOR_KV.put(`email:${peppered}`, uuid);
+
+    const { uuid: found, hash } = await lookupEmailUuid(env as any, email);
+
+    expect(found).toBe(uuid);
+    expect(hash).toBe(peppered);
+    const profile = await getKVJson(`profile:${uuid}`);
+    expect(profile._emailHash).toBe(peppered);
+    expect(await env.ANCHOR_KV.get(`email:${legacyHash}`)).toBeNull();
+  });
+
   it('clears a stale index mapping whose profile no longer exists', async () => {
     // A partially-failed migration (or failed cleanup) can leave an index key
     // pointing at a deleted profile. Left in place it would block the email
