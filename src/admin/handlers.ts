@@ -2193,10 +2193,6 @@ export async function handleAdminDelete(
     `ip:${uuid}`,
   ];
 
-  // Tombstone FIRST: concurrent lookups/migrations treat the uuid as dead
-  // even before the key deletions below propagate.
-  await env.ANCHOR_KV.put(deletedTombstoneKey(uuid), new Date().toISOString());
-
   // Delete email mapping if it exists
   if (stored._emailHash) {
     keysToDelete.push(`email:${stored._emailHash}`);
@@ -2217,6 +2213,12 @@ export async function handleAdminDelete(
     keysToDelete.push(`email:${emailPointer}`);
   }
   keysToDelete.push(emailPointerKey(uuid));
+
+  // Tombstone only once every fallible read above has succeeded — it is
+  // permanent, so writing it and then failing before the deletes would
+  // strand a live profile's email login after the grace period. From here
+  // on, the only remaining steps are the deletes themselves.
+  await env.ANCHOR_KV.put(deletedTombstoneKey(uuid), new Date().toISOString());
 
   // Delete all keys in parallel
   await Promise.all(keysToDelete.map(key => env.ANCHOR_KV.delete(key)));

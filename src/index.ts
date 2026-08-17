@@ -308,10 +308,6 @@ async function purgeUnverifiedProfiles(env: Env): Promise<void> {
     const created = stored.dateCreated ? new Date(stored.dateCreated).getTime() : null;
     if (!created || (now - created) < fiveDays) continue;
 
-    // Tombstone FIRST: concurrent lookups/migrations treat the uuid as dead
-    // even before the key deletions below propagate.
-    await env.ANCHOR_KV.put(deletedTombstoneKey(uuid), new Date().toISOString());
-
     const keysToDelete = [
       `profile:${uuid}`, `claims:${uuid}`, `audit:${uuid}`,
       `signup:${uuid}`, `created:${uuid}`,
@@ -329,6 +325,12 @@ async function purgeUnverifiedProfiles(env: Env): Promise<void> {
     const emailPointer = await env.ANCHOR_KV.get(emailPointerKey(uuid));
     if (emailPointer) keysToDelete.push(`email:${emailPointer}`);
     keysToDelete.push(emailPointerKey(uuid));
+
+    // Tombstone only once every fallible read above has succeeded — it is
+    // permanent, so writing it and then failing before the deletes would
+    // strand a live profile's email login after the grace period. From here
+    // on, the only remaining steps are the deletes themselves.
+    await env.ANCHOR_KV.put(deletedTombstoneKey(uuid), new Date().toISOString());
     await Promise.all(keysToDelete.map(k => env.ANCHOR_KV.delete(k)));
   }
 }

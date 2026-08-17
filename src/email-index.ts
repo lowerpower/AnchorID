@@ -222,28 +222,14 @@ export async function lookupEmailUuid(
     }
   }
 
-  // Deletion may have raced us between the tombstone check above and the
-  // migration writes. This re-check runs OUTSIDE the rollback-guarded try:
-  // by now the legacy key is deleted, so a throwing read must never trigger
-  // the pre-commit rollback (which would leave the email with no index at
-  // all). It is also best-effort, NOT authoritative — KV can serve the
-  // earlier read's cached miss for this same key, so a same-colo race inside
-  // the cache window slips through. That residual is bounded staleness, not
-  // permanent damage: the tombstone-aware branches above stop routing to a
-  // recreated mapping on any later lookup that sees the tombstone. Making
-  // this exact requires a serialization point (a Durable Object), which the
+  // Deletion may race this migration and the keys just written may outlive
+  // the uuid. Deliberately NO undo here: any delete would be value-blind (a
+  // replacement signup's mapping could already occupy `email:<hash>`), and
+  // none is needed — the tombstone-aware branches above stop routing to a
+  // tombstoned uuid, and re-registration's own put overwrites the orphaned
+  // mapping. The residual (a mapping briefly pointing at a deleted uuid) is
+  // bounded staleness; exactness would need a Durable Object, which the
   // threat model deliberately defers. See threat-model.md.
-  if (migrated) {
-    try {
-      if ((await tombstoneState(env, legacyUuid)) !== "none") {
-        await env.ANCHOR_KV.delete(emailPointerKey(legacyUuid));
-        await env.ANCHOR_KV.delete(`email:${hash}`);
-        return { uuid: null, hash };
-      }
-    } catch (e) {
-      console.error("post-migration tombstone check failed:", e);
-    }
-  }
 
   // Report the hash the email is actually indexed under: callers persist it
   // (_emailHash, new index writes), so returning the peppered hash after a
