@@ -158,7 +158,19 @@ Rate limits are enforced in KV with automatic TTL expiration (1 hour).
 **Threat**: Attacker determines which emails have AnchorID accounts.
 
 **Mitigations**:
-- Email addresses are stored as SHA-256 hashes, not plaintext in profiles
+- Email addresses are stored as hashes, not plaintext, in profiles and the
+  `email:<hash>` index
+- With `EMAIL_PEPPER` set (recommended), the index hash is
+  HMAC-SHA256(pepper, email) — a KV dump or backup alone cannot be
+  dictionary-reversed, because the pepper lives outside KV as a Wrangler
+  secret. Without the pepper the hash is bare SHA-256, which an attacker
+  holding the data can reverse for most addresses (emails are low-entropy)
+- Legacy bare-SHA-256 keys migrate to the peppered form lazily, whenever the
+  user next presents their plaintext email (login/signup/admin add). Dormant
+  users' keys stay in the legacy form — and stay reversible — until then
+- **The pepper must never be rotated or removed once set**: already-migrated
+  keys are unrecoverable under a different pepper (affected users would need
+  their backup token)
 - Login endpoint returns the same response for existing and non-existing emails
 - Rate limiting prevents bulk enumeration
 

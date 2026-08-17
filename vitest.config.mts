@@ -13,6 +13,9 @@ export default defineWorkersConfig({
 						// Fake email provider so login/signup handlers don't return 501
 						RESEND_API_KEY: 'test-resend-key',
 						EMAIL_FROM: 'test@example.com',
+						// Peppered email index (HMAC mode); legacy-fallback tests plant
+						// bare-sha256 keys directly in KV
+						EMAIL_PEPPER: 'test-email-pepper',
 						// Low rate limits for security tests (comments in security.spec.ts reference these)
 						IP_RESOLVE_RL_PER_HOUR: '5',
 						IP_CLAIMS_RL_PER_HOUR: '5',

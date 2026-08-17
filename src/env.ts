@@ -55,6 +55,13 @@ export interface Env {
   CLAIM_RL_PER_HOUR?: string;      // default 10 (per UUID for claim creation)
   VERIFY_RL_PER_HOUR?: string;     // default 20 (per UUID for claim verification)
 
+  // Optional: pepper for the email→UUID index (HMAC-SHA256 key, set as a
+  // Wrangler secret). When set, new/updated index keys use
+  // HMAC(pepper, email) instead of bare sha256(email); legacy keys keep
+  // working via fallback and migrate lazily on login/signup.
+  // MUST NOT be rotated or removed once set — see src/email-index.ts.
+  EMAIL_PEPPER?: string;
+
   // Optional: expose the raw KV key-enumeration endpoint at /admin/debug/kv
   ENABLE_ADMIN_DEBUG?: string; // "true" to enable
 

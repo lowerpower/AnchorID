@@ -15,6 +15,7 @@ import { canonicalizeUrl, buildProfile } from '../src/domain/profile';
 import { validateProfileUrl, parseGitHubProfile, stripQueryAndFragment, profilePageHasUuidMarker, urlReflectsProofUuid } from '../src/claims/verify';
 import { claimsKey, upsertClaim } from '../src/claims/store';
 import { clampKvTtl, kvTtlFromEnv, intFromEnv } from '../src/env';
+import { emailIndexHash, legacyEmailHash, lookupEmailUuid } from '../src/email-index';
 
 /**
  * Regression tests for the security audit fixes.
@@ -600,5 +601,83 @@ describe('admin secret exposure', () => {
     // there it is read back via getAttribute() as a string, never parsed as JS.
     expect(html).not.toContain("x');");
     expect(html).toContain('data-profile-name="x&#039;);window.__pwned=1;//"');
+  });
+});
+
+// ------------------------------------------------------------------
+// Peppered email index (EMAIL_PEPPER) with lazy legacy migration
+// ------------------------------------------------------------------
+describe('peppered email index', () => {
+  beforeEach(async () => { await clearAllTestData(); });
+  afterEach(async () => { await clearAllTestData(); });
+
+  const email = 'pepper-test@example.com';
+
+  it('uses HMAC (not bare sha256) when the pepper is set', async () => {
+    const peppered = await emailIndexHash(env as any, email);
+    const legacy = await legacyEmailHash(email);
+    expect(peppered).not.toBe(legacy);
+    expect(peppered).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it('falls back to bare sha256 when no pepper is configured', async () => {
+    const noPepperEnv = { ...(env as any), EMAIL_PEPPER: undefined };
+    expect(await emailIndexHash(noPepperEnv, email)).toBe(await legacyEmailHash(email));
+  });
+
+  it('migrates a legacy sha256 key in place on lookup', async () => {
+    // createMockProfile indexes the email under the legacy bare-sha256 key —
+    // exactly the state of a pre-migration production profile.
+    const { uuid, emailHash: legacyHash } = await createMockProfile({ email });
+    expect(await env.ANCHOR_KV.get(`email:${legacyHash}`)).toBe(uuid);
+
+    const { uuid: found, hash } = await lookupEmailUuid(env as any, email);
+
+    expect(found).toBe(uuid);
+    expect(hash).not.toBe(legacyHash);
+    // New key written, legacy key deleted, profile._emailHash kept in sync
+    // (deletion/purge paths derive the index key from _emailHash).
+    expect(await env.ANCHOR_KV.get(`email:${hash}`)).toBe(uuid);
+    expect(await env.ANCHOR_KV.get(`email:${legacyHash}`)).toBeNull();
+    const profile = await getKVJson(`profile:${uuid}`);
+    expect(profile._emailHash).toBe(hash);
+  });
+
+  it('login through a legacy key succeeds and migrates it', async () => {
+    const { uuid, emailHash: legacyHash } = await createMockProfile({ email });
+
+    const res = await SELF.fetch(createTestRequest('https://anchorid.net/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+      ip: '198.51.100.70',
+    }));
+    expect(res.status).toBe(200);
+
+    const peppered = await emailIndexHash(env as any, email);
+    expect(await env.ANCHOR_KV.get(`email:${peppered}`)).toBe(uuid);
+    expect(await env.ANCHOR_KV.get(`email:${legacyHash}`)).toBeNull();
+  });
+
+  it('signup dup-check catches an email still indexed under a legacy key', async () => {
+    const { uuid } = await createMockProfile({ email });
+
+    const csrf = 'pepper-signup-csrf';
+    const fd = new FormData();
+    fd.append('email', email);
+    fd.append('name', 'Dup Attempt');
+    fd.append('_csrf', csrf);
+    const res = await SELF.fetch(createTestRequest('https://anchorid.net/create', {
+      method: 'POST',
+      headers: { 'Cookie': `anchor_csrf=${csrf}` },
+      body: fd,
+      ip: '198.51.100.71',
+    }));
+
+    // Anti-oracle: same 200 as a real signup — but no second profile may be
+    // created; the (now migrated) index must still point at the original.
+    expect(res.status).toBe(200);
+    const peppered = await emailIndexHash(env as any, email);
+    expect(await env.ANCHOR_KV.get(`email:${peppered}`)).toBe(uuid);
   });
 });

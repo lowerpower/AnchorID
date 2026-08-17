@@ -43,6 +43,18 @@ npx wrangler secret put ANCHOR_ADMIN_SECRET
 token, but `ANCHOR_ADMIN_SECRET` is preferred. Rotating the secret immediately
 revokes all admin login sessions.
 
+**Email index pepper** (recommended — makes the email→UUID index resistant to
+offline dictionary reversal if KV data or a backup ever leaks):
+```bash
+npx wrangler secret put EMAIL_PEPPER    # long random string, 32+ chars
+```
+
+⚠️ **Set it once and never rotate or remove it.** Index keys migrated to the
+peppered form are unrecoverable under a different pepper — affected users
+would need their backup token to log in. Deploying the code without the
+secret is safe (legacy behavior); setting the secret activates HMAC hashing
+for new signups and lazily migrates existing users at their next login.
+
 **Optional admin tuning** (plain vars, set in `wrangler.jsonc`, not secrets):
 - `ADMIN_SESSION_TTL_SECONDS` — admin session lifetime (default 43200 = 12h)
 - `ENABLE_ADMIN_DEBUG` — set to `"true"` to expose `/admin/debug/kv` (off by default)

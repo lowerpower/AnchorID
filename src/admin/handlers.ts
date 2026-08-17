@@ -16,6 +16,7 @@
 
 import type { Env } from "../env";
 import { kvTtlFromEnv } from "../env";
+import { lookupEmailUuid } from "../email-index";
 import { securityHeaders } from "../http";
 import { buildProfile, mergeSameAs } from "../domain/profile";
 import { loadClaims } from "../claims/store";
@@ -939,10 +940,8 @@ export async function handleAdminNewPost(req: Request, env: Env): Promise<Respon
     return redirectWithError("invalid_email", "email");
   }
 
-  const emailHash = await sha256Hex(email);
-
-  // Check if email is already associated with a profile
-  const existingUuid = await env.ANCHOR_KV.get(`email:${emailHash}`);
+  // Dual-read lookup: also catches emails still indexed under a legacy key.
+  const { uuid: existingUuid, hash: emailHash } = await lookupEmailUuid(env, email);
   if (existingUuid) {
     return redirectWithError("email_exists", "email");
   }
@@ -1961,10 +1960,8 @@ export async function handleAdminSavePost(
       });
     }
 
-    const emailHash = await sha256Hex(email);
-
-    // Check if this email is already associated with a different profile
-    const existingUuid = await env.ANCHOR_KV.get(`email:${emailHash}`);
+    // Dual-read lookup: also catches emails still indexed under a legacy key.
+    const { uuid: existingUuid, hash: emailHash } = await lookupEmailUuid(env, email);
     if (existingUuid && existingUuid !== uuid) {
       return new Response(null, {
         status: 303,

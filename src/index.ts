@@ -48,6 +48,7 @@ import { sendEmail, hasEmailConfig } from "./email";
 import { securityHeaders, secretPageHeaders } from "./http";
 import type { Env } from "./env";
 import { intFromEnv, kvTtlFromEnv } from "./env";
+import { emailIndexHash, lookupEmailUuid } from "./email-index";
 
 
 // Env lives in ./env.ts. It used to be duplicated here, which meant two
@@ -1289,10 +1290,9 @@ async function handleSignup(request: Request, env: Env): Promise<Response> {
     return htmlError("Invalid Email", "Please provide a valid email address.", "/create");
   }
 
-  const emailHash = await sha256Hex(email);
-
-  // Check if email already registered
-  const existingUuid = await env.ANCHOR_KV.get(`email:${emailHash}`);
+  // Dual-read lookup: catches emails still indexed under a legacy sha256 key
+  // so an existing user can't be double-registered.
+  const { uuid: existingUuid, hash: emailHash } = await lookupEmailUuid(env, email);
   if (existingUuid) {
     // Identical response to the success path below — a different message here
     // is an account-existence oracle.
@@ -1790,7 +1790,7 @@ async function handleLogin(request: Request, env: Env): Promise<Response> {
     return json({ ok: true }, 200, { "cache-control": "no-store" });
   }
 
-  const emailHash = await sha256Hex(email);
+  const emailHash = await emailIndexHash(env, email);
 
   // Rate limit per email hash per hour
   const maxPerHour = parseInt(env.LOGIN_RL_PER_HOUR || "3", 10);
@@ -1802,7 +1802,8 @@ async function handleLogin(request: Request, env: Env): Promise<Response> {
     return json({ ok: true }, 200, { "cache-control": "no-store" });
   }
 
-  const uuid = await env.ANCHOR_KV.get(`email:${emailHash}`);
+  // Dual-read: falls back to the legacy sha256 key and migrates it in place.
+  const { uuid } = await lookupEmailUuid(env, email);
   if (!uuid) {
     // Don't reveal if email exists
     if (isFormSubmit) {

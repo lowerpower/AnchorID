@@ -6,6 +6,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Security - 2026-08-17
+
+#### Peppered Email Index (`EMAIL_PEPPER`)
+
+- The email→UUID index (`email:<hash>`) can now use HMAC-SHA256 with a secret
+  pepper instead of bare `sha256(email)`, which is dictionary-reversible for
+  anyone holding a KV dump or backup
+- Opt-in: set the `EMAIL_PEPPER` Wrangler secret. Deploying without it changes
+  nothing; with it, new signups are peppered immediately and existing users'
+  legacy keys migrate lazily at next login/signup (dual-read fallback keeps
+  dormant users working indefinitely)
+- ⚠️ The pepper is **permanent once set** — rotating or removing it strands
+  migrated keys (users would need their backup token)
+- New module `src/email-index.ts` (`emailIndexHash`, `lookupEmailUuid`);
+  regression tests cover HMAC mode, no-pepper fallback, lazy migration, and
+  dup-check across both key forms
+
 ### Added - 2026-08-15
 
 #### Compact `aid:<uuid>` Proof Marker & Documentation Sweep
