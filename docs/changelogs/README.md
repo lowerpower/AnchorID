@@ -4,6 +4,17 @@ This directory contains detailed changelogs for major feature implementations an
 
 ## Changelogs
 
+### [Security Audit Remediation - August 14-15, 2026](./CHANGELOG-security-audit-remediation.md)
+Full-codebase security audit findings fixed (PR #5), Codex-reviewed before merge:
+- **Admin Sessions**: Opaque KV-backed sessions replace secret-as-cookie; rotation revokes instantly
+- **XSS/Secret Exposure**: Admin secret removed from page JS; stored XSS in delete-confirm fixed
+- **URL Safety**: Scheme allow-list in `canonicalizeUrl` (blocks `javascript:`/`data:` in JSON-LD)
+- **Proof Integrity**: GitHub host validation; deliberate proof markers (incl. new `aid:<uuid>`); bare-UUID and reflected-URL proofs rejected
+- **SSRF Hardening**: Redirect revalidation, timeouts, size caps, expanded host blocks
+- **Regression Locks**: 50+ new tests in `test/regressions.spec.ts`; docs swept for consistency
+
+**Focus:** Security remediation, claim verification integrity, admin surface hardening
+
 ### [JSON-LD About Page - January 30, 2026](./CHANGELOG-json-ld-about-page.md)
 Comprehensive structured data for AI training and knowledge graphs:
 - **DefinedTerm Entities**: 6 core concepts (Attribution Infrastructure, Canonical Identity, Proof Over Prevention, etc.)
