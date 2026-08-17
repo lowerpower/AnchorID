@@ -152,8 +152,13 @@ Security hardening complete as of 2026-01-24:
 ## 🔜 Open Follow-ups
 
 - [x] Email index: unsalted `sha256(email)` → peppered HMAC with lazy dual-read
-      migration (`src/email-index.ts`; activate by setting `EMAIL_PEPPER` secret —
-      permanent once set)
+      migration (`src/email-index.ts`). Deployed and `EMAIL_PEPPER` set in prod
+      2026-08-17 — permanent, never rotate or remove
+- [ ] Store the `EMAIL_PEPPER` value offline (password manager / recovery-codes
+      location). Wrangler secrets are write-only; without an offline copy, an
+      account loss or rebuild breaks email login for every migrated user.
+      Keep it SEPARATE from backup dumps — the pepper only protects a leaked
+      backup if they aren't stored together
 - [ ] CSP: replace `script-src 'unsafe-inline'` with nonces/hashes on inline-script pages
 - [ ] Deliberately review/apply newer `compatibility_date` in `wrangler.jsonc`
       (the removed `.toml` carried 2026-01-17; `.jsonc` has 2025-09-27)
@@ -163,3 +168,14 @@ Security hardening complete as of 2026-01-24:
       would no longer accept
 - [ ] Admin UI copy still claims email is "never in plaintext" — inaccurate while
       `email:unhashed:<uuid>` (7d) and `profile._email` exist
+
+---
+
+## 🔁 Recurring Ops
+
+- [ ] Periodic offline backup: download `/admin/backup` (POST, full JSON dump of
+      profiles/claims/audit) and store it offline, apart from the pepper.
+      The permanence promise currently rests on one KV namespace in one
+      Cloudflare account — this is the disaster-recovery path for the data,
+      as the offline pepper copy is for the index. Suggested cadence: monthly,
+      and after any batch of new signups
