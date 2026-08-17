@@ -134,9 +134,11 @@ export async function lookupEmailUuid(
     }
     if (tomb === "dead") {
       // The uuid is tombstoned and past the grace period: this mapping is an
-      // orphan from a deletion/migration race. Clearing it is safe (uuids
-      // are never reused) and frees the email to register again.
-      await env.ANCHOR_KV.delete(`email:${hash}`).catch(() => {});
+      // orphan from a deletion/migration race. Report no match so the email
+      // can register again — but do NOT delete the mapping: a KV delete
+      // applies to the key's CURRENT value, and a stale cached read here
+      // could otherwise destroy a replacement mapping written by a completed
+      // re-registration. Re-registration's own put overwrites the orphan.
       return { uuid: null, hash };
     }
 
@@ -182,8 +184,9 @@ export async function lookupEmailUuid(
     return { uuid: legacyUuid, hash: legacy };
   }
   if (legacyTomb === "dead") {
-    // Tombstoned past grace — stale legacy mapping; safe to clear.
-    await env.ANCHOR_KV.delete(`email:${legacy}`).catch(() => {});
+    // Tombstoned past grace — stale legacy mapping. No match, no delete
+    // (same replacement-safety reasoning as the primary branch); the stale
+    // key is shadowed once the email re-registers under a peppered mapping.
     return { uuid: null, hash };
   }
 
@@ -209,20 +212,6 @@ export async function lookupEmailUuid(
     await env.ANCHOR_KV.put(emailPointerKey(legacyUuid), hash);
     await env.ANCHOR_KV.delete(`email:${legacy}`);
     migrated = true;
-
-    // Deletion may have raced us between the tombstone check above and these
-    // writes. This re-check is best-effort, NOT authoritative: KV can serve
-    // the earlier read's cached miss for this same key, so a same-colo race
-    // inside the cache window slips through. That residual is bounded
-    // staleness, not permanent damage — the tombstone-aware branches above
-    // clear a recreated mapping on any later lookup that sees the tombstone.
-    // Making this exact requires a serialization point (a Durable Object),
-    // which the threat model deliberately defers. See threat-model.md.
-    if ((await tombstoneState(env, legacyUuid)) !== "none") {
-      await env.ANCHOR_KV.delete(emailPointerKey(legacyUuid));
-      await env.ANCHOR_KV.delete(`email:${hash}`);
-      return { uuid: null, hash };
-    }
   } catch (e) {
     console.error("email index migration failed, rolling back:", e);
     try {
@@ -230,6 +219,29 @@ export async function lookupEmailUuid(
       await env.ANCHOR_KV.delete(`email:${hash}`);
     } catch (rollbackErr) {
       console.error("email index migration rollback failed:", rollbackErr);
+    }
+  }
+
+  // Deletion may have raced us between the tombstone check above and the
+  // migration writes. This re-check runs OUTSIDE the rollback-guarded try:
+  // by now the legacy key is deleted, so a throwing read must never trigger
+  // the pre-commit rollback (which would leave the email with no index at
+  // all). It is also best-effort, NOT authoritative — KV can serve the
+  // earlier read's cached miss for this same key, so a same-colo race inside
+  // the cache window slips through. That residual is bounded staleness, not
+  // permanent damage: the tombstone-aware branches above stop routing to a
+  // recreated mapping on any later lookup that sees the tombstone. Making
+  // this exact requires a serialization point (a Durable Object), which the
+  // threat model deliberately defers. See threat-model.md.
+  if (migrated) {
+    try {
+      if ((await tombstoneState(env, legacyUuid)) !== "none") {
+        await env.ANCHOR_KV.delete(emailPointerKey(legacyUuid));
+        await env.ANCHOR_KV.delete(`email:${hash}`);
+        return { uuid: null, hash };
+      }
+    } catch (e) {
+      console.error("post-migration tombstone check failed:", e);
     }
   }
 

@@ -774,12 +774,12 @@ describe('peppered email index', () => {
     expect(await env.ANCHOR_KV.get(`email:${otherHash}`)).toBe(uuid);
   });
 
-  it('treats a mapping to a long-tombstoned uuid as no match and clears it', async () => {
+  it('treats a mapping to a long-tombstoned uuid as no match, without deleting it', async () => {
     // A deletion/migration race can leave a mapping pointing at a deleted
-    // uuid. The tombstone (written first by every deletion flow, and
-    // permanent — uuids are never reused) makes the staleness decidable:
-    // once past the grace window, the mapping is safely cleared and the
-    // email can register again.
+    // uuid. Past the grace window the email is freed (no match) — but the
+    // mapping must NOT be deleted: a delete applies to the key's current
+    // value, so a stale cached read could destroy a replacement mapping from
+    // a completed re-registration. Re-registration's put overwrites instead.
     const deadUuid = crypto.randomUUID();
     const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
     await env.ANCHOR_KV.put(deletedTombstoneKey(deadUuid), tenMinutesAgo);
@@ -788,14 +788,15 @@ describe('peppered email index', () => {
     await env.ANCHOR_KV.put(`email:${peppered}`, deadUuid);
     const first = await lookupEmailUuid(env as any, email);
     expect(first.uuid).toBeNull();
-    expect(await env.ANCHOR_KV.get(`email:${peppered}`)).toBeNull();
+    expect(await env.ANCHOR_KV.get(`email:${peppered}`)).toBe(deadUuid);
+    await env.ANCHOR_KV.delete(`email:${peppered}`);
 
     // Same for a legacy mapping.
     const legacy = await legacyEmailHash(email);
     await env.ANCHOR_KV.put(`email:${legacy}`, deadUuid);
     const second = await lookupEmailUuid(env as any, email);
     expect(second.uuid).toBeNull();
-    expect(await env.ANCHOR_KV.get(`email:${legacy}`)).toBeNull();
+    expect(await env.ANCHOR_KV.get(`email:${legacy}`)).toBe(deadUuid);
   });
 
   it('keeps the email reserved while a fresh tombstone (deletion in progress) exists', async () => {
