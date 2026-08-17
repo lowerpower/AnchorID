@@ -98,7 +98,7 @@
 - [x] ❌ No accounts or passwords — using magic links + backup tokens
 - [x] ❌ No OAuth providers — email-based access only
 - [x] ❌ No profile search or discovery — resolve by UUID only
-- [x] ❌ No public write APIs — admin token required
+- [x] ❌ No unauthenticated write APIs — writes require a magic-link session token or the admin token
 
 ---
 
@@ -124,3 +124,41 @@ Security hardening complete as of 2026-01-24:
 - ✅ Load testing suite (test/load.spec.ts)
 - ✅ Complete threat model documentation
 - ✅ Security testing guide (docs/security-testing.md)
+
+---
+
+## ✅ Post-MVP: Security Audit Remediation (shipped 2026-08-14, PR #5)
+
+- [x] Admin cookie replaced with opaque KV-backed session (`adminsess:`, 12h TTL,
+      bound to secret fingerprint — rotating the secret revokes all sessions)
+- [x] Admin secret no longer rendered into admin page JS; stored XSS in delete-confirm fixed
+- [x] `canonicalizeUrl` scheme allow-list (rejects `javascript:`/`data:`/`file:` etc.),
+      strips embedded credentials
+- [x] GitHub claims validated as real `github.com/<username>` profiles; README checked
+      on `main` and `master`
+- [x] SSRF hardening: per-hop redirect revalidation, timeout, 256KB cap, IPv6/CGNAT/
+      metadata/internal-TLD/trailing-dot blocks
+- [x] Public profile proofs require deliberate markers (full URL, `anchorid.net/<uuid>`,
+      `AnchorID: <uuid>`, `aid:<uuid>`, `urn:uuid:`) — bare UUID and reflected-URL
+      proofs rejected
+- [x] `/admin/backup` GET→POST+CSRF; `/admin/debug/kv` gated behind `ENABLE_ADMIN_DEBUG`
+- [x] Correctness: `dateModified` advances properly, claims keys lowercased, cold-visit
+      CSRF fixed, KV TTLs clamped, signup existence-oracle closed, `wrangler.toml` removed
+- [x] Regression-lock suite (`test/regressions.spec.ts`)
+- [x] Docs sweep: all content pages + repo docs consistent on proof marker forms
+
+---
+
+## 🔜 Open Follow-ups
+
+- [ ] Email index: unsalted `sha256(email)` → peppered HMAC (needs migration of
+      existing `email:<hash>` keys; separate PR)
+- [ ] CSP: replace `script-src 'unsafe-inline'` with nonces/hashes on inline-script pages
+- [ ] Deliberately review/apply newer `compatibility_date` in `wrangler.jsonc`
+      (the removed `.toml` carried 2026-01-17; `.jsonc` has 2025-09-27)
+- [ ] If abuse warrants: move rate limiting to Durable Objects or the Workers
+      rate-limiting binding (KV counters are non-atomic — see threat-model.md)
+- [ ] Pass over existing `github`/`public` claims for URLs the tightened rules
+      would no longer accept
+- [ ] Admin UI copy still claims email is "never in plaintext" — inaccurate while
+      `email:unhashed:<uuid>` (7d) and `profile._email` exist
