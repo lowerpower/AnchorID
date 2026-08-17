@@ -151,8 +151,9 @@ Security hardening complete as of 2026-01-24:
 
 ## 🔜 Open Follow-ups
 
-- [ ] Email index: unsalted `sha256(email)` → peppered HMAC (needs migration of
-      existing `email:<hash>` keys; separate PR)
+- [x] Email index: unsalted `sha256(email)` → peppered HMAC with lazy dual-read
+      migration (`src/email-index.ts`; activate by setting `EMAIL_PEPPER` secret —
+      permanent once set)
 - [ ] CSP: replace `script-src 'unsafe-inline'` with nonces/hashes on inline-script pages
 - [ ] Deliberately review/apply newer `compatibility_date` in `wrangler.jsonc`
       (the removed `.toml` carried 2026-01-17; `.jsonc` has 2025-09-27)

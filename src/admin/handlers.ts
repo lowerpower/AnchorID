@@ -16,6 +16,7 @@
 
 import type { Env } from "../env";
 import { kvTtlFromEnv } from "../env";
+import { emailIndexHash, legacyEmailHash, lookupEmailUuid, emailPointerKey, deletedTombstoneKey } from "../email-index";
 import { securityHeaders } from "../http";
 import { buildProfile, mergeSameAs } from "../domain/profile";
 import { loadClaims } from "../claims/store";
@@ -939,10 +940,8 @@ export async function handleAdminNewPost(req: Request, env: Env): Promise<Respon
     return redirectWithError("invalid_email", "email");
   }
 
-  const emailHash = await sha256Hex(email);
-
-  // Check if email is already associated with a profile
-  const existingUuid = await env.ANCHOR_KV.get(`email:${emailHash}`);
+  // Dual-read lookup: also catches emails still indexed under a legacy key.
+  const { uuid: existingUuid, hash: emailHash } = await lookupEmailUuid(env, email);
   if (existingUuid) {
     return redirectWithError("email_exists", "email");
   }
@@ -1961,10 +1960,8 @@ export async function handleAdminSavePost(
       });
     }
 
-    const emailHash = await sha256Hex(email);
-
-    // Check if this email is already associated with a different profile
-    const existingUuid = await env.ANCHOR_KV.get(`email:${emailHash}`);
+    // Dual-read lookup: also catches emails still indexed under a legacy key.
+    const { uuid: existingUuid, hash: emailHash } = await lookupEmailUuid(env, email);
     if (existingUuid && existingUuid !== uuid) {
       return new Response(null, {
         status: 303,
@@ -2200,6 +2197,28 @@ export async function handleAdminDelete(
   if (stored._emailHash) {
     keysToDelete.push(`email:${stored._emailHash}`);
   }
+
+  // Deletable profiles are < 7 days old, so the plaintext email is still in
+  // KV (7-day TTL) — derive BOTH index hashes from it rather than trusting a
+  // single eventually-consistent pointer read to name the live key.
+  const plainEmail = await env.ANCHOR_KV.get(`email:unhashed:${uuid}`);
+  if (plainEmail) {
+    keysToDelete.push(`email:${await legacyEmailHash(plainEmail)}`);
+    keysToDelete.push(`email:${await emailIndexHash(env, plainEmail)}`);
+  }
+
+  // Pointer-named key as a further fallback (e.g. plaintext already expired).
+  const emailPointer = await env.ANCHOR_KV.get(emailPointerKey(uuid));
+  if (emailPointer) {
+    keysToDelete.push(`email:${emailPointer}`);
+  }
+  keysToDelete.push(emailPointerKey(uuid));
+
+  // Tombstone only once every fallible read above has succeeded — it is
+  // permanent, so writing it and then failing before the deletes would
+  // strand a live profile's email login after the grace period. From here
+  // on, the only remaining steps are the deletes themselves.
+  await env.ANCHOR_KV.put(deletedTombstoneKey(uuid), new Date().toISOString());
 
   // Delete all keys in parallel
   await Promise.all(keysToDelete.map(key => env.ANCHOR_KV.delete(key)));

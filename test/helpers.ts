@@ -143,7 +143,7 @@ export async function clearRateLimitKeys(prefix: string = 'rl:'): Promise<number
  * Use with caution - only for test cleanup
  */
 export async function clearAllTestData(): Promise<void> {
-  const prefixes = ['profile:', 'claims:', 'audit:', 'email:', 'login:', 'signup:', 'created:', 'rl:'];
+  const prefixes = ['profile:', 'claims:', 'audit:', 'email:', 'login:', 'signup:', 'created:', 'rl:', 'emailkey:', 'deleted:', 'ip:'];
 
   for (const prefix of prefixes) {
     const list = await env.ANCHOR_KV.list({ prefix });

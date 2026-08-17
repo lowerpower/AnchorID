@@ -7,6 +7,7 @@ import {
   createLoginSession,
   withAdminAuth,
   withAdminSession,
+  withAdminSessionAndCsrf,
   getKVJson,
   setKV,
 } from './helpers';
@@ -15,6 +16,7 @@ import { canonicalizeUrl, buildProfile } from '../src/domain/profile';
 import { validateProfileUrl, parseGitHubProfile, stripQueryAndFragment, profilePageHasUuidMarker, urlReflectsProofUuid } from '../src/claims/verify';
 import { claimsKey, upsertClaim } from '../src/claims/store';
 import { clampKvTtl, kvTtlFromEnv, intFromEnv } from '../src/env';
+import { emailIndexHash, legacyEmailHash, lookupEmailUuid, emailPointerKey, deletedTombstoneKey } from '../src/email-index';
 
 /**
  * Regression tests for the security audit fixes.
@@ -600,5 +602,278 @@ describe('admin secret exposure', () => {
     // there it is read back via getAttribute() as a string, never parsed as JS.
     expect(html).not.toContain("x');");
     expect(html).toContain('data-profile-name="x&#039;);window.__pwned=1;//"');
+  });
+});
+
+// ------------------------------------------------------------------
+// Peppered email index (EMAIL_PEPPER) with lazy legacy migration
+// ------------------------------------------------------------------
+describe('peppered email index', () => {
+  beforeEach(async () => { await clearAllTestData(); });
+  afterEach(async () => { await clearAllTestData(); });
+
+  const email = 'pepper-test@example.com';
+
+  it('uses HMAC (not bare sha256) when the pepper is set', async () => {
+    const peppered = await emailIndexHash(env as any, email);
+    const legacy = await legacyEmailHash(email);
+    expect(peppered).not.toBe(legacy);
+    expect(peppered).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it('falls back to bare sha256 when no pepper is configured', async () => {
+    const noPepperEnv = { ...(env as any), EMAIL_PEPPER: undefined };
+    expect(await emailIndexHash(noPepperEnv, email)).toBe(await legacyEmailHash(email));
+  });
+
+  it('migrates a legacy sha256 key in place on lookup', async () => {
+    // createMockProfile indexes the email under the legacy bare-sha256 key —
+    // exactly the state of a pre-migration production profile.
+    const { uuid, emailHash: legacyHash } = await createMockProfile({ email });
+    expect(await env.ANCHOR_KV.get(`email:${legacyHash}`)).toBe(uuid);
+
+    const { uuid: found, hash } = await lookupEmailUuid(env as any, email);
+
+    expect(found).toBe(uuid);
+    expect(hash).not.toBe(legacyHash);
+    // New key written, pointer records the current hash, legacy key deleted.
+    // The profile document must NOT be rewritten: a stale read on the login
+    // path written back would revert concurrent profile edits.
+    expect(await env.ANCHOR_KV.get(`email:${hash}`)).toBe(uuid);
+    expect(await env.ANCHOR_KV.get(emailPointerKey(uuid))).toBe(hash);
+    expect(await env.ANCHOR_KV.get(`email:${legacyHash}`)).toBeNull();
+    const profile = await getKVJson(`profile:${uuid}`);
+    expect(profile._emailHash).toBe(legacyHash);
+  });
+
+  it('login through a legacy key succeeds and migrates it', async () => {
+    const { uuid, emailHash: legacyHash } = await createMockProfile({ email });
+
+    const res = await SELF.fetch(createTestRequest('https://anchorid.net/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+      ip: '198.51.100.70',
+    }));
+    expect(res.status).toBe(200);
+
+    const peppered = await emailIndexHash(env as any, email);
+    expect(await env.ANCHOR_KV.get(`email:${peppered}`)).toBe(uuid);
+    expect(await env.ANCHOR_KV.get(emailPointerKey(uuid))).toBe(peppered);
+    expect(await env.ANCHOR_KV.get(`email:${legacyHash}`)).toBeNull();
+  });
+
+  it('profile deletion cleans up a migrated (pointer-indexed) email key', async () => {
+    // After migration the live index key diverges from the frozen
+    // _emailHash. Deletion must remove the key named by the pointer, or the
+    // orphaned peppered mapping would block the email from re-registering.
+    const { uuid } = await createMockProfile({ email });
+    await lookupEmailUuid(env as any, email); // migrate
+    const peppered = await emailIndexHash(env as any, email);
+    expect(await env.ANCHOR_KV.get(`email:${peppered}`)).toBe(uuid);
+
+    const { headers, csrfToken } = await withAdminSessionAndCsrf();
+    const fd = new FormData();
+    fd.append('_csrf', csrfToken);
+    const res = await SELF.fetch(createTestRequest(`https://anchorid.net/admin/delete/${uuid}`, {
+      method: 'POST',
+      headers,
+      body: fd,
+      redirect: 'manual',
+      ip: '198.51.100.72',
+    }));
+
+    expect(res.status).toBe(303);
+    expect(await env.ANCHOR_KV.get(`profile:${uuid}`)).toBeNull();
+    expect(await env.ANCHOR_KV.get(`email:${peppered}`)).toBeNull();
+    expect(await env.ANCHOR_KV.get(emailPointerKey(uuid))).toBeNull();
+  });
+
+  it('reconciles a migration interrupted before the pointer write', async () => {
+    // Termination right after the peppered key was written: both index keys
+    // exist, no pointer. Reconcile must record the pointer (so deletion can
+    // find the peppered key) and clear the legacy key — without ever writing
+    // the profile document.
+    const { uuid, emailHash: legacyHash } = await createMockProfile({ email });
+    const peppered = await emailIndexHash(env as any, email);
+    await env.ANCHOR_KV.put(`email:${peppered}`, uuid);
+
+    const { uuid: found, hash } = await lookupEmailUuid(env as any, email);
+
+    expect(found).toBe(uuid);
+    expect(hash).toBe(peppered);
+    expect(await env.ANCHOR_KV.get(emailPointerKey(uuid))).toBe(peppered);
+    expect(await env.ANCHOR_KV.get(`email:${legacyHash}`)).toBeNull();
+    const profile = await getKVJson(`profile:${uuid}`);
+    expect(profile._emailHash).toBe(legacyHash); // untouched
+  });
+
+  it('reconciles a migration interrupted before the legacy delete', async () => {
+    // Termination after the pointer write: pointer already current but the
+    // reversible legacy key lingers. Reconcile must clear it.
+    const { uuid, emailHash: legacyHash } = await createMockProfile({ email });
+    const peppered = await emailIndexHash(env as any, email);
+    await env.ANCHOR_KV.put(`email:${peppered}`, uuid);
+    await env.ANCHOR_KV.put(emailPointerKey(uuid), peppered);
+
+    const { uuid: found } = await lookupEmailUuid(env as any, email);
+
+    expect(found).toBe(uuid);
+    expect(await env.ANCHOR_KV.get(`email:${legacyHash}`)).toBeNull();
+    expect(await env.ANCHOR_KV.get(emailPointerKey(uuid))).toBe(peppered);
+  });
+
+  it('never deletes a primary mapping on a missing-profile read', async () => {
+    // With eventual consistency, signup's independent profile/mapping writes
+    // mean a reader can see the mapping before the profile. Deleting on a
+    // single cross-key miss would free the email for a duplicate signup —
+    // the lookup must fail safe and report the mapping as-is.
+    const ghostUuid = crypto.randomUUID();
+    const peppered = await emailIndexHash(env as any, email);
+    await env.ANCHOR_KV.put(`email:${peppered}`, ghostUuid);
+    // No profile:<ghostUuid> visible (propagation lag or genuine orphan).
+
+    const { uuid: found } = await lookupEmailUuid(env as any, email);
+    expect(found).toBe(ghostUuid);
+    expect(await env.ANCHOR_KV.get(`email:${peppered}`)).toBe(ghostUuid);
+  });
+
+  it('fails closed on a legacy mapping whose profile is not visible', async () => {
+    // During pepper activation, a just-completed signup's legacy mapping can
+    // be visible while its profile is still propagating. Returning "no
+    // match" would let a duplicate signup take over the email — the lookup
+    // must report the mapping (under its actual legacy hash) instead.
+    const ghostUuid = crypto.randomUUID();
+    const legacy = await legacyEmailHash(email);
+    await env.ANCHOR_KV.put(`email:${legacy}`, ghostUuid);
+
+    const { uuid: found, hash } = await lookupEmailUuid(env as any, email);
+    expect(found).toBe(ghostUuid);
+    expect(hash).toBe(legacy);
+    expect(await env.ANCHOR_KV.get(`email:${legacy}`)).toBe(ghostUuid);
+  });
+
+  it('does not reconcile a mismatched _emailHash that is not this email\'s legacy hash', async () => {
+    // A profile can legitimately carry mappings for two emails (admin email
+    // update leaves the prior email's key). Looking up via the older email
+    // must not demote the newer _emailHash or delete its mapping.
+    const { uuid } = await createMockProfile({ email });
+    const otherHash = 'f'.repeat(64); // stands in for a different email's hash
+    const profile = await getKVJson(`profile:${uuid}`);
+    profile._emailHash = otherHash;
+    await env.ANCHOR_KV.put(`profile:${uuid}`, JSON.stringify(profile));
+    await env.ANCHOR_KV.put(`email:${otherHash}`, uuid);
+    const peppered = await emailIndexHash(env as any, email);
+    await env.ANCHOR_KV.put(`email:${peppered}`, uuid);
+
+    const { uuid: found } = await lookupEmailUuid(env as any, email);
+
+    expect(found).toBe(uuid);
+    const after = await getKVJson(`profile:${uuid}`);
+    expect(after._emailHash).toBe(otherHash);
+    expect(await env.ANCHOR_KV.get(`email:${otherHash}`)).toBe(uuid);
+  });
+
+  it('treats a mapping to a long-tombstoned uuid as no match, without deleting it', async () => {
+    // A deletion/migration race can leave a mapping pointing at a deleted
+    // uuid. Past the grace window the email is freed (no match) — but the
+    // mapping must NOT be deleted: a delete applies to the key's current
+    // value, so a stale cached read could destroy a replacement mapping from
+    // a completed re-registration. Re-registration's put overwrites instead.
+    const deadUuid = crypto.randomUUID();
+    const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+    await env.ANCHOR_KV.put(deletedTombstoneKey(deadUuid), tenMinutesAgo);
+
+    const peppered = await emailIndexHash(env as any, email);
+    await env.ANCHOR_KV.put(`email:${peppered}`, deadUuid);
+    const first = await lookupEmailUuid(env as any, email);
+    expect(first.uuid).toBeNull();
+    expect(await env.ANCHOR_KV.get(`email:${peppered}`)).toBe(deadUuid);
+    await env.ANCHOR_KV.delete(`email:${peppered}`);
+
+    // Same for a legacy mapping.
+    const legacy = await legacyEmailHash(email);
+    await env.ANCHOR_KV.put(`email:${legacy}`, deadUuid);
+    const second = await lookupEmailUuid(env as any, email);
+    expect(second.uuid).toBeNull();
+    expect(await env.ANCHOR_KV.get(`email:${legacy}`)).toBe(deadUuid);
+  });
+
+  it('keeps the email reserved while a fresh tombstone (deletion in progress) exists', async () => {
+    // Freeing the email the instant the tombstone appears would let a
+    // re-signup race the deletion flow's unconditional key deletes — its
+    // fresh mapping would be destroyed and the new profile's email login
+    // stranded. Within the grace window the lookup must fail closed and
+    // must not clear or migrate anything.
+    const dyingUuid = crypto.randomUUID();
+    await env.ANCHOR_KV.put(deletedTombstoneKey(dyingUuid), new Date().toISOString());
+
+    const peppered = await emailIndexHash(env as any, email);
+    await env.ANCHOR_KV.put(`email:${peppered}`, dyingUuid);
+    const first = await lookupEmailUuid(env as any, email);
+    expect(first.uuid).toBe(dyingUuid);
+    expect(await env.ANCHOR_KV.get(`email:${peppered}`)).toBe(dyingUuid);
+    await env.ANCHOR_KV.delete(`email:${peppered}`);
+
+    // Legacy form: reserved, and no migration writes for a dying uuid.
+    const legacy = await legacyEmailHash(email);
+    await env.ANCHOR_KV.put(`email:${legacy}`, dyingUuid);
+    const second = await lookupEmailUuid(env as any, email);
+    expect(second.uuid).toBe(dyingUuid);
+    expect(second.hash).toBe(legacy);
+    expect(await env.ANCHOR_KV.get(`email:${peppered}`)).toBeNull();
+    expect(await env.ANCHOR_KV.get(emailPointerKey(dyingUuid))).toBeNull();
+  });
+
+  it('deletion derives both index hashes from the stored plaintext email', async () => {
+    // The pointer read during deletion is eventually consistent and can miss
+    // a fresh migration. Deletable profiles are < 7 days old, so the
+    // plaintext email is still in KV — cleanup must find the peppered key
+    // through it even when the pointer is not visible.
+    const { uuid } = await createMockProfile({ email });
+    await env.ANCHOR_KV.put(`email:unhashed:${uuid}`, email);
+    await lookupEmailUuid(env as any, email); // migrate
+    const peppered = await emailIndexHash(env as any, email);
+    expect(await env.ANCHOR_KV.get(`email:${peppered}`)).toBe(uuid);
+    // Simulate the stale pointer read: the pointer write hasn't propagated.
+    await env.ANCHOR_KV.delete(emailPointerKey(uuid));
+
+    const { headers, csrfToken } = await withAdminSessionAndCsrf();
+    const fd = new FormData();
+    fd.append('_csrf', csrfToken);
+    const res = await SELF.fetch(createTestRequest(`https://anchorid.net/admin/delete/${uuid}`, {
+      method: 'POST',
+      headers,
+      body: fd,
+      redirect: 'manual',
+      ip: '198.51.100.73',
+    }));
+
+    expect(res.status).toBe(303);
+    expect(await env.ANCHOR_KV.get(`email:${peppered}`)).toBeNull();
+    // Tombstone written, permanently marking the uuid dead.
+    expect(await env.ANCHOR_KV.get(deletedTombstoneKey(uuid))).toBeTruthy();
+  });
+
+  it('signup dup-check catches an email still indexed under a legacy key', async () => {
+    const { uuid } = await createMockProfile({ email });
+
+    const csrf = 'pepper-signup-csrf';
+    const fd = new FormData();
+    fd.append('email', email);
+    fd.append('name', 'Dup Attempt');
+    fd.append('_csrf', csrf);
+    const res = await SELF.fetch(createTestRequest('https://anchorid.net/create', {
+      method: 'POST',
+      headers: { 'Cookie': `anchor_csrf=${csrf}` },
+      body: fd,
+      ip: '198.51.100.71',
+    }));
+
+    // Anti-oracle: same 200 as a real signup — but no second profile may be
+    // created; the (now migrated) index must still point at the original.
+    expect(res.status).toBe(200);
+    const peppered = await emailIndexHash(env as any, email);
+    expect(await env.ANCHOR_KV.get(`email:${peppered}`)).toBe(uuid);
   });
 });

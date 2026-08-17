@@ -19,6 +19,8 @@ npm run cf-typegen   # Generate Cloudflare types
 - `BREVO_API_KEY` — Email delivery (Brevo for specified domains)
 - `BREVO_FROM` — Sender email address for Brevo
 - `BREVO_DOMAINS` — Comma-separated domains for Brevo routing (e.g., "outlook.com,hotmail.com")
+- `EMAIL_PEPPER` — HMAC pepper for the email→UUID index (optional; **never rotate/remove
+  once set** — see `src/email-index.ts`)
 
 **Email Provider Routing**:
 AnchorID supports three email providers with intelligent domain-based routing:
@@ -202,6 +204,8 @@ npx wrangler kv key put --remote --binding ANCHOR_KV "page:sitemap" --path ./src
 | `profile:<uuid>` | Person JSON-LD | Permanent |
 | `claims:<uuid>` | Claims array | Permanent |
 | `email:<sha256>` | UUID lookup by email hash | Permanent |
+| `emailkey:<uuid>` | Pointer to the profile's current email index hash (written at migration; diverges from frozen `_emailHash`) | Permanent |
+| `deleted:<uuid>` | Deletion tombstone, written first by admin delete + purge; makes deletion/migration races decidable (uuids never reused) | Permanent |
 | `email:unhashed:<uuid>` | Plaintext email for admin spam detection | 7 days |
 | `ip:<uuid>` | Registration IP address for admin spam detection | 7 days |
 | `adminsess:<token>` | Admin session (cookie value is this opaque id, never the secret) | 12 h |
@@ -237,6 +241,7 @@ npx wrangler kv key put --remote --binding ANCHOR_KV "page:sitemap" --path ./src
 | `BREVO_DOMAINS` | — | Comma-separated domains for Brevo routing (e.g., "outlook.com,hotmail.com") |
 | `ADMIN_SESSION_TTL_SECONDS` | 43200 | Admin session cookie lifetime (12h) |
 | `ENABLE_ADMIN_DEBUG` | — | "true" to expose `/admin/debug/kv` (off by default) |
+| `EMAIL_PEPPER` | — | HMAC pepper for email index (secret; permanent once set) |
 | `LOGIN_TTL_SECONDS` | 900 | Magic link token lifetime |
 | `LOGIN_RL_PER_HOUR` | 3 | Max login emails per email/hour |
 | `UPDATE_RL_PER_HOUR` | 20 | Max updates per UUID/hour |
