@@ -77,7 +77,15 @@ export async function lookupEmailUuid(
   const hash = await emailIndexHash(env, email);
 
   const uuid = await env.ANCHOR_KV.get(`email:${hash}`);
-  if (uuid) return { uuid, hash };
+  if (uuid) {
+    if (await env.ANCHOR_KV.get(`profile:${uuid}`)) return { uuid, hash };
+    // Stale mapping — the profile is gone but the index entry survived (e.g.
+    // a partially-failed migration left a key that profile deletion, which
+    // derives its cleanup from _emailHash, never removed). Left in place it
+    // would block this email from ever registering again.
+    await env.ANCHOR_KV.delete(`email:${hash}`).catch(() => {});
+    return { uuid: null, hash };
+  }
 
   const pepper = (env.EMAIL_PEPPER || "").trim();
   if (!pepper) return { uuid: null, hash };
@@ -86,20 +94,42 @@ export async function lookupEmailUuid(
   const legacyUuid = await env.ANCHOR_KV.get(`email:${legacy}`);
   if (!legacyUuid) return { uuid: null, hash };
 
+  const stored = (await env.ANCHOR_KV.get(`profile:${legacyUuid}`, { type: "json" })) as any | null;
+  if (!stored) {
+    // Stale legacy mapping — same self-heal as above.
+    await env.ANCHOR_KV.delete(`email:${legacy}`).catch(() => {});
+    return { uuid: null, hash };
+  }
+
   // Lazy migration. Failure here must not break the login/signup that
-  // triggered it — the legacy key still works on the next attempt.
+  // triggered it, and must not leave a half-migrated state behind: a stray
+  // peppered key would make every later lookup hit it and short-circuit, so
+  // the migration would never be retried — and after a profile deletion
+  // (which cleans up via _emailHash) the stray key would block the email
+  // from re-registering. On any failure, roll back to the fully-legacy
+  // state so the next lookup retries from scratch.
+  let profilePatched = false;
   try {
     await env.ANCHOR_KV.put(`email:${hash}`, legacyUuid);
 
-    const stored = (await env.ANCHOR_KV.get(`profile:${legacyUuid}`, { type: "json" })) as any | null;
-    if (stored && stored._emailHash === legacy) {
+    if (stored._emailHash === legacy) {
       stored._emailHash = hash;
       await env.ANCHOR_KV.put(`profile:${legacyUuid}`, JSON.stringify(stored));
+      profilePatched = true;
     }
 
     await env.ANCHOR_KV.delete(`email:${legacy}`);
   } catch (e) {
-    console.error("email index migration failed:", e);
+    console.error("email index migration failed, rolling back:", e);
+    try {
+      if (profilePatched) {
+        stored._emailHash = legacy;
+        await env.ANCHOR_KV.put(`profile:${legacyUuid}`, JSON.stringify(stored));
+      }
+      await env.ANCHOR_KV.delete(`email:${hash}`);
+    } catch (rollbackErr) {
+      console.error("email index migration rollback failed:", rollbackErr);
+    }
   }
 
   return { uuid: legacyUuid, hash };

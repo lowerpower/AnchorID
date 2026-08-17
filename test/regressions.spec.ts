@@ -659,6 +659,27 @@ describe('peppered email index', () => {
     expect(await env.ANCHOR_KV.get(`email:${legacyHash}`)).toBeNull();
   });
 
+  it('clears a stale index mapping whose profile no longer exists', async () => {
+    // A partially-failed migration (or failed cleanup) can leave an index key
+    // pointing at a deleted profile. Left in place it would block the email
+    // from ever registering again — lookup must self-heal instead.
+    const ghostUuid = crypto.randomUUID();
+    const peppered = await emailIndexHash(env as any, email);
+    await env.ANCHOR_KV.put(`email:${peppered}`, ghostUuid);
+    // No profile:<ghostUuid> exists.
+
+    const { uuid: found } = await lookupEmailUuid(env as any, email);
+    expect(found).toBeNull();
+    expect(await env.ANCHOR_KV.get(`email:${peppered}`)).toBeNull();
+
+    // Same self-heal for a stale legacy key.
+    const legacy = await legacyEmailHash(email);
+    await env.ANCHOR_KV.put(`email:${legacy}`, ghostUuid);
+    const second = await lookupEmailUuid(env as any, email);
+    expect(second.uuid).toBeNull();
+    expect(await env.ANCHOR_KV.get(`email:${legacy}`)).toBeNull();
+  });
+
   it('signup dup-check catches an email still indexed under a legacy key', async () => {
     const { uuid } = await createMockProfile({ email });
 
