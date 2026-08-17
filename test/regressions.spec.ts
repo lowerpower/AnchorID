@@ -677,6 +677,26 @@ describe('peppered email index', () => {
     expect(await env.ANCHOR_KV.get(`email:${legacyHash}`)).toBeNull();
   });
 
+  it('reconciles a migration interrupted after the profile patch', async () => {
+    // Termination between the profile patch and the legacy delete leaves
+    // _emailHash already current but both index keys alive. The mismatch
+    // guard alone would skip this state, leaving the reversible legacy key
+    // forever — reconcile must clear it without touching _emailHash.
+    const { uuid, emailHash: legacyHash } = await createMockProfile({ email });
+    const peppered = await emailIndexHash(env as any, email);
+    await env.ANCHOR_KV.put(`email:${peppered}`, uuid);
+    const profile = await getKVJson(`profile:${uuid}`);
+    profile._emailHash = peppered; // patch already happened
+    await env.ANCHOR_KV.put(`profile:${uuid}`, JSON.stringify(profile));
+
+    const { uuid: found } = await lookupEmailUuid(env as any, email);
+
+    expect(found).toBe(uuid);
+    expect(await env.ANCHOR_KV.get(`email:${legacyHash}`)).toBeNull();
+    const after = await getKVJson(`profile:${uuid}`);
+    expect(after._emailHash).toBe(peppered);
+  });
+
   it('never deletes a primary mapping on a missing-profile read', async () => {
     // With eventual consistency, signup's independent profile/mapping writes
     // mean a reader can see the mapping before the profile. Deleting on a

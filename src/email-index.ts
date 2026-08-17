@@ -90,21 +90,25 @@ export async function lookupEmailUuid(
       return { uuid, hash };
     }
 
-    // Reconcile an interrupted migration. A Worker termination between the
-    // new-key write and the profile patch / legacy delete never reaches the
-    // rollback below, leaving _emailHash on this email's legacy hash and the
-    // legacy key alive — and deletion/purge clean up via _emailHash. Only
-    // that exact state is reconciled: profiles can legitimately carry other
-    // mappings (e.g. an admin-updated email leaves the prior email's key),
-    // and a broader mismatch rule would demote or delete those.
-    const oldHash = typeof stored._emailHash === "string" ? stored._emailHash : null;
-    if (oldHash && oldHash !== hash && oldHash === (await legacyEmailHash(email))) {
+    // Reconcile an interrupted migration of THIS email. A Worker termination
+    // mid-migration never reaches the rollback below and can strand either
+    // state: _emailHash still on the legacy hash (terminated before the
+    // profile patch), or _emailHash already current but the legacy key still
+    // alive (terminated after the patch, before the delete). Both are
+    // finished here. Scope stays tight: _emailHash is only touched when it
+    // equals this email's own legacy hash, and only this email's legacy key
+    // is removed, and only while it maps to this profile — profiles can
+    // legitimately carry other mappings (e.g. an admin-updated email leaves
+    // the prior email's key), which must not be demoted or deleted.
+    if ((env.EMAIL_PEPPER || "").trim()) {
+      const legacyOfThis = await legacyEmailHash(email);
       try {
-        stored._emailHash = hash;
-        await env.ANCHOR_KV.put(`profile:${uuid}`, JSON.stringify(stored));
-        // Only remove the old key if it still points at this profile.
-        const mapped = await env.ANCHOR_KV.get(`email:${oldHash}`);
-        if (mapped === uuid) await env.ANCHOR_KV.delete(`email:${oldHash}`);
+        if (stored._emailHash === legacyOfThis) {
+          stored._emailHash = hash;
+          await env.ANCHOR_KV.put(`profile:${uuid}`, JSON.stringify(stored));
+        }
+        const mapped = await env.ANCHOR_KV.get(`email:${legacyOfThis}`);
+        if (mapped === uuid) await env.ANCHOR_KV.delete(`email:${legacyOfThis}`);
       } catch (e) {
         console.error("email index reconcile failed:", e);
       }
