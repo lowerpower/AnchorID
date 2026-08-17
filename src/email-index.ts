@@ -206,6 +206,13 @@ export async function lookupEmailUuid(
   // was written, the next primary hit's reconcile fixes the pointer and
   // clears the legacy key; if it wasn't, the next legacy hit retries. The
   // rollback just shortens the inconsistent window.
+  // Deliberately NO rollback on failure. The written keys are shared
+  // identities (two concurrent migrations of the same email write the same
+  // keys), so a failed request deleting "its" writes could destroy a
+  // concurrent request's completed migration and leave the email with no
+  // index at all. Every partial state converges on its own instead: if the
+  // peppered key landed, the next primary hit's reconcile fixes the pointer
+  // and clears the legacy key; if it didn't, the next legacy hit retries.
   let migrated = false;
   try {
     await env.ANCHOR_KV.put(`email:${hash}`, legacyUuid);
@@ -213,13 +220,7 @@ export async function lookupEmailUuid(
     await env.ANCHOR_KV.delete(`email:${legacy}`);
     migrated = true;
   } catch (e) {
-    console.error("email index migration failed, rolling back:", e);
-    try {
-      await env.ANCHOR_KV.delete(emailPointerKey(legacyUuid));
-      await env.ANCHOR_KV.delete(`email:${hash}`);
-    } catch (rollbackErr) {
-      console.error("email index migration rollback failed:", rollbackErr);
-    }
+    console.error("email index migration failed (will converge via reconcile/retry):", e);
   }
 
   // Deletion may race this migration and the keys just written may outlive
