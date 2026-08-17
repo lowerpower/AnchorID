@@ -126,11 +126,15 @@ export async function lookupEmailUuid(
 
   const stored = (await env.ANCHOR_KV.get(`profile:${legacyUuid}`, { type: "json" })) as any | null;
   if (!stored) {
-    // Stale legacy mapping (old profile deleted without index cleanup).
-    // Report no match but do not delete — the read path stays
-    // non-destructive, and once this email registers again its peppered
-    // mapping shadows the stale legacy key permanently.
-    return { uuid: null, hash };
+    // Fail closed, exactly like the primary branch: a missing profile is not
+    // proof the mapping is stale. During EMAIL_PEPPER activation, a signup
+    // completed just before the secret was enabled can have its legacy
+    // mapping visible while its independently-written profile is still
+    // propagating — treating that as "no match" would let a duplicate
+    // signup take over the email under the peppered key. Report the mapping
+    // under its actual (legacy) hash; migration waits for a lookup that can
+    // see the profile. A genuinely orphaned legacy key needs manual cleanup.
+    return { uuid: legacyUuid, hash: legacy };
   }
 
   // Lazy migration. Failure here must not break the login/signup that

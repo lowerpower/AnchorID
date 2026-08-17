@@ -712,16 +712,18 @@ describe('peppered email index', () => {
     expect(await env.ANCHOR_KV.get(`email:${peppered}`)).toBe(ghostUuid);
   });
 
-  it('reports no match for a stale legacy mapping without deleting it', async () => {
-    // Legacy keys are only written pre-pepper, so a legacy mapping with no
-    // profile is genuinely stale — but the read path stays non-destructive;
-    // a future peppered mapping simply shadows the stale key.
+  it('fails closed on a legacy mapping whose profile is not visible', async () => {
+    // During pepper activation, a just-completed signup's legacy mapping can
+    // be visible while its profile is still propagating. Returning "no
+    // match" would let a duplicate signup take over the email — the lookup
+    // must report the mapping (under its actual legacy hash) instead.
     const ghostUuid = crypto.randomUUID();
     const legacy = await legacyEmailHash(email);
     await env.ANCHOR_KV.put(`email:${legacy}`, ghostUuid);
 
-    const { uuid: found } = await lookupEmailUuid(env as any, email);
-    expect(found).toBeNull();
+    const { uuid: found, hash } = await lookupEmailUuid(env as any, email);
+    expect(found).toBe(ghostUuid);
+    expect(hash).toBe(legacy);
     expect(await env.ANCHOR_KV.get(`email:${legacy}`)).toBe(ghostUuid);
   });
 
