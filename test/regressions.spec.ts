@@ -677,25 +677,53 @@ describe('peppered email index', () => {
     expect(await env.ANCHOR_KV.get(`email:${legacyHash}`)).toBeNull();
   });
 
-  it('clears a stale index mapping whose profile no longer exists', async () => {
-    // A partially-failed migration (or failed cleanup) can leave an index key
-    // pointing at a deleted profile. Left in place it would block the email
-    // from ever registering again — lookup must self-heal instead.
+  it('never deletes a primary mapping on a missing-profile read', async () => {
+    // With eventual consistency, signup's independent profile/mapping writes
+    // mean a reader can see the mapping before the profile. Deleting on a
+    // single cross-key miss would free the email for a duplicate signup —
+    // the lookup must fail safe and report the mapping as-is.
     const ghostUuid = crypto.randomUUID();
     const peppered = await emailIndexHash(env as any, email);
     await env.ANCHOR_KV.put(`email:${peppered}`, ghostUuid);
-    // No profile:<ghostUuid> exists.
+    // No profile:<ghostUuid> visible (propagation lag or genuine orphan).
+
+    const { uuid: found } = await lookupEmailUuid(env as any, email);
+    expect(found).toBe(ghostUuid);
+    expect(await env.ANCHOR_KV.get(`email:${peppered}`)).toBe(ghostUuid);
+  });
+
+  it('reports no match for a stale legacy mapping without deleting it', async () => {
+    // Legacy keys are only written pre-pepper, so a legacy mapping with no
+    // profile is genuinely stale — but the read path stays non-destructive;
+    // a future peppered mapping simply shadows the stale key.
+    const ghostUuid = crypto.randomUUID();
+    const legacy = await legacyEmailHash(email);
+    await env.ANCHOR_KV.put(`email:${legacy}`, ghostUuid);
 
     const { uuid: found } = await lookupEmailUuid(env as any, email);
     expect(found).toBeNull();
-    expect(await env.ANCHOR_KV.get(`email:${peppered}`)).toBeNull();
+    expect(await env.ANCHOR_KV.get(`email:${legacy}`)).toBe(ghostUuid);
+  });
 
-    // Same self-heal for a stale legacy key.
-    const legacy = await legacyEmailHash(email);
-    await env.ANCHOR_KV.put(`email:${legacy}`, ghostUuid);
-    const second = await lookupEmailUuid(env as any, email);
-    expect(second.uuid).toBeNull();
-    expect(await env.ANCHOR_KV.get(`email:${legacy}`)).toBeNull();
+  it('does not reconcile a mismatched _emailHash that is not this email\'s legacy hash', async () => {
+    // A profile can legitimately carry mappings for two emails (admin email
+    // update leaves the prior email's key). Looking up via the older email
+    // must not demote the newer _emailHash or delete its mapping.
+    const { uuid } = await createMockProfile({ email });
+    const otherHash = 'f'.repeat(64); // stands in for a different email's hash
+    const profile = await getKVJson(`profile:${uuid}`);
+    profile._emailHash = otherHash;
+    await env.ANCHOR_KV.put(`profile:${uuid}`, JSON.stringify(profile));
+    await env.ANCHOR_KV.put(`email:${otherHash}`, uuid);
+    const peppered = await emailIndexHash(env as any, email);
+    await env.ANCHOR_KV.put(`email:${peppered}`, uuid);
+
+    const { uuid: found } = await lookupEmailUuid(env as any, email);
+
+    expect(found).toBe(uuid);
+    const after = await getKVJson(`profile:${uuid}`);
+    expect(after._emailHash).toBe(otherHash);
+    expect(await env.ANCHOR_KV.get(`email:${otherHash}`)).toBe(uuid);
   });
 
   it('signup dup-check catches an email still indexed under a legacy key', async () => {

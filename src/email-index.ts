@@ -80,21 +80,25 @@ export async function lookupEmailUuid(
   if (uuid) {
     const stored = (await env.ANCHOR_KV.get(`profile:${uuid}`, { type: "json" })) as any | null;
     if (!stored) {
-      // Stale mapping — the profile is gone but the index entry survived
-      // (e.g. an interrupted migration left a key that profile deletion,
-      // which derives its cleanup from _emailHash, never removed). Left in
-      // place it would block this email from ever registering again.
-      await env.ANCHOR_KV.delete(`email:${hash}`).catch(() => {});
-      return { uuid: null, hash };
+      // Missing profile on a primary hit is NOT proof the mapping is stale:
+      // signup writes profile and mapping as independent KV puts, and with
+      // eventual consistency a reader can see the mapping before the
+      // profile. Deleting here would free the email for a duplicate signup.
+      // Fail safe — report the mapping as-is; a genuinely orphaned peppered
+      // key (which the rollback/reconcile paths exist to prevent) needs
+      // manual cleanup via `wrangler kv key delete`.
+      return { uuid, hash };
     }
 
     // Reconcile an interrupted migration. A Worker termination between the
     // new-key write and the profile patch / legacy delete never reaches the
-    // rollback below, leaving _emailHash on the old hash and the legacy key
-    // alive — and deletion/purge clean up via _emailHash. Finish the job
-    // whenever a primary hit sees the mismatch.
+    // rollback below, leaving _emailHash on this email's legacy hash and the
+    // legacy key alive — and deletion/purge clean up via _emailHash. Only
+    // that exact state is reconciled: profiles can legitimately carry other
+    // mappings (e.g. an admin-updated email leaves the prior email's key),
+    // and a broader mismatch rule would demote or delete those.
     const oldHash = typeof stored._emailHash === "string" ? stored._emailHash : null;
-    if (oldHash && oldHash !== hash) {
+    if (oldHash && oldHash !== hash && oldHash === (await legacyEmailHash(email))) {
       try {
         stored._emailHash = hash;
         await env.ANCHOR_KV.put(`profile:${uuid}`, JSON.stringify(stored));
@@ -118,8 +122,10 @@ export async function lookupEmailUuid(
 
   const stored = (await env.ANCHOR_KV.get(`profile:${legacyUuid}`, { type: "json" })) as any | null;
   if (!stored) {
-    // Stale legacy mapping — same self-heal as above.
-    await env.ANCHOR_KV.delete(`email:${legacy}`).catch(() => {});
+    // Stale legacy mapping (old profile deleted without index cleanup).
+    // Report no match but do not delete — the read path stays
+    // non-destructive, and once this email registers again its peppered
+    // mapping shadows the stale legacy key permanently.
     return { uuid: null, hash };
   }
 
