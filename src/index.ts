@@ -48,7 +48,7 @@ import { sendEmail, hasEmailConfig } from "./email";
 import { securityHeaders, secretPageHeaders } from "./http";
 import type { Env } from "./env";
 import { intFromEnv, kvTtlFromEnv } from "./env";
-import { emailIndexHash, lookupEmailUuid, emailPointerKey } from "./email-index";
+import { emailIndexHash, legacyEmailHash, lookupEmailUuid, emailPointerKey, deletedTombstoneKey } from "./email-index";
 
 
 // Env lives in ./env.ts. It used to be duplicated here, which meant two
@@ -308,14 +308,24 @@ async function purgeUnverifiedProfiles(env: Env): Promise<void> {
     const created = stored.dateCreated ? new Date(stored.dateCreated).getTime() : null;
     if (!created || (now - created) < fiveDays) continue;
 
+    // Tombstone FIRST: concurrent lookups/migrations treat the uuid as dead
+    // even before the key deletions below propagate.
+    await env.ANCHOR_KV.put(deletedTombstoneKey(uuid), new Date().toISOString());
+
     const keysToDelete = [
       `profile:${uuid}`, `claims:${uuid}`, `audit:${uuid}`,
       `signup:${uuid}`, `created:${uuid}`,
       `email:unhashed:${uuid}`, `ip:${uuid}`,
     ];
     if (stored._emailHash) keysToDelete.push(`email:${stored._emailHash}`);
-    // A migrated email is indexed under the hash in the pointer key, which
-    // diverges from the frozen _emailHash — delete both candidates.
+    // Purged profiles are young enough that the plaintext email is still in
+    // KV (7-day TTL) — derive BOTH index hashes from it rather than trusting
+    // a single eventually-consistent pointer read to name the live key.
+    const plainEmail = await env.ANCHOR_KV.get(`email:unhashed:${uuid}`);
+    if (plainEmail) {
+      keysToDelete.push(`email:${await legacyEmailHash(plainEmail)}`);
+      keysToDelete.push(`email:${await emailIndexHash(env, plainEmail)}`);
+    }
     const emailPointer = await env.ANCHOR_KV.get(emailPointerKey(uuid));
     if (emailPointer) keysToDelete.push(`email:${emailPointer}`);
     keysToDelete.push(emailPointerKey(uuid));

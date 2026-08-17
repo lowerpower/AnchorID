@@ -16,7 +16,7 @@
 
 import type { Env } from "../env";
 import { kvTtlFromEnv } from "../env";
-import { lookupEmailUuid, emailPointerKey } from "../email-index";
+import { emailIndexHash, legacyEmailHash, lookupEmailUuid, emailPointerKey, deletedTombstoneKey } from "../email-index";
 import { securityHeaders } from "../http";
 import { buildProfile, mergeSameAs } from "../domain/profile";
 import { loadClaims } from "../claims/store";
@@ -2193,13 +2193,25 @@ export async function handleAdminDelete(
     `ip:${uuid}`,
   ];
 
+  // Tombstone FIRST: concurrent lookups/migrations treat the uuid as dead
+  // even before the key deletions below propagate.
+  await env.ANCHOR_KV.put(deletedTombstoneKey(uuid), new Date().toISOString());
+
   // Delete email mapping if it exists
   if (stored._emailHash) {
     keysToDelete.push(`email:${stored._emailHash}`);
   }
 
-  // A migrated email is indexed under the hash in the pointer key, which
-  // diverges from the frozen _emailHash — delete both candidates.
+  // Deletable profiles are < 7 days old, so the plaintext email is still in
+  // KV (7-day TTL) — derive BOTH index hashes from it rather than trusting a
+  // single eventually-consistent pointer read to name the live key.
+  const plainEmail = await env.ANCHOR_KV.get(`email:unhashed:${uuid}`);
+  if (plainEmail) {
+    keysToDelete.push(`email:${await legacyEmailHash(plainEmail)}`);
+    keysToDelete.push(`email:${await emailIndexHash(env, plainEmail)}`);
+  }
+
+  // Pointer-named key as a further fallback (e.g. plaintext already expired).
   const emailPointer = await env.ANCHOR_KV.get(emailPointerKey(uuid));
   if (emailPointer) {
     keysToDelete.push(`email:${emailPointer}`);

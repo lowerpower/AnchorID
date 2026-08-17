@@ -205,6 +205,7 @@ npx wrangler kv key put --remote --binding ANCHOR_KV "page:sitemap" --path ./src
 | `claims:<uuid>` | Claims array | Permanent |
 | `email:<sha256>` | UUID lookup by email hash | Permanent |
 | `emailkey:<uuid>` | Pointer to the profile's current email index hash (written at migration; diverges from frozen `_emailHash`) | Permanent |
+| `deleted:<uuid>` | Deletion tombstone, written first by admin delete + purge; makes deletion/migration races decidable (uuids never reused) | Permanent |
 | `email:unhashed:<uuid>` | Plaintext email for admin spam detection | 7 days |
 | `ip:<uuid>` | Registration IP address for admin spam detection | 7 days |
 | `adminsess:<token>` | Admin session (cookie value is this opaque id, never the secret) | 12 h |

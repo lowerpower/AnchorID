@@ -82,6 +82,24 @@ export function emailPointerKey(uuid: string): string {
   return `emailkey:${uuid.toLowerCase()}`;
 }
 
+/**
+ * Permanent tombstone written FIRST by every profile-deletion flow.
+ *
+ * UUIDs are random v4 and never reused, so this is an authoritative "this
+ * uuid is dead" signal. It is what makes deletion/migration races decidable
+ * on an eventually consistent store: a mapping pointing at a tombstoned uuid
+ * is stale by definition and can safely be ignored and cleaned up, and a
+ * migration can re-check it after writing (a cold read of a fresh key goes
+ * to the origin store, not a possibly-stale edge cache) and undo itself.
+ */
+export function deletedTombstoneKey(uuid: string): string {
+  return `deleted:${uuid.toLowerCase()}`;
+}
+
+async function isDeleted(env: Env, uuid: string): Promise<boolean> {
+  return (await env.ANCHOR_KV.get(deletedTombstoneKey(uuid))) !== null;
+}
+
 export async function lookupEmailUuid(
   env: Env,
   email: string
@@ -91,6 +109,14 @@ export async function lookupEmailUuid(
 
   const uuid = await env.ANCHOR_KV.get(`email:${hash}`);
   if (uuid) {
+    if (await isDeleted(env, uuid)) {
+      // The uuid is tombstoned: this mapping is an orphan from a
+      // deletion/migration race. Clearing it is safe (uuids are never
+      // reused) and frees the email to register again.
+      await env.ANCHOR_KV.delete(`email:${hash}`).catch(() => {});
+      return { uuid: null, hash };
+    }
+
     // Note: no profile read here. A missing profile would not be proof the
     // mapping is stale anyway (signup's profile and mapping writes are
     // independent puts, so a reader can see one before the other) — the
@@ -126,15 +152,20 @@ export async function lookupEmailUuid(
   const legacyUuid = await env.ANCHOR_KV.get(`email:${legacy}`);
   if (!legacyUuid) return { uuid: null, hash };
 
+  if (await isDeleted(env, legacyUuid)) {
+    // Tombstoned uuid — stale legacy mapping; safe to clear (see above).
+    await env.ANCHOR_KV.delete(`email:${legacy}`).catch(() => {});
+    return { uuid: null, hash };
+  }
+
   if (!(await env.ANCHOR_KV.get(`profile:${legacyUuid}`))) {
-    // Fail closed: a missing profile is not proof the mapping is stale.
-    // During EMAIL_PEPPER activation, a signup completed just before the
-    // secret was enabled can have its legacy mapping visible while its
-    // independently-written profile is still propagating — treating that as
-    // "no match" would let a duplicate signup take over the email. Report
-    // the mapping under its actual (legacy) hash; migration waits for a
-    // lookup that can see the profile. A genuinely orphaned legacy key
-    // needs manual cleanup.
+    // Fail closed: a missing profile without a tombstone is not proof the
+    // mapping is stale. During EMAIL_PEPPER activation, a signup completed
+    // just before the secret was enabled can have its legacy mapping visible
+    // while its independently-written profile is still propagating —
+    // treating that as "no match" would let a duplicate signup take over
+    // the email. Report the mapping under its actual (legacy) hash;
+    // migration waits for a lookup that can see the profile.
     return { uuid: legacyUuid, hash: legacy };
   }
 
@@ -149,6 +180,16 @@ export async function lookupEmailUuid(
     await env.ANCHOR_KV.put(emailPointerKey(legacyUuid), hash);
     await env.ANCHOR_KV.delete(`email:${legacy}`);
     migrated = true;
+
+    // Deletion may have raced us between the profile check above and these
+    // writes. The tombstone is written first by every deletion flow and this
+    // is a cold read of a fresh key (origin, not edge cache), so it decides
+    // the race: if the uuid is dead, undo the index we just recreated.
+    if (await isDeleted(env, legacyUuid)) {
+      await env.ANCHOR_KV.delete(emailPointerKey(legacyUuid));
+      await env.ANCHOR_KV.delete(`email:${hash}`);
+      return { uuid: null, hash };
+    }
   } catch (e) {
     console.error("email index migration failed, rolling back:", e);
     try {

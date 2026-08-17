@@ -16,7 +16,7 @@ import { canonicalizeUrl, buildProfile } from '../src/domain/profile';
 import { validateProfileUrl, parseGitHubProfile, stripQueryAndFragment, profilePageHasUuidMarker, urlReflectsProofUuid } from '../src/claims/verify';
 import { claimsKey, upsertClaim } from '../src/claims/store';
 import { clampKvTtl, kvTtlFromEnv, intFromEnv } from '../src/env';
-import { emailIndexHash, legacyEmailHash, lookupEmailUuid, emailPointerKey } from '../src/email-index';
+import { emailIndexHash, legacyEmailHash, lookupEmailUuid, emailPointerKey, deletedTombstoneKey } from '../src/email-index';
 
 /**
  * Regression tests for the security audit fixes.
@@ -772,6 +772,58 @@ describe('peppered email index', () => {
     const after = await getKVJson(`profile:${uuid}`);
     expect(after._emailHash).toBe(otherHash);
     expect(await env.ANCHOR_KV.get(`email:${otherHash}`)).toBe(uuid);
+  });
+
+  it('treats a mapping to a tombstoned uuid as no match and clears it', async () => {
+    // A deletion/migration race can leave a mapping pointing at a deleted
+    // uuid. The tombstone (written first by every deletion flow, and
+    // permanent — uuids are never reused) makes the staleness decidable, so
+    // the mapping is safely cleared and the email can register again.
+    const deadUuid = crypto.randomUUID();
+    await env.ANCHOR_KV.put(deletedTombstoneKey(deadUuid), new Date().toISOString());
+
+    const peppered = await emailIndexHash(env as any, email);
+    await env.ANCHOR_KV.put(`email:${peppered}`, deadUuid);
+    const first = await lookupEmailUuid(env as any, email);
+    expect(first.uuid).toBeNull();
+    expect(await env.ANCHOR_KV.get(`email:${peppered}`)).toBeNull();
+
+    // Same for a legacy mapping.
+    const legacy = await legacyEmailHash(email);
+    await env.ANCHOR_KV.put(`email:${legacy}`, deadUuid);
+    const second = await lookupEmailUuid(env as any, email);
+    expect(second.uuid).toBeNull();
+    expect(await env.ANCHOR_KV.get(`email:${legacy}`)).toBeNull();
+  });
+
+  it('deletion derives both index hashes from the stored plaintext email', async () => {
+    // The pointer read during deletion is eventually consistent and can miss
+    // a fresh migration. Deletable profiles are < 7 days old, so the
+    // plaintext email is still in KV — cleanup must find the peppered key
+    // through it even when the pointer is not visible.
+    const { uuid } = await createMockProfile({ email });
+    await env.ANCHOR_KV.put(`email:unhashed:${uuid}`, email);
+    await lookupEmailUuid(env as any, email); // migrate
+    const peppered = await emailIndexHash(env as any, email);
+    expect(await env.ANCHOR_KV.get(`email:${peppered}`)).toBe(uuid);
+    // Simulate the stale pointer read: the pointer write hasn't propagated.
+    await env.ANCHOR_KV.delete(emailPointerKey(uuid));
+
+    const { headers, csrfToken } = await withAdminSessionAndCsrf();
+    const fd = new FormData();
+    fd.append('_csrf', csrfToken);
+    const res = await SELF.fetch(createTestRequest(`https://anchorid.net/admin/delete/${uuid}`, {
+      method: 'POST',
+      headers,
+      body: fd,
+      redirect: 'manual',
+      ip: '198.51.100.73',
+    }));
+
+    expect(res.status).toBe(303);
+    expect(await env.ANCHOR_KV.get(`email:${peppered}`)).toBeNull();
+    // Tombstone written, permanently marking the uuid dead.
+    expect(await env.ANCHOR_KV.get(deletedTombstoneKey(uuid))).toBeTruthy();
   });
 
   it('signup dup-check catches an email still indexed under a legacy key', async () => {
