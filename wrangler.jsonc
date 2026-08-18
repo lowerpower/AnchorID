@@ -26,8 +26,13 @@
 	"kv_namespaces": [
 		{
 			"binding": "ANCHOR_KV",
-			"id": "813539ddad014d25b787ecb551dbe51b",
-			"remote": true
+			"id": "813539ddad014d25b787ecb551dbe51b"
+			// NEVER set "remote": true here. The vitest pool reads this config,
+			// and pool versions that honor remote bindings (0.12+) will run the
+			// ENTIRE TEST SUITE against production KV — including the
+			// clearAllTestData() prefix-deletes between tests, which wiped the
+			// production profile/claims/email keys on 2026-08-18. For
+			// prod-connected local dev, use `wrangler dev --remote` explicitly.
 		}
 	],
 	"triggers": {
