@@ -714,15 +714,20 @@ describe('CSP script-src hardening', () => {
     // this comment's assumption of a single shared script) to be revisited.
     let executableScripts = 0;
     for (const [name, html] of Object.entries(STATIC_PAGES)) {
-      for (const m of html.matchAll(/<script>([\s\S]*?)<\/script>/g)) {
+      // Case-insensitive throughout: browsers execute <SCRIPT> just as
+      // readily, so a case-sensitive lock would miss valid variants.
+      for (const m of html.matchAll(/<script>([\s\S]*?)<\/script>/gi)) {
         executableScripts++;
         const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(m[1]));
         const b64 = btoa(String.fromCharCode(...new Uint8Array(digest)));
         expect(`${name}: sha256-${b64}`).toBe(`${name}: ${STATIC_PAGE_SCRIPT_HASH}`);
       }
       // JSON-LD data blocks need no allowance; nothing else may execute.
-      const executableTags = (html.match(/<script(?![^>]*ld\+json)[^>]*>/g) || []).length;
-      const bareTags = (html.match(/<script>/g) || []).length;
+      // Any executable tag variant not counted by the bare-tag hash loop
+      // above (attributes, stray whitespace, case tricks) breaks equality
+      // here and forces a look.
+      const executableTags = (html.match(/<script(?![^>]*ld\+json)[^>]*>/gi) || []).length;
+      const bareTags = (html.match(/<script>/gi) || []).length;
       expect(`${name}: ${executableTags}`).toBe(`${name}: ${bareTags}`);
     }
     // 8 of the 9 pages carry the footer script (proofs-social has none).
