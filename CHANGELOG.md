@@ -6,6 +6,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Changed - 2026-08-18
+
+#### `compatibility_date` 2025-09-27 → 2026-03-10
+
+- Every flag default-on in between reviewed against this Worker's API surface —
+  all are node:* stubs, WebSocket/Queue/Workflow/DO/RPC behavior (none used),
+  or additive spec-compliance; semantics verified empirically by running the
+  full behavioral suite on workerd 1.20260310 before deploying
+- Dev toolchain: wrangler CLI updated (4.59 → 4.86); tests stay on the fast
+  vitest-pool-workers 0.8.x line, whose bundled workerd caps at 2025-09-06 —
+  the miniflare "latest supported compatibility date" warning during tests is
+  expected and documented in wrangler.jsonc
+- `nodejs_compat` (carried by the long-deleted wrangler.toml) confirmed
+  unnecessary: the Worker imports no Node builtins
+
 ### Security - 2026-08-18
 
 #### CSP: `script-src 'unsafe-inline'` Removed

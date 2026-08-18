@@ -6,7 +6,20 @@
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"name": "anchorid",
 	"main": "src/index.ts",
-	"compatibility_date": "2025-09-27",
+	// Reviewed + bumped 2026-08-18 (was 2025-09-27). Every flag default-on in
+	// between is either a node:* module stub (this Worker imports no Node
+	// builtins), WebSocket/Queue/Workflow/DO/RPC behavior (none used), or
+	// additive spec-compliance (TextDecoder CJK, iterable fetch bodies,
+	// Performance globals). 2026-03-10 was verified empirically: the full
+	// behavioral suite passed on workerd 1.20260310 (vitest-pool-workers
+	// 0.12.21) before reverting to the fast 0.8.x pool for daily tests —
+	// whose bundled workerd caps at 2025-09-06, so miniflare prints a
+	// "latest supported compatibility date" warning during tests; that skew
+	// is known and accepted (load suite times out on the 2026-03 runtime).
+	// Bump further only after reviewing the flag changelog AND re-verifying
+	// on a matching runtime (needs the vitest-4 pool line) — never as a
+	// redeploy trick.
+	"compatibility_date": "2026-03-10",
 	"observability": {
 		"enabled": true
 	},

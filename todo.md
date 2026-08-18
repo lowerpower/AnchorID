@@ -164,8 +164,12 @@ Security hardening complete as of 2026-01-24:
       Worker-generated pages, one shared sha256 hash for the static pages' footer
       script, `'none'` for JSON/homepage. `style-src 'unsafe-inline'` remains
       (style="" attributes; CSS injection is a weak primitive — accepted)
-- [ ] Deliberately review/apply newer `compatibility_date` in `wrangler.jsonc`
-      (the removed `.toml` carried 2026-01-17; `.jsonc` has 2025-09-27)
+- [x] `compatibility_date` bumped 2025-09-27 → 2026-03-10 (2026-08-18): every
+      in-between flag reviewed (all node-stubs/WS/Queue/DO — irrelevant here);
+      semantics verified by running the behavioral suite on workerd 1.20260310.
+      Daily tests use the fast 0.8.x pool (workerd caps at 2025-09-06 — the
+      miniflare warning is expected). `nodejs_compat` from the old .toml
+      confirmed unnecessary (zero node: imports)
 - [ ] If abuse warrants: move rate limiting to Durable Objects or the Workers
       rate-limiting binding (KV counters are non-atomic — see threat-model.md)
 - [ ] Pass over existing `github`/`public` claims for URLs the tightened rules
