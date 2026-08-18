@@ -45,7 +45,7 @@ import { loadClaims } from "./claims/store";
 
 import { buildProfile, mergeSameAs } from "./domain/profile";
 import { sendEmail, hasEmailConfig } from "./email";
-import { securityHeaders, secretPageHeaders } from "./http";
+import { securityHeaders, staticPageHeaders, secretPageHeaders, noncedHeaders, newScriptNonce, injectScriptNonce } from "./http";
 import type { Env } from "./env";
 import { intFromEnv, kvTtlFromEnv } from "./env";
 import { emailIndexHash, legacyEmailHash, lookupEmailUuid, emailPointerKey, deletedTombstoneKey } from "./email-index";
@@ -656,7 +656,7 @@ async function route(request: Request, env: Env): Promise<Response> {
           "content-type": "text/html; charset=utf-8",
           "cache-control":
             "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400",
-          ...securityHeaders(),
+          ...staticPageHeaders(),
         },
       });
     }
@@ -672,7 +672,7 @@ async function route(request: Request, env: Env): Promise<Response> {
           "content-type": "text/html; charset=utf-8",
           "cache-control":
             "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400",
-          ...securityHeaders(),
+          ...staticPageHeaders(),
         },
       });
     }
@@ -754,7 +754,7 @@ https://anchorid.net/resolve/4ff7ed97-b78f-4ae6-9011-5af714ee241c
           "content-type": "text/html; charset=utf-8",
           "cache-control":
             "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400",
-          ...securityHeaders(),
+          ...staticPageHeaders(),
         },
       });
     }
@@ -770,7 +770,7 @@ https://anchorid.net/resolve/4ff7ed97-b78f-4ae6-9011-5af714ee241c
           "content-type": "text/html; charset=utf-8",
           "cache-control":
             "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400",
-          ...securityHeaders(),
+          ...staticPageHeaders(),
         },
       });
     }
@@ -785,7 +785,7 @@ https://anchorid.net/resolve/4ff7ed97-b78f-4ae6-9011-5af714ee241c
           "content-type": "text/html; charset=utf-8",
           "cache-control":
             "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400",
-          ...securityHeaders(),
+          ...staticPageHeaders(),
         },
       });
     }
@@ -800,7 +800,7 @@ https://anchorid.net/resolve/4ff7ed97-b78f-4ae6-9011-5af714ee241c
           "content-type": "text/html; charset=utf-8",
           "cache-control":
             "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400",
-          ...securityHeaders(),
+          ...staticPageHeaders(),
         },
       });
     }
@@ -815,7 +815,7 @@ https://anchorid.net/resolve/4ff7ed97-b78f-4ae6-9011-5af714ee241c
           "content-type": "text/html; charset=utf-8",
           "cache-control":
             "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400",
-          ...securityHeaders(),
+          ...staticPageHeaders(),
         },
       });
     }
@@ -831,7 +831,7 @@ https://anchorid.net/resolve/4ff7ed97-b78f-4ae6-9011-5af714ee241c
           "content-type": "text/html; charset=utf-8",
           "cache-control":
             "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400",
-          ...securityHeaders(),
+          ...staticPageHeaders(),
         },
       });
     }
@@ -847,7 +847,7 @@ https://anchorid.net/resolve/4ff7ed97-b78f-4ae6-9011-5af714ee241c
           "content-type": "text/html; charset=utf-8",
           "cache-control":
             "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400",
-          ...securityHeaders(),
+          ...staticPageHeaders(),
         },
       });
     }
@@ -1255,16 +1255,17 @@ async function handleSignupPage(request: Request, env: Env): Promise<Response> {
 </script>
 </body></html>`;
 
+  const nonce = newScriptNonce();
   const headers: Record<string, string> = {
     "content-type": "text/html; charset=utf-8",
     "cache-control": "no-store",
-    ...securityHeaders(),
+    ...noncedHeaders(nonce),
   };
   if (needsSet) {
     headers["set-cookie"] = setCsrfCookie(csrfToken);
   }
 
-  return new Response(html, { headers });
+  return new Response(injectScriptNonce(html, nonce), { headers });
 }
 
 // Single response used for every /create outcome so the page cannot be used to
@@ -1462,8 +1463,8 @@ ${backupToken ? `
   <div class="token-box" id="token">${escapeHtml(backupToken)}</div>
 
   <div style="margin:12px 0">
-    <button type="button" onclick="copyToken()"><span class="icon">📋</span>Copy Token</button>
-    <button type="button" class="secondary" onclick="downloadToken()"><span class="icon">💾</span>Download as File</button>
+    <button type="button" id="copyTokenBtn"><span class="icon">📋</span>Copy Token</button>
+    <button type="button" class="secondary" id="downloadTokenBtn"><span class="icon">💾</span>Download as File</button>
     <span id="saveStatus" class="saved-indicator" style="display:none">Copied!</span>
   </div>
 
@@ -1515,6 +1516,9 @@ window.addEventListener('beforeunload', function(e) {
     return e.returnValue;
   }
 });
+
+document.getElementById('copyTokenBtn').addEventListener('click', copyToken);
+document.getElementById('downloadTokenBtn').addEventListener('click', downloadToken);
 </script>
 ` : `
 <div class="card warning">
@@ -1576,13 +1580,14 @@ window.addEventListener('beforeunload', function(e) {
 
 </body></html>`;
 
-  return new Response(html, {
+  const setupNonce = newScriptNonce();
+  return new Response(injectScriptNonce(html, setupNonce), {
     headers: {
       "content-type": "text/html; charset=utf-8",
       "cache-control": "no-store",
       // This page renders the plaintext backup token and is reached via a URL
       // containing the setup token — no-referrer keeps that out of Referer.
-      ...secretPageHeaders(),
+      ...secretPageHeaders(setupNonce),
     },
   });
 }
@@ -1655,8 +1660,8 @@ async function handleLoginPage(request: Request, env: Env): Promise<Response> {
 <p>Choose your login method below.</p>
 
 <div class="tabs">
-  <button class="tab active" onclick="switchTab('email')">Email Magic Link</button>
-  <button class="tab" onclick="switchTab('backup')">Backup Token</button>
+  <button class="tab active" data-tab="email">Email Magic Link</button>
+  <button class="tab" data-tab="backup">Backup Token</button>
 </div>
 
 <!-- Email Magic Link Tab -->
@@ -1684,7 +1689,7 @@ async function handleLoginPage(request: Request, env: Env): Promise<Response> {
   <h2 style="margin-top:0;font-size:18px">Login with Backup Token</h2>
   <p style="margin-bottom:14px;color:#555">Use your backup recovery token to access your profile.</p>
 
-  <form id="backupForm" onsubmit="return handleBackupLogin(event)">
+  <form id="backupForm">
     <div class="card">
       <label>AnchorID (UUID)</label>
       <input id="uuidInput" type="text" placeholder="4ff7ed97-b78f-4ae6-9011-5af714ee241c" required pattern="[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}">
@@ -1717,15 +1722,20 @@ async function handleLoginPage(request: Request, env: Env): Promise<Response> {
 </p>
 
 <script>
-function switchTab(tab) {
+function switchTab(tab, clicked) {
   // Update tab buttons
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-  event.target.classList.add('active');
+  clicked.classList.add('active');
 
   // Update tab content
   document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
   document.getElementById(tab + '-tab').classList.add('active');
 }
+
+document.querySelectorAll('.tab').forEach(function(btn) {
+  btn.addEventListener('click', function() { switchTab(btn.dataset.tab, btn); });
+});
+document.getElementById('backupForm').addEventListener('submit', handleBackupLogin);
 
 function handleBackupLogin(e) {
   e.preventDefault();
@@ -1753,16 +1763,17 @@ function handleBackupLogin(e) {
 
 </body></html>`;
 
+  const nonce = newScriptNonce();
   const headers: Record<string, string> = {
     "content-type": "text/html; charset=utf-8",
     "cache-control": "no-store",
-    ...securityHeaders(),
+    ...noncedHeaders(nonce),
   };
   if (needsSet) {
     headers["set-cookie"] = setCsrfCookie(csrfToken);
   }
 
-  return new Response(html, { headers });
+  return new Response(injectScriptNonce(html, nonce), { headers });
 }
 
 // POST /login - Request magic link (handles both JSON API and form submission)
@@ -2013,7 +2024,7 @@ async function handleEditPage(request: Request, env: Env): Promise<Response> {
   <p class="hint">Cannot be changed after creation.</p>
 </div>
 
-<form method="post" action="/update" onsubmit="return submitForm(event)">
+<form method="post" action="/update" id="editForm">
   <input type="hidden" name="token" value="${escapeHtml(sessionToken)}" />
   <input type="hidden" name="_csrf" value="${escapeHtml(csrfToken)}" />
 
@@ -2465,20 +2476,23 @@ async function submitForm(e){
   document.getElementById("out").textContent = await res.text();
   return false;
 }
+
+document.getElementById("editForm").addEventListener("submit", submitForm);
 </script>
 </body></html>`;
 
+  const editNonce = newScriptNonce();
   const headers: Record<string, string> = {
     "content-type": "text/html; charset=utf-8",
     "cache-control": "no-store",
     // Renders the live session token and is reached via a URL containing it.
-    ...secretPageHeaders(),
+    ...secretPageHeaders(editNonce),
   };
   if (needsCsrfCookie) {
     headers["set-cookie"] = setCsrfCookie(csrfToken);
   }
 
-  return new Response(html, { headers });
+  return new Response(injectScriptNonce(html, editNonce), { headers });
 }
 
 

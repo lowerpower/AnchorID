@@ -17,7 +17,7 @@
 import type { Env } from "../env";
 import { kvTtlFromEnv } from "../env";
 import { emailIndexHash, legacyEmailHash, lookupEmailUuid, emailPointerKey, deletedTombstoneKey } from "../email-index";
-import { securityHeaders } from "../http";
+import { noncedHeaders, newScriptNonce, injectScriptNonce } from "../http";
 import { buildProfile, mergeSameAs } from "../domain/profile";
 import { loadClaims } from "../claims/store";
 import { formatErrorHtml } from "../claims/errors";
@@ -297,13 +297,17 @@ function computeChangedFields(before: any, after: any): string[] {
 
 // ------------------ HTML helpers ------------------
 
+// Both HTML emitters mint a per-response nonce, stamp it on every <script>
+// tag, and send the matching script-src 'nonce-…' CSP — admin pages never
+// need 'unsafe-inline'.
 function htmlResponse(html: string, status = 200, extra: Record<string, string> = {}) {
-  return new Response(html, {
+  const nonce = newScriptNonce();
+  return new Response(injectScriptNonce(html, nonce), {
     status,
     headers: {
       "content-type": "text/html; charset=utf-8",
       "cache-control": "no-store",
-      ...securityHeaders(),
+      ...noncedHeaders(nonce),
       ...extra,
     },
   });
@@ -316,16 +320,17 @@ function htmlResponseWithCsrf(
   status = 200,
   extraHeaders: Record<string, string> = {}
 ): Response {
+  const nonce = newScriptNonce();
   const headers: Record<string, string> = {
     "content-type": "text/html; charset=utf-8",
     "cache-control": "no-store",
-    ...securityHeaders(),
+    ...noncedHeaders(nonce),
     ...extraHeaders,
   };
   if (csrf.needsSet) {
     headers["set-cookie"] = setCsrfCookie(csrf.token);
   }
-  return new Response(html, { status, headers });
+  return new Response(injectScriptNonce(html, nonce), { status, headers });
 }
 
 // Helper to inject CSRF hidden input into forms.
@@ -1040,8 +1045,8 @@ ${backupToken ? `
 
   <div class="token-box" id="token">${escapeHtml(backupToken)}</div>
 
-  <button type="button" onclick="copyToken()">Copy Token</button>
-  <button type="button" class="secondary" onclick="downloadToken()">Download as File</button>
+  <button type="button" id="copyTokenBtn">Copy Token</button>
+  <button type="button" class="secondary" id="downloadTokenBtn">Download as File</button>
 
   <p class="hint" style="margin-top:12px">
     Store this somewhere safe (password manager, secure note, printed copy).
@@ -1062,6 +1067,8 @@ function downloadToken() {
   a.download = 'anchorid-backup-${escapeHtml(uuid.slice(0, 8))}.txt';
   a.click();
 }
+document.getElementById('copyTokenBtn').addEventListener('click', copyToken);
+document.getElementById('downloadTokenBtn').addEventListener('click', downloadToken);
 </script>
 ` : `
 <div class="card warning">
@@ -2112,8 +2119,8 @@ export async function handleAdminRotateToken(
 
   <div class="token-box" id="token">${escapeHtml(newBackupToken)}</div>
 
-  <button type="button" onclick="copyToken()">Copy Token</button>
-  <button type="button" class="secondary" onclick="downloadToken()">Download as File</button>
+  <button type="button" id="copyTokenBtn">Copy Token</button>
+  <button type="button" class="secondary" id="downloadTokenBtn">Download as File</button>
 
   <p class="hint" style="margin-top:12px">
     Store this somewhere safe (password manager, secure note, printed copy).
@@ -2133,6 +2140,8 @@ function downloadToken() {
   a.download = 'anchorid-backup-${escapeHtml(uuid.slice(0, 8))}.txt';
   a.click();
 }
+document.getElementById('copyTokenBtn').addEventListener('click', copyToken);
+document.getElementById('downloadTokenBtn').addEventListener('click', downloadToken);
 </script>
 
 <div class="card">

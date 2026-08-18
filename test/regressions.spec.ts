@@ -17,6 +17,29 @@ import { validateProfileUrl, parseGitHubProfile, stripQueryAndFragment, profileP
 import { claimsKey, upsertClaim } from '../src/claims/store';
 import { clampKvTtl, kvTtlFromEnv, intFromEnv } from '../src/env';
 import { emailIndexHash, legacyEmailHash, lookupEmailUuid, emailPointerKey, deletedTombstoneKey } from '../src/email-index';
+import { STATIC_PAGE_SCRIPT_HASH } from '../src/http';
+
+import aboutHtml from '../src/content/about.html';
+import guideHtml from '../src/content/guide.html';
+import faqHtml from '../src/content/faq.html';
+import privacyHtml from '../src/content/privacy.html';
+import proofsHtml from '../src/content/proofs.html';
+import proofsWebsiteHtml from '../src/content/proofs-website.html';
+import proofsDnsHtml from '../src/content/proofs-dns.html';
+import proofsGithubHtml from '../src/content/proofs-github.html';
+import proofsSocialHtml from '../src/content/proofs-social.html';
+
+const STATIC_PAGES: Record<string, string> = {
+  about: aboutHtml,
+  guide: guideHtml,
+  faq: faqHtml,
+  privacy: privacyHtml,
+  proofs: proofsHtml,
+  'proofs-website': proofsWebsiteHtml,
+  'proofs-dns': proofsDnsHtml,
+  'proofs-github': proofsGithubHtml,
+  'proofs-social': proofsSocialHtml,
+};
 
 /**
  * Regression tests for the security audit fixes.
@@ -602,6 +625,121 @@ describe('admin secret exposure', () => {
     // there it is read back via getAttribute() as a string, never parsed as JS.
     expect(html).not.toContain("x');");
     expect(html).toContain('data-profile-name="x&#039;);window.__pwned=1;//"');
+  });
+});
+
+// ------------------------------------------------------------------
+// CSP: no 'unsafe-inline' scripts anywhere — nonces (dynamic pages),
+// a shared hash (static pages), or 'none' (everything else)
+// ------------------------------------------------------------------
+describe('CSP script-src hardening', () => {
+  beforeEach(async () => { await clearAllTestData(); });
+  afterEach(async () => { await clearAllTestData(); });
+
+  function scriptSrcOf(res: Response): string {
+    const csp = res.headers.get('content-security-policy') || '';
+    const m = csp.match(/script-src ([^;]+)/);
+    return m ? m[1] : '';
+  }
+
+  it('serves nonced CSP on dynamic pages, with every script tag carrying the nonce', async () => {
+    for (const path of ['/login', '/create']) {
+      const res = await SELF.fetch(createTestRequest(`https://anchorid.net${path}`, { ip: '198.51.100.80' }));
+      expect(res.status).toBe(200);
+      const src = scriptSrcOf(res);
+      expect(src).not.toContain("'unsafe-inline'");
+      const nonceMatch = src.match(/'nonce-([^']+)'/);
+      expect(nonceMatch).toBeTruthy();
+
+      const html = await res.text();
+      const scriptTags = html.match(/<script[^>]*>/g) || [];
+      expect(scriptTags.length).toBeGreaterThan(0);
+      for (const tag of scriptTags) {
+        expect(tag).toContain(`nonce="${nonceMatch![1]}"`);
+      }
+    }
+  });
+
+  it('serves nonced CSP on the token-bearing /edit page', async () => {
+    const uuid = crypto.randomUUID();
+    await createMockProfile({ uuid });
+    const token = await createLoginSession(uuid);
+
+    const res = await SELF.fetch(createTestRequest(`https://anchorid.net/edit?token=${token}`, { ip: '198.51.100.81' }));
+    expect(res.status).toBe(200);
+    const src = scriptSrcOf(res);
+    expect(src).not.toContain("'unsafe-inline'");
+    expect(src).toMatch(/'nonce-[^']+'/);
+    // Secret-bearing page keeps no-referrer on top of the nonce.
+    expect(res.headers.get('referrer-policy')).toBe('no-referrer');
+  });
+
+  it('serves nonced CSP on admin pages', async () => {
+    const res = await SELF.fetch(createTestRequest('https://anchorid.net/admin', {
+      headers: await withAdminSession(),
+      redirect: 'manual',
+      ip: '198.51.100.82',
+    }));
+    expect(res.status).toBe(200);
+    const src = scriptSrcOf(res);
+    expect(src).not.toContain("'unsafe-inline'");
+  });
+
+  it("serves script-src 'none' on the homepage (JSON-LD is a data block, not executed)", async () => {
+    const res = await SELF.fetch(createTestRequest('https://anchorid.net/', { ip: '198.51.100.83' }));
+    expect(res.status).toBe(200);
+    expect(scriptSrcOf(res)).toBe("'none'");
+  });
+
+  it('serves the shared script hash on static content pages', async () => {
+    // Same year-script the real content pages carry (byte-exact inner text).
+    const pageHtml = '<html><body><footer><script>\n' +
+      '      document.getElementById("y").textContent = String(new Date().getFullYear());\n' +
+      '    </script></footer></body></html>';
+    await env.ANCHOR_KV.put('page:about', pageHtml);
+
+    const res = await SELF.fetch(createTestRequest('https://anchorid.net/about', { ip: '198.51.100.84' }));
+    expect(res.status).toBe(200);
+    const src = scriptSrcOf(res);
+    expect(src).not.toContain("'unsafe-inline'");
+    expect(src).toBe(`'${STATIC_PAGE_SCRIPT_HASH}'`);
+
+  });
+
+  it('the CSP hash constant matches every real static page\'s executable script', async () => {
+    // Hash the ACTUAL src/content files that get deployed to KV — a fixture
+    // here would keep passing while an edited footer script got blocked in
+    // every browser. Any executable <script> in any content page must hash
+    // to the shared constant, or this fails and forces the constant (and
+    // this comment's assumption of a single shared script) to be revisited.
+    let executableScripts = 0;
+    for (const [name, html] of Object.entries(STATIC_PAGES)) {
+      // Case-insensitive throughout: browsers execute <SCRIPT> just as
+      // readily, so a case-sensitive lock would miss valid variants.
+      for (const m of html.matchAll(/<script>([\s\S]*?)<\/script>/gi)) {
+        executableScripts++;
+        const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(m[1]));
+        const b64 = btoa(String.fromCharCode(...new Uint8Array(digest)));
+        expect(`${name}: sha256-${b64}`).toBe(`${name}: ${STATIC_PAGE_SCRIPT_HASH}`);
+      }
+      // JSON-LD data blocks need no allowance; nothing else may execute.
+      // Any executable tag variant not counted by the bare-tag hash loop
+      // above (attributes, stray whitespace, case tricks) breaks equality
+      // here and forces a look.
+      const executableTags = (html.match(/<script(?![^>]*type\s*=\s*["']application\/ld\+json["'])[^>]*>/gi) || []).length;
+      const bareTags = (html.match(/<script>/gi) || []).length;
+      expect(`${name}: ${executableTags}`).toBe(`${name}: ${bareTags}`);
+    }
+    // 8 of the 9 pages carry the footer script (proofs-social has none).
+    expect(executableScripts).toBe(8);
+  });
+
+  it('keeps strict no-script CSP on JSON endpoints', async () => {
+    const uuid = crypto.randomUUID();
+    await createMockProfile({ uuid });
+    const res = await SELF.fetch(createTestRequest(`https://anchorid.net/resolve/${uuid}`, { ip: '198.51.100.85' }));
+    expect(res.status).toBe(200);
+    expect(scriptSrcOf(res)).toBe("'none'");
   });
 });
 

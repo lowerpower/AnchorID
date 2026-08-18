@@ -6,6 +6,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Security - 2026-08-18
+
+#### CSP: `script-src 'unsafe-inline'` Removed
+
+- Worker-generated pages (create/login/setup/edit, all admin pages) now send a
+  per-response `script-src 'nonce-…'`; every inline `<script>` is stamped with
+  the nonce at response time, and all inline event handlers (`onclick=` etc.)
+  were converted to `addEventListener` wiring inside the nonce'd scripts
+- Static KV content pages send `script-src 'sha256-…'` covering their single
+  shared footer script — no HTML changes or KV redeploys needed; a regression
+  test recomputes the hash so editing that script fails the suite instead of
+  silently breaking the pages
+- Homepage and all JSON/text responses drop to `script-src 'none'` (JSON-LD is
+  a data block and needs no allowance)
+- Injected scripts — from a stored-XSS slip or a hostile browser extension's
+  content — no longer execute on any page
+- Known accepted limitation: `style-src 'unsafe-inline'` remains (pages use
+  `style=""` attributes, which nonces cannot cover)
+
 ### Security - 2026-08-17
 
 #### Peppered Email Index (`EMAIL_PEPPER`)

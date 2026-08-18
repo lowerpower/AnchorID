@@ -7,6 +7,9 @@ export default defineWorkersConfig({
 			workers: {
 				wrangler: { configPath: './wrangler.jsonc' },
 				miniflare: {
+					// Lets tests import src/content/*.html as text to hash the real
+					// static pages' inline scripts against the CSP constant
+					modulesRules: [{ type: 'Text', include: ['**/*.html'] }],
 					bindings: {
 						// Admin auth (required for admin routes to be enabled in tests)
 						ANCHOR_ADMIN_TOKEN: 'test-admin-token',
