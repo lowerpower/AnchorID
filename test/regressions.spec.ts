@@ -17,6 +17,7 @@ import { validateProfileUrl, parseGitHubProfile, stripQueryAndFragment, profileP
 import { claimsKey, upsertClaim } from '../src/claims/store';
 import { clampKvTtl, kvTtlFromEnv, intFromEnv } from '../src/env';
 import { emailIndexHash, legacyEmailHash, lookupEmailUuid, emailPointerKey, deletedTombstoneKey } from '../src/email-index';
+import { STATIC_PAGE_SCRIPT_HASH } from '../src/http';
 
 /**
  * Regression tests for the security audit fixes.
@@ -602,6 +603,100 @@ describe('admin secret exposure', () => {
     // there it is read back via getAttribute() as a string, never parsed as JS.
     expect(html).not.toContain("x');");
     expect(html).toContain('data-profile-name="x&#039;);window.__pwned=1;//"');
+  });
+});
+
+// ------------------------------------------------------------------
+// CSP: no 'unsafe-inline' scripts anywhere — nonces (dynamic pages),
+// a shared hash (static pages), or 'none' (everything else)
+// ------------------------------------------------------------------
+describe('CSP script-src hardening', () => {
+  beforeEach(async () => { await clearAllTestData(); });
+  afterEach(async () => { await clearAllTestData(); });
+
+  function scriptSrcOf(res: Response): string {
+    const csp = res.headers.get('content-security-policy') || '';
+    const m = csp.match(/script-src ([^;]+)/);
+    return m ? m[1] : '';
+  }
+
+  it('serves nonced CSP on dynamic pages, with every script tag carrying the nonce', async () => {
+    for (const path of ['/login', '/create']) {
+      const res = await SELF.fetch(createTestRequest(`https://anchorid.net${path}`, { ip: '198.51.100.80' }));
+      expect(res.status).toBe(200);
+      const src = scriptSrcOf(res);
+      expect(src).not.toContain("'unsafe-inline'");
+      const nonceMatch = src.match(/'nonce-([^']+)'/);
+      expect(nonceMatch).toBeTruthy();
+
+      const html = await res.text();
+      const scriptTags = html.match(/<script[^>]*>/g) || [];
+      expect(scriptTags.length).toBeGreaterThan(0);
+      for (const tag of scriptTags) {
+        expect(tag).toContain(`nonce="${nonceMatch![1]}"`);
+      }
+    }
+  });
+
+  it('serves nonced CSP on the token-bearing /edit page', async () => {
+    const uuid = crypto.randomUUID();
+    await createMockProfile({ uuid });
+    const token = await createLoginSession(uuid);
+
+    const res = await SELF.fetch(createTestRequest(`https://anchorid.net/edit?token=${token}`, { ip: '198.51.100.81' }));
+    expect(res.status).toBe(200);
+    const src = scriptSrcOf(res);
+    expect(src).not.toContain("'unsafe-inline'");
+    expect(src).toMatch(/'nonce-[^']+'/);
+    // Secret-bearing page keeps no-referrer on top of the nonce.
+    expect(res.headers.get('referrer-policy')).toBe('no-referrer');
+  });
+
+  it('serves nonced CSP on admin pages', async () => {
+    const res = await SELF.fetch(createTestRequest('https://anchorid.net/admin', {
+      headers: await withAdminSession(),
+      redirect: 'manual',
+      ip: '198.51.100.82',
+    }));
+    expect(res.status).toBe(200);
+    const src = scriptSrcOf(res);
+    expect(src).not.toContain("'unsafe-inline'");
+  });
+
+  it("serves script-src 'none' on the homepage (JSON-LD is a data block, not executed)", async () => {
+    const res = await SELF.fetch(createTestRequest('https://anchorid.net/', { ip: '198.51.100.83' }));
+    expect(res.status).toBe(200);
+    expect(scriptSrcOf(res)).toBe("'none'");
+  });
+
+  it('serves the shared script hash on static content pages', async () => {
+    // Same year-script the real content pages carry (byte-exact inner text).
+    const pageHtml = '<html><body><footer><script>\n' +
+      '      document.getElementById("y").textContent = String(new Date().getFullYear());\n' +
+      '    </script></footer></body></html>';
+    await env.ANCHOR_KV.put('page:about', pageHtml);
+
+    const res = await SELF.fetch(createTestRequest('https://anchorid.net/about', { ip: '198.51.100.84' }));
+    expect(res.status).toBe(200);
+    const src = scriptSrcOf(res);
+    expect(src).not.toContain("'unsafe-inline'");
+    expect(src).toBe(`'${STATIC_PAGE_SCRIPT_HASH}'`);
+
+    // The constant must actually match the script content the pages ship —
+    // recompute it so editing the year-script without updating the constant
+    // fails here instead of silently breaking every content page.
+    const inner = pageHtml.match(/<script>([\s\S]*?)<\/script>/)![1];
+    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(inner));
+    const b64 = btoa(String.fromCharCode(...new Uint8Array(digest)));
+    expect(STATIC_PAGE_SCRIPT_HASH).toBe(`sha256-${b64}`);
+  });
+
+  it('keeps strict no-script CSP on JSON endpoints', async () => {
+    const uuid = crypto.randomUUID();
+    await createMockProfile({ uuid });
+    const res = await SELF.fetch(createTestRequest(`https://anchorid.net/resolve/${uuid}`, { ip: '198.51.100.85' }));
+    expect(res.status).toBe(200);
+    expect(scriptSrcOf(res)).toBe("'none'");
   });
 });
 

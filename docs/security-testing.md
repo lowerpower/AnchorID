@@ -138,7 +138,9 @@ names the flaw it locks down, so a refactor that reopens one fails loudly.
   themselves contain the UUID (reflection guard)
 - Claims keys are lowercased; re-asserted claims drop stale `verifiedAt`
 - `dateModified` advances only on real edits; KV TTLs are clamped to the 60s floor
-- Security headers (CSP, `X-Frame-Options`) present on secret-bearing pages
+- Security headers (CSP, `X-Frame-Options`) present on secret-bearing pages;
+  `script-src` never allows `'unsafe-inline'` — nonces on dynamic pages, a
+  shared hash on static pages (recomputed by the test), `'none'` elsewhere
 
 **Expected outcomes**:
 - All marker forms verify; bare UUIDs and reflected-marker URLs do not

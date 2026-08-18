@@ -160,7 +160,10 @@ Security hardening complete as of 2026-01-24:
       the offline copy is required to ever rebuild the Worker. Keep it SEPARATE
       from backup dumps — the pepper only protects a leaked backup if they
       aren't stored together
-- [ ] CSP: replace `script-src 'unsafe-inline'` with nonces/hashes on inline-script pages
+- [x] CSP: `script-src 'unsafe-inline'` removed everywhere — per-request nonces on
+      Worker-generated pages, one shared sha256 hash for the static pages' footer
+      script, `'none'` for JSON/homepage. `style-src 'unsafe-inline'` remains
+      (style="" attributes; CSS injection is a weak primitive — accepted)
 - [ ] Deliberately review/apply newer `compatibility_date` in `wrangler.jsonc`
       (the removed `.toml` carried 2026-01-17; `.jsonc` has 2025-09-27)
 - [ ] If abuse warrants: move rate limiting to Durable Objects or the Workers
