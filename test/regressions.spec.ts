@@ -19,6 +19,28 @@ import { clampKvTtl, kvTtlFromEnv, intFromEnv } from '../src/env';
 import { emailIndexHash, legacyEmailHash, lookupEmailUuid, emailPointerKey, deletedTombstoneKey } from '../src/email-index';
 import { STATIC_PAGE_SCRIPT_HASH } from '../src/http';
 
+import aboutHtml from '../src/content/about.html';
+import guideHtml from '../src/content/guide.html';
+import faqHtml from '../src/content/faq.html';
+import privacyHtml from '../src/content/privacy.html';
+import proofsHtml from '../src/content/proofs.html';
+import proofsWebsiteHtml from '../src/content/proofs-website.html';
+import proofsDnsHtml from '../src/content/proofs-dns.html';
+import proofsGithubHtml from '../src/content/proofs-github.html';
+import proofsSocialHtml from '../src/content/proofs-social.html';
+
+const STATIC_PAGES: Record<string, string> = {
+  about: aboutHtml,
+  guide: guideHtml,
+  faq: faqHtml,
+  privacy: privacyHtml,
+  proofs: proofsHtml,
+  'proofs-website': proofsWebsiteHtml,
+  'proofs-dns': proofsDnsHtml,
+  'proofs-github': proofsGithubHtml,
+  'proofs-social': proofsSocialHtml,
+};
+
 /**
  * Regression tests for the security audit fixes.
  *
@@ -682,13 +704,29 @@ describe('CSP script-src hardening', () => {
     expect(src).not.toContain("'unsafe-inline'");
     expect(src).toBe(`'${STATIC_PAGE_SCRIPT_HASH}'`);
 
-    // The constant must actually match the script content the pages ship —
-    // recompute it so editing the year-script without updating the constant
-    // fails here instead of silently breaking every content page.
-    const inner = pageHtml.match(/<script>([\s\S]*?)<\/script>/)![1];
-    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(inner));
-    const b64 = btoa(String.fromCharCode(...new Uint8Array(digest)));
-    expect(STATIC_PAGE_SCRIPT_HASH).toBe(`sha256-${b64}`);
+  });
+
+  it('the CSP hash constant matches every real static page\'s executable script', async () => {
+    // Hash the ACTUAL src/content files that get deployed to KV — a fixture
+    // here would keep passing while an edited footer script got blocked in
+    // every browser. Any executable <script> in any content page must hash
+    // to the shared constant, or this fails and forces the constant (and
+    // this comment's assumption of a single shared script) to be revisited.
+    let executableScripts = 0;
+    for (const [name, html] of Object.entries(STATIC_PAGES)) {
+      for (const m of html.matchAll(/<script>([\s\S]*?)<\/script>/g)) {
+        executableScripts++;
+        const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(m[1]));
+        const b64 = btoa(String.fromCharCode(...new Uint8Array(digest)));
+        expect(`${name}: sha256-${b64}`).toBe(`${name}: ${STATIC_PAGE_SCRIPT_HASH}`);
+      }
+      // JSON-LD data blocks need no allowance; nothing else may execute.
+      const executableTags = (html.match(/<script(?![^>]*ld\+json)[^>]*>/g) || []).length;
+      const bareTags = (html.match(/<script>/g) || []).length;
+      expect(`${name}: ${executableTags}`).toBe(`${name}: ${bareTags}`);
+    }
+    // 8 of the 9 pages carry the footer script (proofs-social has none).
+    expect(executableScripts).toBe(8);
   });
 
   it('keeps strict no-script CSP on JSON endpoints', async () => {
