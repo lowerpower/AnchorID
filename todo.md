@@ -172,8 +172,16 @@ Security hardening complete as of 2026-01-24:
       confirmed unnecessary (zero node: imports)
 - [ ] If abuse warrants: move rate limiting to Durable Objects or the Workers
       rate-limiting binding (KV counters are non-atomic — see threat-model.md)
-- [ ] Pass over existing `github`/`public` claims for URLs the tightened rules
-      would no longer accept
+- [x] Pass over existing `github`/`public` claims (2026-08-18): **zero claims
+      exist in production KV** — nothing for the tightened rules to affect.
+      NOTE: the audit uncovered that the test suite had wiped prod KV earlier
+      the same day via `"remote": true` + the 0.12.x vitest pool (fixed in
+      `e99081e`); pre-wipe claim state is unknowable but the empty result was
+      verified against live endpoints too
+- [ ] Organization profile `4c785577-…` returns 404 from `/resolve` while being
+      referenced by `/.well-known/anchorid.txt`, every file header, and the
+      JSON-LD on content pages — either hardcode it like the founder fallback
+      or create it properly in KV
 - [ ] Admin UI copy still claims email is "never in plaintext" — inaccurate while
       `email:unhashed:<uuid>` (7d) and `profile._email` exist
 
