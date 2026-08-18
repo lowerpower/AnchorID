@@ -726,7 +726,7 @@ describe('CSP script-src hardening', () => {
       // Any executable tag variant not counted by the bare-tag hash loop
       // above (attributes, stray whitespace, case tricks) breaks equality
       // here and forces a look.
-      const executableTags = (html.match(/<script(?![^>]*ld\+json)[^>]*>/gi) || []).length;
+      const executableTags = (html.match(/<script(?![^>]*type\s*=\s*["']application\/ld\+json["'])[^>]*>/gi) || []).length;
       const bareTags = (html.match(/<script>/gi) || []).length;
       expect(`${name}: ${executableTags}`).toBe(`${name}: ${bareTags}`);
     }
