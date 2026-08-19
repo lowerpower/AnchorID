@@ -178,10 +178,11 @@ Security hardening complete as of 2026-01-24:
       the same day via `"remote": true` + the 0.12.x vitest pool (fixed in
       `e99081e`); pre-wipe claim state is unknowable but the empty result was
       verified against live endpoints too
-- [ ] Organization profile `4c785577-…` returns 404 from `/resolve` while being
-      referenced by `/.well-known/anchorid.txt`, every file header, and the
-      JSON-LD on content pages — either hardcode it like the founder fallback
-      or create it properly in KV
+- [x] Organization profile `4c785577-…` 404 — resolved by the 2026-08-19 restore
+      (profile + 3 verified claims back in KV)
+- [ ] Delete the 4 test-junk profiles leaked during the 2026-08-18 incident
+      (63396ed1, 6bc1cd65, 8d2933e0, d6ade89d — nameless, no email, created
+      06:02Z mid-test-run)
 - [ ] Admin UI copy still claims email is "never in plaintext" — inaccurate while
       `email:unhashed:<uuid>` (7d) and `profile._email` exist
 
