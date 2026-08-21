@@ -126,7 +126,7 @@ All four verify. A bare UUID with no label or URL around it does **not** verify 
 
 **Examples:**
 
-**Twitter bio (limited space):**
+**Twitter bio (limited space)** — note X now has its own proof type, [X proof](./x.md), which verifies the bio directly:
 ```
 Software developer | Open source contributor
 AnchorID: 4ff7ed97-b78f-4ae6-9011-5af714ee241c
@@ -263,7 +263,9 @@ For stronger signals, combine with:
 - OAuth tokens or session data
 - Follower lists or private information
 
-AnchorID only fetches the public profile page to verify your resolver URL appears in the bio. No authentication is used.
+AnchorID only fetches the public profile page to verify your resolver URL appears in the bio. No authentication is used for this proof type.
+
+**X (Twitter) is the exception.** `x.com` does not serve profile bios to anonymous fetchers, so X has its own proof type that reads the public bio through the X API — see [X proof](./x.md). It still reads nothing but your public bio and website field, and still requires no login from you.
 
 ---
 

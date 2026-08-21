@@ -551,6 +551,30 @@ aid:&lt;your-uuid&gt;</code></pre>
       </p>
     </div>
 
+    <div class="proof-card">
+      <h3>X (Twitter) Proof <span class="status good">Good Signal</span></h3>
+
+      <p>Verify control of an X account by adding your AnchorID to your profile bio or the website field on your profile.</p>
+
+      <p><strong>Why X has its own proof type:</strong> <code>x.com</code> serves a JavaScript shell
+      to non-browser clients, so a public profile proof can never read the bio. X proof reads the
+      public bio through the X API instead.</p>
+
+      <p><strong>Add to your bio or website field</strong> (any of these forms):</p>
+      <pre><code>https://anchorid.net/resolve/&lt;your-uuid&gt;
+anchorid.net/&lt;your-uuid&gt;
+AnchorID: &lt;your-uuid&gt;
+aid:&lt;your-uuid&gt;</code></pre>
+
+      <p class="small">Unlike the other proof types, a third party cannot machine-re-check this one
+      without their own X API credentials — though anyone can still open your profile and see the
+      marker.</p>
+
+      <p class="small">
+        <a href="/proofs/x">View detailed guide →</a>
+      </p>
+    </div>
+
     <hr />
 
     <h2>Proof strength comparison</h2>
@@ -584,10 +608,15 @@ aid:&lt;your-uuid&gt;</code></pre>
           <td style="padding: 8px;">Good</td>
           <td style="padding: 8px;">Developers, technical work</td>
         </tr>
-        <tr>
+        <tr style="border-bottom: 1px solid var(--rule);">
           <td style="padding: 8px;">Public Profile</td>
           <td style="padding: 8px;">Good</td>
           <td style="padding: 8px;">Any public profile page, social media, forums</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px;">X (Twitter)</td>
+          <td style="padding: 8px;">Good</td>
+          <td style="padding: 8px;">X accounts. Visible to anyone, but only re-checkable by machine with X API credentials</td>
         </tr>
       </tbody>
     </table>

@@ -55,9 +55,20 @@ would need their backup token to log in. Deploying the code without the
 secret is safe (legacy behavior); setting the secret activates HMAC hashing
 for new signups and lazily migrates existing users at their next login.
 
+**X (Twitter) claim verification** (optional):
+```bash
+npx wrangler secret put X_API_BEARER_TOKEN   # OAuth 2.0 App-Only Bearer token
+```
+
+Without this secret the X claim type is hidden in the claim UI and X verification
+returns a transient failure rather than revoking existing claims. X API reads are
+metered, so a worker-wide hourly ceiling is applied — see `X_API_RL_PER_HOUR`
+below and `docs/proofs/x.md`.
+
 **Optional admin tuning** (plain vars, set in `wrangler.jsonc`, not secrets):
 - `ADMIN_SESSION_TTL_SECONDS` — admin session lifetime (default 43200 = 12h)
 - `ENABLE_ADMIN_DEBUG` — set to `"true"` to expose `/admin/debug/kv` (off by default)
+- `X_API_RL_PER_HOUR` — worker-wide cap on metered X API reads (default 200)
 
 **Email provider** - choose at least one:
 
@@ -190,10 +201,11 @@ npx wrangler deployments list
 - [ ] Tests pass (`npm test`)
 - [ ] Worker deployed (`npm run deploy`)
 - [ ] Secrets configured (check with `npx wrangler secret list`)
-- [ ] Static pages uploaded to KV (12 pages total)
+- [ ] Static pages uploaded to KV (13 pages total — see `src/content/README.md`)
 - [ ] Admin login working
 - [ ] Email sending working (test with `/create`)
 - [ ] Enhanced admin list view showing metadata
+- [ ] If enabling X claims: `X_API_BEARER_TOKEN` set and `page:proofs-x` uploaded
 
 ---
 

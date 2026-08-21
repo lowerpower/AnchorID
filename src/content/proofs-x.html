@@ -1,0 +1,376 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <title>X (Twitter) Proof Guide | AnchorID</title>
+  <meta name="description" content="Prove you control an X (Twitter) account by adding your AnchorID to your profile bio. Step-by-step guide for X proof verification." />
+
+  <link rel="canonical" href="https://anchorid.net/proofs/x" />
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "Person",
+        "@id": "https://blog.mycal.net/about/#mycal",
+        "identifier": {
+          "@type": "PropertyValue",
+          "propertyID": "canonical-uuid",
+          "value": "urn:uuid:4ff7ed97-b78f-4ae6-9011-5af714ee241c"
+        },
+        "name": "Mike Johnson",
+        "alternateName": ["Mycal", "Michael Johnson"],
+        "url": "https://blog.mycal.net/about/",
+        "sameAs": [
+          "https://anchorid.net/resolve/4ff7ed97-b78f-4ae6-9011-5af714ee241c",
+          "https://github.com/lowerpower",
+          "https://music.mycal.net"
+        ]
+      },
+      {
+        "@type": "Organization",
+        "@id": "https://anchorid.net/#org",
+        "identifier": {
+          "@type": "PropertyValue",
+          "propertyID": "canonical-uuid",
+          "value": "urn:uuid:4c785577-9f55-4a22-a80b-dd1f4d9b4658"
+        },
+        "name": "AnchorID",
+        "alternateName": "AnchorID.net",
+        "description": "A permanent attribution anchor for long-lived work. Durable, UUID-based attribution that survives platform changes and outlives any single service.",
+        "url": "https://anchorid.net",
+        "foundingDate": "2026-01-11",
+        "founder": {
+          "@id": "https://blog.mycal.net/about/#mycal"
+        },
+        "sameAs": [
+          "https://anchorid.net/resolve/4c785577-9f55-4a22-a80b-dd1f4d9b4658",
+          "https://github.com/lowerpower/AnchorID"
+        ],
+        "slogan": "Attribution as infrastructure, not a profile"
+      },
+      {
+        "@type": "WebPage",
+        "@id": "https://anchorid.net/proofs/x",
+        "url": "https://anchorid.net/proofs/x",
+        "name": "X (Twitter) Proof Guide",
+        "description": "Prove you control an X account by adding your AnchorID to your profile bio or website field.",
+        "isPartOf": { "@id": "https://anchorid.net/#website" },
+        "about": { "@id": "https://anchorid.net/#org" },
+        "breadcrumb": {
+          "@type": "BreadcrumbList",
+          "itemListElement": [
+            { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://anchorid.net/" },
+            { "@type": "ListItem", "position": 2, "name": "Proofs", "item": "https://anchorid.net/proofs" },
+            { "@type": "ListItem", "position": 3, "name": "X Proof", "item": "https://anchorid.net/proofs/x" }
+          ]
+        }
+      },
+      {
+        "@type": "HowTo",
+        "name": "Verify an X account with AnchorID",
+        "description": "Add your AnchorID resolver URL to your X bio or profile website field, then verify the claim.",
+        "totalTime": "PT3M",
+        "estimatedCost": { "@type": "MonetaryAmount", "currency": "USD", "value": "0" },
+        "step": [
+          {
+            "@type": "HowToStep",
+            "position": 1,
+            "name": "Add the claim",
+            "text": "On your AnchorID edit page, choose the X claim type and enter @yourhandle or https://x.com/yourhandle."
+          },
+          {
+            "@type": "HowToStep",
+            "position": 2,
+            "name": "Add your AnchorID to your X profile",
+            "text": "Put https://anchorid.net/resolve/<your-uuid> in your X bio or in the website field on your profile. In a 160-character bio you can use the shorter forms anchorid.net/<uuid>, 'AnchorID: <uuid>', or 'aid:<uuid>'."
+          },
+          {
+            "@type": "HowToStep",
+            "position": 3,
+            "name": "Verify",
+            "text": "Click Verify on the claim. AnchorID reads your public bio and website field through the X API and looks for the marker."
+          }
+        ]
+      },
+      {
+        "@type": "TechArticle",
+        "@id": "https://anchorid.net/proofs/x#article",
+        "headline": "X (Twitter) Proof Guide",
+        "description": "How AnchorID verifies control of an X account through the public profile bio.",
+        "author": { "@id": "https://blog.mycal.net/about/#mycal" },
+        "publisher": { "@id": "https://anchorid.net/#org" },
+        "mainEntityOfPage": { "@id": "https://anchorid.net/proofs/x" },
+        "teaches": [
+          "X proof verifies control of an X account by reading the public profile bio or the website field on the profile",
+          "Accepted input forms: @handle, bare handle, https://x.com/handle, https://twitter.com/handle - all normalized to https://x.com/<handle>",
+          "Accepted markers: the full resolver URL, the short URL anchorid.net/<UUID>, the labeled form 'AnchorID: <UUID>', the compact form 'aid:<UUID>', or 'urn:uuid:<UUID>' - a bare UUID does not verify",
+          "Unlike every other AnchorID proof type, X cannot be fetched anonymously - x.com serves a JavaScript shell to non-browser clients, so AnchorID reads the profile through the X API with a server-side application token",
+          "The proof remains publicly visible and human-checkable: anyone can open x.com/<handle> in a browser and see the marker, but a third party cannot machine-re-check it without their own X API credentials",
+          "AnchorID reads only the bio and website field. It never reads posts, followers, direct messages, or credentials, and there is no Sign in with X step",
+          "X rewrites bio links through t.co, so verification matches the expanded link target rather than the truncated display text",
+          "Verification failures caused by the X API itself (rate limits, outages, missing credentials) are treated as transient and never revoke an already-verified claim"
+        ]
+      },
+      {
+        "@type": "FAQPage",
+        "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "Do I have to log in to X or authorize an app?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "No. There is no Sign in with X step. AnchorID reads your public profile bio the same way any visitor could, using a server-side application token. You are never asked for access to your account."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Why does X need an API when other proof types do not?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "x.com serves a JavaScript shell to non-browser clients, so a plain HTTPS fetch never sees the bio text. The X API is the only way to read a public bio programmatically."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Can someone else verify my X proof independently?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "By eye, yes - anyone can open your X profile and see the marker in your bio. Programmatically, no, not without their own X API credentials. That makes X proof weaker than website, DNS or GitHub proof, where anyone can re-run the check with curl."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "What happens if I change my X handle?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "The claim is keyed on the handle, so it stops verifying. Add the claim again under the new handle and delete the old one."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "My bio has the link but verification fails. Why?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Check for typos, and make sure the profile change is saved. Verification results are cached for about 15 minutes, so use the re-check option after editing your bio."
+            }
+          }
+        ]
+      },
+      {
+        "@type": "DefinedTerm",
+        "name": "X proof",
+        "description": "An AnchorID claim type that verifies control of an X (Twitter) account by finding the account owner's resolver URL in the public profile bio or website field."
+      }
+    ]
+  }
+  </script>
+
+  <style>
+    :root {
+      --bg: #ffffff;
+      --fg: #111111;
+      --muted: #555555;
+      --rule: #e7e7e7;
+      --codebg: #f6f6f6;
+      --link: #0b57d0;
+      --maxw: 860px;
+    }
+    html, body { background: var(--bg); color: var(--fg); margin: 0; padding: 0; }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; line-height: 1.55; }
+    .wrap { max-width: var(--maxw); margin: 0 auto; padding: 32px 20px; }
+    a { color: var(--link); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    h1 { font-size: 2rem; margin: 0 0 10px 0; letter-spacing: -0.02em; }
+    h2 { font-size: 1.35rem; margin: 20px 0 10px 0; letter-spacing: -0.01em; }
+    h3 { font-size: 1.1rem; margin: 18px 0 8px 0; }
+    .kicker { color: var(--muted); margin: 0 0 18px 0; }
+    .small { font-size: 0.95rem; color: var(--muted); }
+    hr { border: 0; border-top: 1px solid var(--rule); margin: 24px 0; }
+    p { margin: 10px 0; }
+    ul, ol { margin: 10px 0 10px 20px; }
+    li { margin: 6px 0; }
+    code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+    code { background: var(--codebg); padding: 2px 6px; border-radius: 4px; }
+    pre { background: var(--codebg); padding: 14px; border: 1px solid var(--rule); border-radius: 10px; overflow: auto; }
+    pre code { background: none; padding: 0; }
+    .callout { border-left: 3px solid var(--rule); padding: 10px 14px; background: #fafafa; border-radius: 10px; margin: 16px 0; }
+    footer { border-top: 1px solid var(--rule); }
+    header.wrap { padding-bottom: 6px; }
+    main.wrap { padding-top: 6px; }
+    header.wrap hr { margin: 6px 0; }
+    nav.topnav { font-size: 14px; margin-bottom: 24px; }
+    nav.topnav span { color: #111; font-weight: 500; }
+    nav.topnav a, nav.topnav span { margin-right: 16px; }
+    table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+    th, td { text-align: left; padding: 8px; border-bottom: 1px solid var(--rule); }
+    th { font-weight: 500; }
+  </style>
+</head>
+
+<body>
+  <header class="wrap">
+    <nav class="topnav">
+      <a href="/">Home</a>
+      <a href="/about">About</a>
+      <a href="/guide">Guide</a>
+      <a href="/proofs">Proofs</a>
+      <a href="/faq">FAQ</a>
+      <a href="/privacy">Privacy</a>
+    </nav>
+    <h1>X (Twitter) Proof Guide</h1>
+    <p class="kicker">Prove you control an X account by adding your AnchorID to your profile bio.</p>
+    <hr />
+  </header>
+
+  <main class="wrap">
+    <div class="callout">
+      <p><strong>What is this?</strong> X proof lets you prove you control an X account by adding your AnchorID to your profile bio or the website field on your profile.</p>
+      <p><strong>Important:</strong> This is an <strong>account control</strong> proof. It does not prove legal identity.</p>
+    </div>
+
+    <hr />
+
+    <h2>How this differs from every other proof type</h2>
+
+    <p>Every other AnchorID proof is fetched with an ordinary anonymous HTTPS request, which means
+    anyone can re-run the check themselves with <code>curl</code>. X proof cannot work that way.
+    <code>x.com</code> serves a JavaScript shell to non-browser clients, so a plain fetch never sees
+    the bio text. AnchorID therefore reads the profile through the X API using a server-side
+    application token.</p>
+
+    <p>Stated plainly, here is what that changes:</p>
+
+    <ul>
+      <li>The proof is still <strong>public and human-checkable</strong>. Anyone can open
+      <code>https://x.com/&lt;handle&gt;</code> in a browser and see the marker in the bio for themselves.</li>
+      <li>The proof is <strong>not machine-re-checkable by a third party</strong>. Someone without
+      their own X API credentials cannot reproduce the check programmatically the way they can for a
+      website, DNS or GitHub proof.</li>
+      <li>Verification can fail for reasons <strong>inside AnchorID's control</strong> — an expired
+      API token, a quota ceiling, an outage. This is a first for the system. Such failures are
+      treated as <em>transient</em>: they record that a check was attempted and leave your claim's
+      status untouched, rather than revoking a good claim.</li>
+    </ul>
+
+    <p>If you want a proof that any stranger can independently verify end to end, use a
+    <a href="/proofs/website">website</a>, <a href="/proofs/dns">DNS</a> or
+    <a href="/proofs/github">GitHub</a> proof. X proof is a convenience for an account you already
+    have, not the strongest link in your record.</p>
+
+    <hr />
+
+    <h2>Setup</h2>
+
+    <h3>1. Add the claim</h3>
+
+    <p>On your edit page, choose <strong>X (profile bio)</strong> and enter either form:</p>
+
+    <pre><code>@yourhandle
+https://x.com/yourhandle</code></pre>
+
+    <p><code>twitter.com</code> URLs and <code>www.</code> prefixes are accepted and normalized. The
+    claim is always stored canonically as <code>https://x.com/&lt;handle&gt;</code>, lowercased.</p>
+
+    <h3>2. Put your AnchorID on your X profile</h3>
+
+    <p>Add your resolver URL to <strong>either</strong> your bio <strong>or</strong> the website
+    field on your profile:</p>
+
+    <pre><code>https://anchorid.net/resolve/&lt;your-uuid&gt;</code></pre>
+
+    <p>X bios are 160 characters. If that is tight, these shorter forms also verify:</p>
+
+    <table>
+      <tr><th>Form</th><th>Example</th></tr>
+      <tr><td>Short URL</td><td><code>anchorid.net/&lt;uuid&gt;</code></td></tr>
+      <tr><td>Labeled</td><td><code>AnchorID: &lt;uuid&gt;</code></td></tr>
+      <tr><td>Compact</td><td><code>aid:&lt;uuid&gt;</code></td></tr>
+      <tr><td>URN</td><td><code>urn:uuid:&lt;uuid&gt;</code></td></tr>
+    </table>
+
+    <p>A bare UUID with no label or URL around it does <strong>not</strong> verify. A marker that
+    only appears in your display name, your location, or a pinned post does not verify either — only
+    the bio and the website field are read.</p>
+
+    <h3>3. Verify</h3>
+
+    <p>Click <strong>Verify</strong> on the claim. On success the claim moves to
+    <code>verified</code> and <code>https://x.com/&lt;handle&gt;</code> is published in your
+    profile's <code>sameAs</code>.</p>
+
+    <hr />
+
+    <h2>What AnchorID reads</h2>
+
+    <p>Two public fields, and nothing else:</p>
+
+    <ul>
+      <li><code>description</code> — your bio text</li>
+      <li>the <code>url</code> field — the website link on your profile</li>
+    </ul>
+
+    <p>Specifically, AnchorID reads the <strong>expanded</strong> form of any link in those fields.
+    X rewrites every URL in a bio through its <code>t.co</code> shortener and shows a truncated
+    display form, so the real destination is only visible in the expanded link data the API
+    returns.</p>
+
+    <p><strong>What AnchorID does not see:</strong></p>
+    <ul>
+      <li>Your posts, replies or likes</li>
+      <li>Your followers or who you follow</li>
+      <li>Direct messages</li>
+      <li>Your email address, phone number, or any account credential</li>
+    </ul>
+
+    <p>There is no "Sign in with X" step, and AnchorID never asks for access to your account.</p>
+
+    <p>A link that merely <em>redirects</em> to your resolver URL does not verify. The marker has to
+    be on X.</p>
+
+    <hr />
+
+    <h2>Handle changes</h2>
+
+    <p>The claim is keyed on the handle. If you change your X handle, the old claim stops verifying —
+    add the claim again under the new handle and delete the old one.</p>
+
+    <p>Because handles on X can be released and re-registered by someone else, a verified X claim is
+    a statement about the account that held the handle when it was checked. This is the same caveat
+    that applies to any platform-issued name, and it is one of the reasons AnchorID identifiers are
+    UUIDs rather than names.</p>
+
+    <hr />
+
+    <h2>Troubleshooting</h2>
+
+    <table>
+      <tr><th>Message</th><th>Meaning</th></tr>
+      <tr><td>Proof not found</td><td>The resolver URL or a short marker isn't in your bio or website field. Check for typos and that the change is saved.</td></tr>
+      <tr><td>X account not found</td><td>The handle doesn't exist. Check spelling, or re-add the claim if you changed handles.</td></tr>
+      <tr><td>X account unavailable</td><td>The account is suspended or restricted, so its bio can't be read.</td></tr>
+      <tr><td>X verification temporarily unavailable</td><td>The API request limit was reached. Your claim status is unchanged — try again shortly.</td></tr>
+      <tr><td>X verification is not enabled</td><td>This server has no X API credentials configured. Contact the administrator.</td></tr>
+      <tr><td>Could not reach the X API</td><td>Temporary network problem. Your claim status is unchanged.</td></tr>
+    </table>
+
+    <p class="small">Verification results are cached for about 15 minutes. Use the re-check option to
+    bypass the cache after editing your bio.</p>
+
+    <hr />
+
+    <p><a href="/proofs">← Back to Proofs</a></p>
+  </main>
+
+  <footer class="wrap">
+    <p class="small">&copy; <span id="y"></span> AnchorID. <a href="/">Home</a> · <a href="/about">About</a> · <a href="/guide">Guide</a> · <a href="/proofs">Proofs</a> · <a href="/faq">FAQ</a> · <a href="/privacy">Privacy</a></p>
+    <p class="small">Built by <a href="https://www.mycal.net">Mycal</a>.</p>
+    <script>
+      document.getElementById("y").textContent = String(new Date().getFullYear());
+    </script>
+  </footer>
+</body>
+</html>

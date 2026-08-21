@@ -24,6 +24,9 @@ import {
   parseGitHubProfile,
   claimIdForDns,
   claimIdForPublic,
+  parseXProfile,
+  claimIdForX,
+  buildXProof,
   buildWellKnownProof,
   buildGitHubReadmeProof,
   buildDnsProof,
@@ -32,12 +35,64 @@ import {
   validateProfileUrl,
   verifyClaim,
 } from "./verify";
+import type { VerifyResult } from "./verify";
 import { getErrorInfo } from "./errors";
 import { sendClaimVerifiedEmail, sendClaimFailedEmail, shouldSendNotification } from "./notifications";
 
 // Optional: pass base resolver host in if you want staging/prod support later
 function resolverUrlFor(uuid: string): string {
   return `https://anchorid.net/resolve/${uuid}`;
+}
+
+/**
+ * The X option for the claim-type dropdown, or "" when X verification is off.
+ *
+ * Offering a claim type the server has no credentials to verify is a dead end:
+ * the user files a claim that can only ever sit at self_asserted. Both claim
+ * UIs (user edit page and admin) render this.
+ */
+export function xClaimOptionHtml(env: Env): string {
+  return env.X_API_BEARER_TOKEN ? '<option value="x">X (profile bio)</option>' : "";
+}
+
+const X_INPUT_ERROR =
+  "Invalid X profile. Expected @username or https://x.com/username";
+
+/** True if the input names x.com/twitter.com, whether or not the handle parses. */
+function isXProfileHost(input: string): boolean {
+  try {
+    const host = new URL(input.includes("://") ? input : `https://${input}`)
+      .hostname.toLowerCase().replace(/^www\./, "").replace(/\.+$/, "");
+    return host === "x.com" || host === "twitter.com";
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Build an X claim from user input, or null if the input is not a valid X
+ * profile reference.
+ *
+ * The stored url must be an absolute https URL: buildProfile's canonicalizeUrl
+ * drops anything new URL() cannot parse, which would silently keep a verified
+ * claim out of the published sameAs (see the DNS branch comment below).
+ */
+function buildXClaim(input: string, resolverUrl: string, now: string): Claim | null {
+  const parsed = parseXProfile(input);
+  if (!parsed) return null;
+
+  const proof = buildXProof(parsed.canonicalUrl, resolverUrl);
+  if (!proof) return null;
+
+  return {
+    id: claimIdForX(parsed.canonicalUrl),
+    type: "x",
+    url: parsed.canonicalUrl,
+    status: "self_asserted",
+    proof,
+    createdAt: now,
+    updatedAt: now,
+  };
 }
 
 
@@ -197,13 +252,21 @@ export async function handlePostClaim(request: Request,   env: Env): Promise<Res
   // /resolve never reads.
   const uuid = String(payload.uuid || "").trim().toLowerCase();
   const type = String(payload.type || "").trim();
-  // normalize FIRST, before building ids or proofs (except for public/social, which needs special handling)
-  const url = (type === "public" || type === "social") ? String(payload.url || "").trim() : normalizeIdentityUrl(String(payload.url || ""));
+  // normalize FIRST, before building ids or proofs — except for public/social
+  // (handle forms) and x/twitter (bare "@handle" must not become "https://@handle")
+  const skipNormalize = type === "public" || type === "social" || type === "x" || type === "twitter";
+  const url = skipNormalize ? String(payload.url || "").trim() : normalizeIdentityUrl(String(payload.url || ""));
 
   if (!isUuid(uuid)) return new Response("Bad UUID", { status: 400 });
   if (url.length > 2048) return new Response("URL too long", { status: 400 });
-  // Accept both "public" (new) and "social" (backward compatibility)
-  if (type !== "website" && type !== "github" && type !== "dns" && type !== "public" && type !== "social") return new Response("Bad type", { status: 400 });
+  // Accept both "public" (new) and "social" (backward compatibility), and both
+  // "x" (new) and "twitter" (input alias, never stored).
+  if (
+    type !== "website" && type !== "github" && type !== "dns" &&
+    type !== "public" && type !== "social" && type !== "x" && type !== "twitter"
+  ) {
+    return new Response("Bad type", { status: 400 });
+  }
 
   const resolverUrl = resolverUrlFor(uuid);
   const now = nowIso();
@@ -301,37 +364,51 @@ export async function handlePostClaim(request: Request,   env: Env): Promise<Res
       createdAt: now,
       updatedAt: now,
     };
+  } else if (type === "x" || type === "twitter") {
+    const xClaim = buildXClaim(url, resolverUrl, now);
+    if (!xClaim) return new Response(X_INPUT_ERROR, { status: 400 });
+    claim = xClaim;
   } else if (type === "public" || type === "social") {
-    // Parse @user@instance format or accept full URL
-    let profileUrl = url;
+    // An x.com/twitter.com profile filed as a "public" claim can never verify —
+    // x.com serves a JS shell to unauthenticated fetchers, so the bio text is
+    // never in the fetched bytes. Route it to the X claim path rather than
+    // creating a claim that is permanently stuck at self_asserted.
+    if (isXProfileHost(url)) {
+      const asX = buildXClaim(url, resolverUrl, now);
+      if (!asX) return new Response(X_INPUT_ERROR, { status: 400 });
+      claim = asX;
+    } else {
+      // Parse @user@instance format or accept full URL
+      let profileUrl = url;
 
-    // Try parsing as Fediverse handle first
-    if (url.includes('@') && !url.startsWith('http')) {
-      const parsed = parseFediverseHandle(url);
-      if (!parsed) {
-        return new Response("Invalid Fediverse handle format. Use @user@instance.social or full URL", { status: 400 });
+      // Try parsing as Fediverse handle first
+      if (url.includes('@') && !url.startsWith('http')) {
+        const parsed = parseFediverseHandle(url);
+        if (!parsed) {
+          return new Response("Invalid Fediverse handle format. Use @user@instance.social or full URL", { status: 400 });
+        }
+        profileUrl = parsed;
       }
-      profileUrl = parsed;
+
+      // Validate URL for SSRF protection
+      const validation = validateProfileUrl(profileUrl);
+      if (!validation.ok) {
+        return new Response(`Invalid URL: ${validation.error}`, { status: 400 });
+      }
+
+      const id = claimIdForPublic(profileUrl);
+      const proof = buildPublicProof(profileUrl, resolverUrl);
+
+      claim = {
+        id,
+        type: "public",  // Always create new claims with "public" type
+        url: profileUrl,
+        status: "self_asserted",
+        proof,
+        createdAt: now,
+        updatedAt: now,
+      };
     }
-
-    // Validate URL for SSRF protection
-    const validation = validateProfileUrl(profileUrl);
-    if (!validation.ok) {
-      return new Response(`Invalid URL: ${validation.error}`, { status: 400 });
-    }
-
-    const id = claimIdForPublic(profileUrl);
-    const proof = buildPublicProof(profileUrl, resolverUrl);
-
-    claim = {
-      id,
-      type: "public",  // Always create new claims with "public" type
-      url: profileUrl,
-      status: "self_asserted",
-      proof,
-      createdAt: now,
-      updatedAt: now,
-    };
   } else {
     return new Response("Invalid claim type", { status: 400 });
   }
@@ -370,11 +447,35 @@ export async function handlePostClaimVerify(
   const previousStatus = claim.status; // Track previous status for notifications
   const now = nowIso();
 
-  let result: { status: Claim["status"]; failReason?: string };
+  let result: VerifyResult;
   try {
-    result = await verifyClaim(claim, env.ANCHOR_KV, bypassCache);
+    result = await verifyClaim(claim, env.ANCHOR_KV, bypassCache, env);
   } catch (e: any) {
     result = { status: "failed", failReason: `verify_error:${String(e?.message || e)}` };
+  }
+
+  // A transient failure is ours, not the claimant's — an X API outage, a quota
+  // ceiling, a missing token. Writing it through as "failed" would revoke a
+  // good claim and strip it from the published sameAs on the next resolve.
+  // Record that we looked; change nothing else.
+  if (result.transient) {
+    claim.lastCheckedAt = now;
+
+    const updatedTransient = [...list];
+    updatedTransient[idx] = claim;
+    await saveClaims(env, uuid, updatedTransient);
+
+    return new Response(
+      JSON.stringify({ ok: false, transient: true, failReason: result.failReason, claim }, null, 2),
+      {
+        status: 503,
+        headers: {
+          "content-type": "application/json; charset=utf-8",
+          "retry-after": "300",
+          ...securityHeaders(),
+        },
+      }
+    );
   }
 
   claim.status = result.status;

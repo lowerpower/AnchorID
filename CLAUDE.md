@@ -21,6 +21,8 @@ npm run cf-typegen   # Generate Cloudflare types
 - `BREVO_DOMAINS` — Comma-separated domains for Brevo routing (e.g., "outlook.com,hotmail.com")
 - `EMAIL_PEPPER` — HMAC pepper for the email→UUID index (optional; **never rotate/remove
   once set** — see `src/email-index.ts`)
+- `X_API_BEARER_TOKEN` — X (Twitter) app-only OAuth 2.0 Bearer token (optional; without it
+  the X claim type is hidden in the UI and X verification fails transiently)
 
 **Email Provider Routing**:
 AnchorID supports three email providers with intelligent domain-based routing:
@@ -122,6 +124,7 @@ AnchorID/
 | `GET /about` | KV `page:about` | About page |
 | `GET /guide` | KV `page:guide` | Placement guide |
 | `GET /proofs` | KV `page:proofs` | Proofs overview |
+| `GET /proofs/x` | KV `page:proofs-x` | X (Twitter) proof guide |
 | `GET /faq` | KV `page:faq` | FAQ page |
 | `GET /privacy` | KV `page:privacy` | Privacy policy |
 | `GET /sitemap.xml` | KV `page:sitemap` | XML sitemap |
@@ -214,6 +217,8 @@ npx wrangler kv key put --remote --binding ANCHOR_KV "page:sitemap" --path ./src
 | `created:<uuid>` | Backup token for admin flow | 60 sec |
 | `audit:<uuid>` | Audit log entries (max 100) | Permanent |
 | `page:<name>` | Static HTML pages (guide, privacy, proofs) | Permanent |
+| `xcache:<username>` | Cached X API bio/website strings for a handle | 15 min (2 min on failure) |
+| `rl:xapi:<yyyymmddhh>` | Worker-wide hourly counter of metered X API reads | 1 hour |
 | `rl:login:<hash>` | Rate limit counter (login by email) | 1 hour |
 | `rl:update:<uuid>` | Rate limit counter (profile updates) | 1 hour |
 | `rl:claim:<uuid>` | Rate limit counter (claim creation) | 1 hour |
@@ -242,6 +247,8 @@ npx wrangler kv key put --remote --binding ANCHOR_KV "page:sitemap" --path ./src
 | `ADMIN_SESSION_TTL_SECONDS` | 43200 | Admin session cookie lifetime (12h) |
 | `ENABLE_ADMIN_DEBUG` | — | "true" to expose `/admin/debug/kv` (off by default) |
 | `EMAIL_PEPPER` | — | HMAC pepper for email index (secret; permanent once set) |
+| `X_API_BEARER_TOKEN` | — | X app-only Bearer token (secret; gates the X claim type) |
+| `X_API_RL_PER_HOUR` | 200 | Worker-wide cap on metered X API reads |
 | `LOGIN_TTL_SECONDS` | 900 | Magic link token lifetime |
 | `LOGIN_RL_PER_HOUR` | 3 | Max login emails per email/hour |
 | `UPDATE_RL_PER_HOUR` | 20 | Max updates per UUID/hour |
@@ -274,11 +281,12 @@ npx wrangler kv key put --remote --binding ANCHOR_KV "page:sitemap" --path ./src
 
 ### Claims System (`src/claims/`)
 
-Four claim types:
+Five claim types:
 - **Website**: Proof at `https://domain/.well-known/anchorid.txt` containing resolver URL
 - **GitHub**: Profile README containing resolver URL
 - **DNS**: TXT record at `_anchorid.domain.com` containing resolver URL
 - **Public**: Profile page bio/description containing resolver URL (Mastodon, etc.)
+- **X**: X (Twitter) profile bio or website field containing resolver URL, read via the X API
 
 Claim states: `self_asserted` → `verified` or `failed`
 
@@ -294,6 +302,24 @@ Claim states: `self_asserted` → `verified` or `failed`
 - SSRF protection blocks localhost, private IPs, cloud metadata endpoints
 - Verification: fetches profile page and searches for resolver URL in bio/description
 - Input formats: `@mycal@noauthority.social` or `https://noauthority.social/@mycal`
+
+**X (Twitter) claims:**
+- Gated on `X_API_BEARER_TOKEN`; the claim type is hidden in both claim UIs without it
+- Input formats: `@handle`, `handle`, `https://x.com/handle`, `https://twitter.com/handle`
+  — all canonicalized to `https://x.com/<handle>` (lowercased); handle regex
+  `^[A-Za-z0-9_]{1,15}$`, host-pinned, deep links and reserved paths rejected
+- An `x.com`/`twitter.com` URL submitted as a `public` claim is auto-upgraded to type `x`
+  (a `public` claim on x.com can never verify — x.com serves a JS shell to plain fetchers)
+- Verification calls `GET /2/users/by/username/:username` with the app-only Bearer token
+  and matches against `entities.description.urls[].expanded_url`,
+  `entities.url.urls[].expanded_url`, and the raw `description`.
+  **Matching must use the expanded URLs** — X t.co-wraps bio links, so `description`
+  holds only a truncated display form
+- Responses cached in KV as `xcache:<username>` (15 min ok / 2 min fail), plus a
+  worker-wide hourly budget counter `rl:xapi:<yyyymmddhh>` (metered API)
+- API-side failures (401/403/429/5xx/timeout/no token/budget) are **transient**:
+  `handlePostClaimVerify` records `lastCheckedAt`, returns 503, and leaves the claim's
+  status untouched, so an outage never revokes a verified claim
 
 ---
 

@@ -268,7 +268,7 @@ export async function createLoginSession(
 export async function createClaim(
   uuid: string,
   claim: {
-    type: 'website' | 'github' | 'dns';
+    type: 'website' | 'github' | 'dns' | 'public' | 'x';
     url: string;
     status?: 'pending' | 'verified' | 'failed';
   }
@@ -283,7 +283,11 @@ export async function createClaim(
     status: claim.status || 'pending',
     createdAt: new Date().toISOString(),
     proof: {
-      kind: claim.type === 'website' ? 'well_known' : claim.type === 'github' ? 'github_readme' : 'dns_txt',
+      kind: claim.type === 'website' ? 'well_known'
+        : claim.type === 'github' ? 'github_readme'
+        : claim.type === 'public' ? 'profile_page'
+        : claim.type === 'x' ? 'x_profile'
+        : 'dns_txt',
     },
   });
 

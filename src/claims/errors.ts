@@ -153,7 +153,68 @@ export function getErrorInfo(failReason: string): ErrorInfo {
   if (failReason === "unknown_claim_type") {
     return {
       message: "Unsupported claim type",
-      hint: "This claim type is not supported. Use 'website', 'github', 'dns', or 'public'.",
+      hint: "This claim type is not supported. Use 'website', 'github', 'dns', 'public', or 'x'.",
+    };
+  }
+
+  // ---- X (Twitter) claims ----
+
+  if (failReason === "x_user_not_found") {
+    return {
+      message: "X account not found",
+      hint: "Check the handle for typos. If you recently changed your handle, add the claim again under the new one.",
+      docLink: "/proofs/x",
+    };
+  }
+
+  if (failReason === "x_user_unavailable") {
+    return {
+      message: "X account unavailable",
+      hint: "The account appears to be suspended or restricted, so its bio cannot be read.",
+      docLink: "/proofs/x",
+    };
+  }
+
+  if (failReason === "x_auth_failed") {
+    return {
+      message: "X API credentials rejected",
+      hint: "This is a server configuration problem, not a problem with your claim. Your existing status is unchanged.",
+    };
+  }
+
+  if (failReason === "x_rate_limited" || failReason === "x_budget_exceeded") {
+    return {
+      message: "X verification temporarily unavailable",
+      hint: "The X API request limit was reached. Your claim status is unchanged - try again in a few minutes.",
+    };
+  }
+
+  if (failReason === "x_api_not_configured") {
+    return {
+      message: "X verification is not enabled",
+      hint: "This server has no X API credentials configured. Contact the administrator.",
+    };
+  }
+
+  if (failReason === "x_api_timeout" || failReason === "x_api_unreachable") {
+    return {
+      message: "Could not reach the X API",
+      hint: "A temporary network problem. Your claim status is unchanged - try again shortly.",
+    };
+  }
+
+  if (failReason === "x_api_bad_response") {
+    return {
+      message: "Unexpected response from the X API",
+      hint: "This is a temporary upstream problem. Your claim status is unchanged - try again shortly.",
+    };
+  }
+
+  if (failReason.startsWith("x_api_error:")) {
+    const status = failReason.split(":")[1];
+    return {
+      message: `X API returned HTTP ${status}`,
+      hint: "A temporary upstream problem. Your claim status is unchanged - try again in a few minutes.",
     };
   }
 

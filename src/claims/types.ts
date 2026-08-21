@@ -20,13 +20,26 @@ export type ClaimProof =
   | { kind: "well_known"; url: string; mustContain: string; fallbackUrls?: string[] }
   | { kind: "github_readme"; url: string; mustContain: string; fallbackUrls?: string[] }
   | { kind: "dns_txt"; qname: string; expectedToken: string }
-  | { kind: "profile_page"; url: string; mustContain: string; fallbackUrls?: string[] };
+  | { kind: "profile_page"; url: string; mustContain: string; fallbackUrls?: string[] }
+  /**
+   * X (Twitter) profile bio / website field, read through the X API.
+   *
+   * Unlike every other proof kind this one cannot be fetched anonymously —
+   * x.com serves a JS shell to non-browser clients, so the bio text never
+   * appears in a plain GET. `url` and `mustContain` are named to match the
+   * other variants so the claims ledger and edit-page proof blocks render it
+   * without special-casing; `username` is what the API lookup keys on.
+   */
+  | { kind: "x_profile"; username: string; url: string; mustContain: string };
 
 /**
  * "social" is the legacy name for "public" and still appears in stored records
  * and in accepted API input, so it stays in the union for back-compat.
+ *
+ * "twitter" is accepted as input for "x" but is never stored — see
+ * handlePostClaim, which always writes the claim as type "x".
  */
-export type ClaimType = "website" | "github" | "dns" | "public" | "social";
+export type ClaimType = "website" | "github" | "dns" | "public" | "social" | "x";
 
 export type Claim = {
   id: string;

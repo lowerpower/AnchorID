@@ -28,6 +28,11 @@ export default defineWorkersConfig({
 						IP_UPDATE_RL_PER_HOUR: '10',
 						IP_CLAIM_RL_PER_HOUR: '5',
 						CLAIM_RL_PER_HOUR: '5',
+						// X claims: a token so the claim type is offered in the UI, and a
+						// zero hourly budget so verification always short-circuits before
+						// any real request reaches the X API.
+						X_API_BEARER_TOKEN: 'test-x-token',
+						X_API_RL_PER_HOUR: '0',
 					},
 				},
 			},

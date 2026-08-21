@@ -15,7 +15,22 @@
  */
 
 import type { Claim, ClaimProof, ClaimStatus } from "./types";
-import { clampKvTtl } from "../env";
+import type { Env } from "../env";
+import { clampKvTtl, intFromEnv } from "../env";
+
+/**
+ * Outcome of a verification attempt.
+ *
+ * `transient` marks a failure that is not the claimant's fault — an X API
+ * outage, a quota ceiling, a missing token. Callers must not turn a transient
+ * failure into a stored "failed" status, or an upstream hiccup would revoke
+ * good claims and strip them from the published sameAs.
+ */
+export type VerifyResult = {
+  status: ClaimStatus;
+  failReason?: string;
+  transient?: boolean;
+};
 
 export function claimIdForWebsite(url: string): string {
   try {
@@ -64,6 +79,95 @@ export function parseGitHubProfile(url: string): { user: string; canonicalUrl: s
 export function claimIdForGitHub(url: string): string {
   const parsed = parseGitHubProfile(url);
   return parsed ? `github:${parsed.user}` : `github:${url}`;
+}
+
+/** X handles: 1-15 chars, letters/digits/underscore only. */
+const X_HANDLE_RE = /^[A-Za-z0-9_]{1,15}$/;
+
+/**
+ * Reserved first-path segments on x.com that are routes, not accounts.
+ *
+ * Some of these ("home", "about") also fail no other check, so without this
+ * list https://x.com/home would be accepted as a claim on an account that
+ * cannot exist.
+ */
+const X_RESERVED_PATHS = new Set([
+  "i", "home", "explore", "search", "notifications", "messages", "settings",
+  "compose", "intent", "share", "login", "logout", "signup", "account",
+  "about", "tos", "privacy", "help", "download", "hashtag",
+]);
+
+const X_HOSTS = new Set(["x.com", "www.x.com", "twitter.com", "www.twitter.com"]);
+
+/**
+ * Parse an X profile reference into a canonical handle + URL.
+ *
+ * Accepts a bare handle ("mycal"), an @-handle ("@mycal"), or a profile URL on
+ * x.com / twitter.com (with or without www.). Everything else returns null.
+ *
+ * The host pinning here matters for the same reason it does in
+ * parseGitHubProfile: the proof is read from the X account named by the path,
+ * so accepting an arbitrary host would let someone publish a verified sameAs
+ * pointing at a domain they do not control.
+ *
+ * Canonical form is always x.com — that is the current brand and what the API
+ * reports. Note canonicalizeUrl does no cross-domain aliasing, so a manual
+ * sameAs entry of twitter.com/<handle> stays a separate entry.
+ */
+export function parseXProfile(input: string): { username: string; canonicalUrl: string } | null {
+  const raw = (input || "").trim();
+  if (!raw) return null;
+
+  let handle: string;
+
+  if (raw.includes("://") || raw.toLowerCase().startsWith("x.com/") ||
+      raw.toLowerCase().startsWith("twitter.com/") || raw.toLowerCase().startsWith("www.")) {
+    // URL form — parse it, pinning the host.
+    let u: URL;
+    try {
+      u = new URL(raw.includes("://") ? raw : `https://${raw}`);
+    } catch {
+      return null;
+    }
+
+    if (u.protocol !== "https:" && u.protocol !== "http:") return null;
+    if (!X_HOSTS.has(u.hostname.toLowerCase().replace(/\.+$/, ""))) return null;
+
+    const parts = u.pathname.split("/").filter(Boolean);
+    // Reject deep links (/status/..., /i/flow/login) — this claim is about a profile.
+    if (parts.length !== 1) return null;
+    handle = parts[0];
+    // x.com/@handle is not a real X URL form, but people paste it anyway.
+    if (handle.startsWith("@")) handle = handle.slice(1);
+  } else {
+    // Bare or @-prefixed handle.
+    handle = raw.startsWith("@") ? raw.slice(1) : raw;
+    // A handle must not look like a path or a host.
+    if (handle.includes("/") || handle.includes(".") || handle.includes("@")) return null;
+  }
+
+  if (!X_HANDLE_RE.test(handle)) return null;
+
+  const username = handle.toLowerCase();
+  if (X_RESERVED_PATHS.has(username)) return null;
+
+  return { username, canonicalUrl: `https://x.com/${username}` };
+}
+
+export function claimIdForX(input: string): string {
+  const parsed = parseXProfile(input);
+  return parsed ? `x:${parsed.username}` : `x:${input}`;
+}
+
+export function buildXProof(input: string, resolverUrl: string): ClaimProof | null {
+  const parsed = parseXProfile(input);
+  if (!parsed) return null;
+  return {
+    kind: "x_profile",
+    username: parsed.username,
+    url: parsed.canonicalUrl,
+    mustContain: resolverUrl,
+  };
 }
 
 export function claimIdForDns(qname: string): string {
@@ -639,7 +743,7 @@ async function verifyDnsClaim(
   claim: Claim,
   kv: KVNamespace,
   bypassCache: boolean = false
-): Promise<{ status: ClaimStatus; failReason?: string }> {
+): Promise<VerifyResult> {
   if (claim.proof.kind !== "dns_txt") {
     return { status: "failed", failReason: "invalid_proof_kind" };
   }
@@ -733,17 +837,299 @@ export function profilePageHasUuidMarker(mustContain: string, text: string): boo
   return new RegExp(`\\baid:[ \\t]*${uuid}`).test(haystack);
 }
 
+// ------------------ X (Twitter) profile verification ------------------
+
+const X_API_TIMEOUT_MS = 5000;
+const X_API_MAX_BYTES = 64 * 1024;
+const X_CACHE_OK_TTL_SECONDS = 15 * 60;
+const X_CACHE_FAIL_TTL_SECONDS = 2 * 60;
+const X_API_DEFAULT_RL_PER_HOUR = 200;
+
+/**
+ * The parts of an X user payload that can carry a proof.
+ *
+ * Only the bio and the profile website field count. Display name, location and
+ * pinned posts are not proofs.
+ */
+export interface XProofCandidates {
+  description: string;
+  expandedUrls: string[];
+}
+
+/**
+ * Pull the proof-bearing strings out of an X API user payload.
+ *
+ * The expanded URLs are the important part. X linkifies every URL in a bio
+ * through t.co, so `description` holds a *truncated display form*
+ * ("anchorid.net/resolve/8f3ac1...") while the real target only ever appears in
+ * entities[].expanded_url. Matching on the description text alone would fail on
+ * every correctly-configured profile.
+ */
+export function extractXProofCandidates(payload: any): XProofCandidates {
+  const data = payload?.data ?? payload;
+  const description = typeof data?.description === "string" ? data.description : "";
+
+  const expandedUrls: string[] = [];
+  const collect = (urls: any) => {
+    if (!Array.isArray(urls)) return;
+    for (const u of urls) {
+      if (u && typeof u.expanded_url === "string") expandedUrls.push(u.expanded_url);
+    }
+  };
+
+  // Links inside the bio text.
+  collect(data?.entities?.description?.urls);
+  // The single "website" field on the profile.
+  collect(data?.entities?.url?.urls);
+
+  return { description, expandedUrls };
+}
+
+/**
+ * True if the bio / website field proves the claim.
+ *
+ * Kept pure and exported so the match rules are testable against captured API
+ * payloads without any network or fetch stubbing.
+ */
+export function xCandidatesProveClaim(candidates: XProofCandidates, mustContain: string): boolean {
+  // Full resolver URL, in a linked URL or typed as plain text.
+  if (candidates.expandedUrls.some((u) => u.includes(mustContain))) return true;
+  if (candidates.description.includes(mustContain)) return true;
+
+  // Short marker forms. X bios are 160 characters, which is exactly the
+  // space-constrained case profilePageHasUuidMarker was written for.
+  const haystack = [candidates.description, ...candidates.expandedUrls].join(" ");
+  return profilePageHasUuidMarker(mustContain, haystack);
+}
+
+type XLookupResult =
+  | { ok: true; candidates: XProofCandidates }
+  | { ok: false; failReason: string; transient: boolean };
+
+interface CachedXResult {
+  ok: boolean;
+  candidates?: XProofCandidates;
+  failReason?: string;
+  transient?: boolean;
+  cachedAt: number;
+  expiresAt: number;
+}
+
+/**
+ * Reserve one unit of the hourly X API budget.
+ *
+ * X reads are metered per request, so an unbounded verification loop is a
+ * billing problem, not just a rate-limit one. The per-UUID and per-IP verify
+ * limits already bound normal use; this is the backstop that bounds the whole
+ * worker.
+ */
+async function reserveXApiBudget(kv: KVNamespace, limitPerHour: number): Promise<boolean> {
+  // Hour-bucketed key: no clock sync needed, and it expires on its own.
+  const bucket = new Date().toISOString().slice(0, 13).replace(/[-T:]/g, "");
+  const key = `rl:xapi:${bucket}`;
+  const cur = await kv.get(key);
+  const n = (cur ? parseInt(cur, 10) : 0) + 1;
+  if (n > limitPerHour) return false;
+  try {
+    await kv.put(key, String(n), { expirationTtl: 3600 });
+  } catch {
+    // A failed counter write must not block verification.
+  }
+  return true;
+}
+
+/** Fetch a user from the X API. Fixed host, so no SSRF surface and no redirects. */
+async function fetchXUser(username: string, bearer: string): Promise<XLookupResult> {
+  const url =
+    `https://api.x.com/2/users/by/username/${encodeURIComponent(username)}` +
+    `?user.fields=description,url,entities,id,username`;
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), X_API_TIMEOUT_MS);
+
+  let r: Response;
+  try {
+    r = await fetch(url, {
+      method: "GET",
+      redirect: "manual",
+      signal: controller.signal,
+      headers: {
+        authorization: `Bearer ${bearer}`,
+        accept: "application/json",
+        "user-agent": "AnchorID-ClaimVerifier/1.0",
+      },
+    });
+  } catch (e: any) {
+    clearTimeout(timer);
+    const aborted = e?.name === "AbortError";
+    return {
+      ok: false,
+      failReason: aborted ? "x_api_timeout" : "x_api_unreachable",
+      transient: true,
+    };
+  }
+
+  try {
+    // Auth and quota problems are ours, not the claimant's — never let them
+    // turn a good claim into a failed one.
+    if (r.status === 401 || r.status === 403) {
+      return { ok: false, failReason: "x_auth_failed", transient: true };
+    }
+    if (r.status === 429) {
+      return { ok: false, failReason: "x_rate_limited", transient: true };
+    }
+    if (r.status >= 500) {
+      return { ok: false, failReason: `x_api_error:${r.status}`, transient: true };
+    }
+    if (!r.ok) {
+      return { ok: false, failReason: `x_api_error:${r.status}`, transient: true };
+    }
+
+    const text = await readCapped(r, X_API_MAX_BYTES);
+    let payload: any;
+    try {
+      payload = JSON.parse(text);
+    } catch {
+      return { ok: false, failReason: "x_api_bad_response", transient: true };
+    }
+
+    // A missing/suspended account comes back 200 with an errors[] array.
+    if (!payload?.data) {
+      const title = payload?.errors?.[0]?.title || "";
+      if (/not found/i.test(title)) {
+        return { ok: false, failReason: "x_user_not_found", transient: false };
+      }
+      if (/suspend|forbidden/i.test(title)) {
+        return { ok: false, failReason: "x_user_unavailable", transient: false };
+      }
+      return { ok: false, failReason: "x_api_bad_response", transient: true };
+    }
+
+    return { ok: true, candidates: extractXProofCandidates(payload) };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * Cached X user lookup.
+ *
+ * Cached by handle only, and it caches the *extracted strings* rather than a
+ * verdict, so two profiles claiming the same handle share one API read while
+ * each still matches against its own resolver URL.
+ */
+async function fetchXUserCached(
+  username: string,
+  bearer: string,
+  kv: KVNamespace,
+  limitPerHour: number,
+  bypassCache: boolean
+): Promise<XLookupResult> {
+  const cacheKey = `xcache:${username.toLowerCase()}`;
+  const now = Date.now();
+
+  if (!bypassCache) {
+    const cachedJson = await kv.get(cacheKey);
+    if (cachedJson) {
+      try {
+        const cached: CachedXResult = JSON.parse(cachedJson);
+        if (cached.expiresAt > now) {
+          return cached.ok && cached.candidates
+            ? { ok: true, candidates: cached.candidates }
+            : {
+                ok: false,
+                failReason: cached.failReason || "x_api_bad_response",
+                transient: Boolean(cached.transient),
+              };
+        }
+      } catch {
+        // Bad cache entry — fall through to a fresh lookup.
+      }
+    }
+  }
+
+  if (!(await reserveXApiBudget(kv, limitPerHour))) {
+    return { ok: false, failReason: "x_budget_exceeded", transient: true };
+  }
+
+  const result = await fetchXUser(username, bearer);
+
+  const ttlSeconds = clampKvTtl(result.ok ? X_CACHE_OK_TTL_SECONDS : X_CACHE_FAIL_TTL_SECONDS);
+  const cached: CachedXResult = result.ok
+    ? { ok: true, candidates: result.candidates, cachedAt: now, expiresAt: now + ttlSeconds * 1000 }
+    : {
+        ok: false,
+        failReason: result.failReason,
+        transient: result.transient,
+        cachedAt: now,
+        expiresAt: now + ttlSeconds * 1000,
+      };
+
+  try {
+    await kv.put(cacheKey, JSON.stringify(cached), { expirationTtl: ttlSeconds });
+  } catch {
+    // Cache write failure is non-fatal.
+  }
+
+  return result;
+}
+
+async function verifyXClaim(
+  claim: Claim,
+  kv: KVNamespace | undefined,
+  env: Env | undefined,
+  bypassCache: boolean
+): Promise<VerifyResult> {
+  if (claim.proof.kind !== "x_profile") {
+    return { status: "failed", failReason: "invalid_proof_kind" };
+  }
+  if (!kv) {
+    return { status: "failed", failReason: "kv_not_available" };
+  }
+
+  const bearer = env?.X_API_BEARER_TOKEN;
+  if (!bearer) {
+    // The server is misconfigured, not the claim. Keep whatever status the
+    // claim already has rather than revoking it.
+    return { status: "failed", failReason: "x_api_not_configured", transient: true };
+  }
+
+  const limitPerHour = intFromEnv(env?.X_API_RL_PER_HOUR, X_API_DEFAULT_RL_PER_HOUR);
+  const result = await fetchXUserCached(claim.proof.username, bearer, kv, limitPerHour, bypassCache);
+
+  if (!result.ok) {
+    return {
+      status: "failed",
+      failReason: result.failReason,
+      ...(result.transient ? { transient: true } : {}),
+    };
+  }
+
+  if (xCandidatesProveClaim(result.candidates, claim.proof.mustContain)) {
+    return { status: "verified" };
+  }
+
+  return { status: "failed", failReason: "proof_not_found" };
+}
+
 export async function verifyClaim(
   claim: Claim,
   kv?: KVNamespace,
-  bypassCache: boolean = false
-): Promise<{ status: ClaimStatus; failReason?: string }> {
+  bypassCache: boolean = false,
+  env?: Env
+): Promise<VerifyResult> {
   // Handle DNS claims
   if (claim.type === "dns") {
     if (!kv) {
       return { status: "failed", failReason: "kv_not_available" };
     }
     return verifyDnsClaim(claim, kv, bypassCache);
+  }
+
+  // X profile claims go through the X API — x.com serves a JS shell to
+  // unauthenticated fetchers, so there is no anonymous path to the bio text.
+  if (claim.proof.kind === "x_profile") {
+    return verifyXClaim(claim, kv, env, bypassCache);
   }
 
   // Handle website, github, and social profile claims

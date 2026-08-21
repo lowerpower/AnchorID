@@ -146,6 +146,21 @@ https://anchorid.net/claims/<uuid>
 - A bare UUID with no label or URL around it does not verify
 - Verification: AnchorID fetches the page and checks for one of the accepted forms
 
+**X (Twitter) Claim**
+- Proof: Add your AnchorID to your X profile bio or the website field on your profile
+- Accepted forms: same as the public profile claim
+- Verification: AnchorID reads the public bio and website field through the X API
+
+  This is the one claim type that cannot be fetched anonymously — `x.com` serves a
+  JavaScript shell to non-browser clients, so the bio text never appears in a plain
+  HTTPS GET. The consequence is a deliberate weakening of the auditability property
+  the other four claim types have: the proof stays **publicly visible** (anyone can
+  open the profile in a browser and see it) but is **not machine-re-checkable** by a
+  third party without their own X API credentials. It is also the only claim type
+  whose verification can fail for reasons inside AnchorID's own trust boundary — an
+  expired token, a quota ceiling, an upstream outage. Those failures are recorded as
+  transient and never revoke an already-verified claim. See `docs/proofs/x.md`.
+
 ### Claim States
 
 | State | Meaning |
