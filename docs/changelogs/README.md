@@ -4,6 +4,17 @@ This directory contains detailed changelogs for major feature implementations an
 
 ## Changelogs
 
+### [X (Twitter) Claims - August 22, 2026](./CHANGELOG-x-claims.md)
+New `x` claim type (PR #8, by Thel), verified through the X API because x.com hides bios from plain fetchers:
+- **Proof Sources**: Bio text, bio links, and the profile website field — matched on t.co *expanded* URLs
+- **Safe Failure**: API outages, bad credentials, and quota ceilings are transient — a verified claim is never revoked by upstream trouble
+- **Cost Controls**: Per-handle KV cache plus a worker-wide hourly budget on metered reads
+- **Gated Rollout**: Feature hidden entirely until `X_API_BEARER_TOKEN` is set
+- **Legacy Migration**: Old x.com public claims upgrade themselves on their next Verify
+- **Regression Locks**: 41 new tests; prod KV snapshotted via new `npm run backup` before merge
+
+**Focus:** New proof type, third-party API integration, graceful degradation
+
 ### [Security Audit Remediation - August 14-15, 2026](./CHANGELOG-security-audit-remediation.md)
 Full-codebase security audit findings fixed (PR #5), Codex-reviewed before merge:
 - **Admin Sessions**: Opaque KV-backed sessions replace secret-as-cookie; rotation revokes instantly

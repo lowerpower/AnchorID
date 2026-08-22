@@ -6,6 +6,45 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added - 2026-08-22
+
+#### X (Twitter) Claim Type (PR #8, by Thel)
+
+- New `x` claim type: proof is the resolver URL, `anchorid.net/<uuid>`,
+  `AnchorID: <uuid>`, `aid:<uuid>`, or `urn:uuid:<uuid>` in an X profile's bio
+  or website field, read through the X API (`GET /2/users/by/username`) with an
+  app-only Bearer token — x.com serves a JS shell to plain fetchers, so the
+  existing public-profile proof could never read an X bio
+- Matching uses `entities[].expanded_url`, not the t.co-truncated bio text
+- Gated on the `X_API_BEARER_TOKEN` secret: without it the type is hidden in
+  both claim UIs. Input accepts `@handle`, `handle`, `x.com/handle`,
+  `twitter.com/handle`; host-pinned, deep links and reserved routes rejected;
+  an x.com URL filed as a `public` claim is rewritten to `x`
+- API-side failures (401/403/429/5xx/timeout/no token/budget) are *transient*:
+  `/claim/verify` returns 503 + `retry-after` and leaves the stored status
+  untouched, so an outage never revokes a verified claim
+- Worker-wide hourly budget on metered X reads (`rl:xapi:<hour>`, default 200,
+  `X_API_RL_PER_HOUR`) plus a 15-minute `xcache:<username>` KV cache
+- New `/proofs/x` page, `docs/proofs/x.md`, threat-model and identity-model
+  sections, 38 regression tests. Codex review: one P1 (the budget counter is a
+  non-atomic KV read-modify-write) — same known limitation as every other rate
+  limiter here; tracked with the Durable Objects follow-up in `todo.md`
+
+#### Legacy x.com Public Claims Upgrade on Verify (`326bb35`)
+
+- A `public`/`social` claim on x.com stored before the X type existed carried a
+  `profile_page` proof that could never verify. `/claim/verify` now rebuilds it
+  as an `x_profile` claim first (id `x:<handle>`, `createdAt` kept, status reset
+  to `self_asserted`); if an `x:<handle>` claim already exists the dead legacy
+  entry is dropped in its favour. No delete-and-re-add needed
+
+#### `scripts/backup-kv.sh` (`9c0a851`)
+
+- `npm run backup` had pointed at a script that did not exist. It now dumps the
+  whole prod namespace to `backup/kv-<utc-timestamp>.json` in the same flat
+  `{key: value}` shape `scripts/restore-from-backup.py` consumes. First run
+  2026-08-22 (106 keys), taken before merging PR #8
+
 ### Changed - 2026-08-18
 
 #### `compatibility_date` 2025-09-27 → 2026-03-10

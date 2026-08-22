@@ -59,6 +59,7 @@ npx wrangler secret put MYCAL_MAIL_ENDPOINT    # Paste: https://example.com/api/
 npm run kv:list:prod                              # List profile keys
 npm run kv:get:prod -- "profile:UUID"             # Get specific profile
 npx wrangler kv key put --remote --binding ANCHOR_KV "key" --path ./file  # Upload content
+npm run backup                                    # Dump ALL prod keys to backup/kv-<timestamp>.json
 ```
 
 **Security Testing**:
@@ -413,7 +414,7 @@ Admins can delete profiles that are less than 7 days old. From `/admin/edit/<uui
 
 See `todo.md` for the MVP checklist. Core functionality complete:
 - ✅ Identity resolution
-- ✅ Claims verification (website, GitHub, DNS, public profiles)
+- ✅ Claims verification (website, GitHub, DNS, public profiles, X via the X API)
 - ✅ Email magic link flow with domain-based routing (Brevo, mycal.net, Resend)
 - ✅ Backup token recovery
 - ✅ Admin UI (with email addition and profile deletion)

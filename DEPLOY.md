@@ -324,6 +324,13 @@ npx wrangler kv key put --env preview --binding ANCHOR_KV "page:about" --path ./
 
 ## Rollback
 
+Before any deploy or rollback that touches how claims or profiles are stored,
+snapshot KV first — a code rollback does not roll back data:
+
+```bash
+npm run backup    # -> backup/kv-<timestamp>.json (restore: scripts/restore-from-backup.py)
+```
+
 If issues arise after deployment:
 
 ```bash

@@ -171,7 +171,10 @@ Security hardening complete as of 2026-01-24:
       miniflare warning is expected). `nodejs_compat` from the old .toml
       confirmed unnecessary (zero node: imports)
 - [ ] If abuse warrants: move rate limiting to Durable Objects or the Workers
-      rate-limiting binding (KV counters are non-atomic — see threat-model.md)
+      rate-limiting binding (KV counters are non-atomic — see threat-model.md).
+      Include the worker-wide X API budget `rl:xapi:<hour>` (Codex P1 on PR #8,
+      2026-08-22): it is a backstop behind the per-IP/per-UUID verify limits,
+      so overshoot is bounded, but it has the same read-modify-write race
 - [x] Pass over existing `github`/`public` claims (2026-08-18): **zero claims
       exist in production KV** — nothing for the tightened rules to affect.
       NOTE: the audit uncovered that the test suite had wiped prod KV earlier
@@ -190,8 +193,11 @@ Security hardening complete as of 2026-01-24:
 
 ## 🔁 Recurring Ops
 
-- [ ] Periodic offline backup: download `/admin/backup` (POST, full JSON dump of
-      profiles/claims/audit) and store it offline, apart from the pepper.
+- [ ] Periodic offline backup: `npm run backup` (`scripts/backup-kv.sh` — dumps
+      every key to `backup/kv-<timestamp>.json`, restorable with
+      `scripts/restore-from-backup.py`), or download `/admin/backup` (POST,
+      profiles/claims/audit only) and store it offline, apart from the pepper.
+      Last taken: 2026-08-22 (106 keys, before the X claims merge).
       The permanence promise currently rests on one KV namespace in one
       Cloudflare account — this is the disaster-recovery path for the data,
       as the offline pepper copy is for the index. Suggested cadence: monthly,

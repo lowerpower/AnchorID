@@ -32,6 +32,8 @@ To create your own AnchorID:
    - Public profile: add your resolver URL to any public bio — the short URL
      `anchorid.net/<uuid>`, labeled `AnchorID: <uuid>`, or compact `aid:<uuid>`
      forms also verify
+   - X (Twitter): same marker in your X bio or profile website field, read
+     through the X API (x.com hides bios from plain fetchers)
 
 4. **Embed the AnchorID in your content**  
    Add this line to your site's HTML head or JSON-LD:
@@ -210,6 +212,14 @@ AnchorID supports **self-asserted claims** that can be **verified automatically*
   ```
 
   A bare UUID with no label or URL around it does not verify.
+
+* **X (Twitter)**
+  Proof via your X profile's bio or website field, read through the X API
+  (`x.com` serves a JavaScript shell to plain fetchers, so the public-profile
+  proof cannot see an X bio). Accepts `@handle` or `https://x.com/handle`; the
+  same marker forms as above verify, including `urn:uuid:<uuid>`. Anyone can
+  see the marker on your profile, but re-checking it by machine needs X API
+  credentials. See [docs/proofs/x.md](docs/proofs/x.md).
 
 Each claim includes:
 
