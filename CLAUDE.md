@@ -309,7 +309,10 @@ Claim states: `self_asserted` → `verified` or `failed`
   — all canonicalized to `https://x.com/<handle>` (lowercased); handle regex
   `^[A-Za-z0-9_]{1,15}$`, host-pinned, deep links and reserved paths rejected
 - An `x.com`/`twitter.com` URL submitted as a `public` claim is auto-upgraded to type `x`
-  (a `public` claim on x.com can never verify — x.com serves a JS shell to plain fetchers)
+  (a `public` claim on x.com can never verify — x.com serves a JS shell to plain fetchers).
+  A legacy `public`/`social` x.com claim stored before the X type existed is upgraded the same
+  way on its next `/claim/verify` (`upgradeLegacyXClaim`): id becomes `x:<handle>`, `createdAt`
+  is kept, and if an `x:<handle>` claim already exists the legacy entry is dropped in its favour
 - Verification calls `GET /2/users/by/username/:username` with the app-only Bearer token
   and matches against `entities.description.urls[].expanded_url`,
   `entities.url.urls[].expanded_url`, and the raw `description`.

@@ -1293,3 +1293,121 @@ describe('X claim UI gating', () => {
     await clearAllTestData();
   });
 });
+
+describe('Legacy x.com public claims upgrade on verify', () => {
+  // Before the X claim type existed, an x.com profile could only be filed as
+  // a public/social claim with a profile_page proof — which can never verify,
+  // because x.com serves a JS shell to plain fetchers. Verifying such a claim
+  // must route it through the X path instead of failing it forever.
+  //
+  // The test env sets X_API_RL_PER_HOUR=0, so reaching the X path shows up as
+  // a 503 x_budget_exceeded: proof that the X verifier ran, with no request
+  // ever leaving for api.x.com.
+  const legacyClaim = (uuid: string) => ({
+    id: 'social:x.com/mycal_1',
+    type: 'social',
+    url: 'https://x.com/mycal_1',
+    status: 'failed',
+    proof: {
+      kind: 'profile_page',
+      url: 'https://x.com/mycal_1',
+      mustContain: `https://anchorid.net/resolve/${uuid}`,
+    },
+    createdAt: '2026-02-01T18:49:59.239Z',
+    updatedAt: '2026-02-01T23:22:15.171Z',
+    lastCheckedAt: '2026-02-01T23:22:15.171Z',
+    failReason: 'proof_not_found',
+  });
+
+  async function verify(uuid: string, claimId: string, ip: string) {
+    return SELF.fetch(createTestRequest('https://anchorid.net/claim/verify', {
+      method: 'POST',
+      headers: withAdminAuth(env, { 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ uuid, claimId }),
+      ip,
+    }));
+  }
+
+  it('rebuilds a profile_page claim on x.com as an x_profile claim and verifies via the X path', async () => {
+    await clearAllTestData();
+    const uuid = crypto.randomUUID();
+    await createMockProfile({ uuid });
+    await setKV(claimsKey(uuid), JSON.stringify([legacyClaim(uuid)]));
+
+    const res = await verify(uuid, 'social:x.com/mycal_1', '198.51.100.51');
+    expect(res.status).toBe(503);
+    const body = await res.json() as any;
+    expect(body.transient).toBe(true);
+    expect(body.failReason).toBe('x_budget_exceeded');
+
+    const stored = await getKVJson(claimsKey(uuid));
+    expect(stored).toHaveLength(1);
+    const c = stored[0];
+    expect(c.id).toBe('x:mycal_1');
+    expect(c.type).toBe('x');
+    expect(c.url).toBe('https://x.com/mycal_1');
+    expect(c.proof.kind).toBe('x_profile');
+    expect(c.proof.username).toBe('mycal_1');
+    expect(c.proof.mustContain).toBe(`https://anchorid.net/resolve/${uuid}`);
+    // The old "failed" verdict came from a verifier that could never succeed;
+    // the rebuilt claim starts clean, with its original filing date kept.
+    expect(c.status).toBe('self_asserted');
+    expect(c.failReason).toBeUndefined();
+    expect(c.createdAt).toBe('2026-02-01T18:49:59.239Z');
+    expect(c.lastCheckedAt).toBeTruthy();
+    await clearAllTestData();
+  });
+
+  it('drops the legacy entry when an x:<handle> claim already exists, and verifies that one', async () => {
+    await clearAllTestData();
+    const uuid = crypto.randomUUID();
+    await createMockProfile({ uuid });
+
+    const real = {
+      id: 'x:mycal_1',
+      type: 'x',
+      url: 'https://x.com/mycal_1',
+      status: 'verified',
+      proof: {
+        kind: 'x_profile',
+        username: 'mycal_1',
+        url: 'https://x.com/mycal_1',
+        mustContain: `https://anchorid.net/resolve/${uuid}`,
+      },
+      createdAt: '2026-08-22T00:00:00.000Z',
+      updatedAt: '2026-08-22T00:00:00.000Z',
+      verifiedAt: '2026-08-22T00:00:00.000Z',
+    };
+    await setKV(claimsKey(uuid), JSON.stringify([legacyClaim(uuid), real]));
+
+    const res = await verify(uuid, 'social:x.com/mycal_1', '198.51.100.52');
+    expect(res.status).toBe(503);
+
+    const stored = await getKVJson(claimsKey(uuid));
+    expect(stored).toHaveLength(1);
+    expect(stored[0].id).toBe('x:mycal_1');
+    // Transient result: the real claim keeps its verified status.
+    expect(stored[0].status).toBe('verified');
+    expect(stored[0].verifiedAt).toBe(real.verifiedAt);
+    await clearAllTestData();
+  });
+
+  it('leaves an unparseable x.com claim alone rather than half-upgrading it', async () => {
+    await clearAllTestData();
+    const uuid = crypto.randomUUID();
+    await createMockProfile({ uuid });
+    // /home is a reserved route, not an account: buildXClaim returns null.
+    const bogus = { ...legacyClaim(uuid), id: 'social:x.com/home', url: 'https://x.com/home',
+      proof: { ...legacyClaim(uuid).proof, url: 'https://x.com/home' } };
+    await setKV(claimsKey(uuid), JSON.stringify([bogus]));
+
+    // Falls through to the profile_page verifier; we only care that the
+    // stored record was not rewritten into an X claim.
+    await verify(uuid, 'social:x.com/home', '198.51.100.53');
+    const stored = await getKVJson(claimsKey(uuid));
+    expect(stored).toHaveLength(1);
+    expect(stored[0].id).toBe('social:x.com/home');
+    expect(stored[0].proof.kind).toBe('profile_page');
+    await clearAllTestData();
+  });
+});

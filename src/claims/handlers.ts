@@ -96,6 +96,20 @@ function buildXClaim(input: string, resolverUrl: string, now: string): Claim | n
 }
 
 
+/**
+ * Rebuild a pre-X-era public/social claim on x.com / twitter.com as an
+ * x_profile claim, keeping its createdAt. Returns null for anything else.
+ *
+ * Such claims carry a profile_page proof, which can never verify — x.com
+ * serves a JS shell to plain fetchers — so without this they sit at "failed"
+ * forever unless the user notices, deletes, and re-adds under the X type.
+ */
+function upgradeLegacyXClaim(claim: Claim, resolverUrl: string, now: string): Claim | null {
+  if (claim.proof.kind !== "profile_page" || !isXProfileHost(claim.url)) return null;
+  const rebuilt = buildXClaim(claim.url, resolverUrl, now);
+  if (!rebuilt) return null;
+  return { ...rebuilt, createdAt: claim.createdAt || now };
+}
 
 export async function handleGetClaims(
   request: Request,
@@ -439,13 +453,30 @@ export async function handlePostClaimVerify(
   if (!isUuid(uuid)) return new Response("Bad UUID", { status: 400 });
   if (!id) return new Response("Bad claim id", { status: 400 });
 
-  const list = await loadClaims(env, uuid);
-  const idx = list.findIndex((c) => c.id === id);
+  const now = nowIso();
+  let list = await loadClaims(env, uuid);
+  let idx = list.findIndex((c) => c.id === id);
   if (idx < 0) return new Response("Claim not found", { status: 404 });
+
+  // handlePostClaim only upgrades x.com URLs to the X type for *new*
+  // submissions; claims stored before the type existed need it here, on
+  // their next verify, so the user does not have to delete and re-add.
+  const upgraded = upgradeLegacyXClaim(list[idx], resolverUrlFor(uuid), now);
+  if (upgraded) {
+    const dupIdx = list.findIndex((c, i) => i !== idx && c.id === upgraded.id);
+    if (dupIdx >= 0) {
+      // An x:<handle> claim was already filed separately — drop the dead
+      // legacy entry and verify the real one instead.
+      list = list.filter((_, i) => i !== idx);
+      idx = list.findIndex((c) => c.id === upgraded.id);
+    } else {
+      list = [...list];
+      list[idx] = upgraded;
+    }
+  }
 
   const claim = { ...list[idx] };
   const previousStatus = claim.status; // Track previous status for notifications
-  const now = nowIso();
 
   let result: VerifyResult;
   try {
