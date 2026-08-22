@@ -65,6 +65,14 @@ export interface Env {
   // Optional: expose the raw KV key-enumeration endpoint at /admin/debug/kv
   ENABLE_ADMIN_DEBUG?: string; // "true" to enable
 
+  // X (Twitter) claim verification.
+  // App-only OAuth 2.0 Bearer token from the X developer portal. Used server-side
+  // only, for GET /2/users/by/username — never sent to the browser.
+  // Without it the X claim type is hidden in the UI and verification returns a
+  // transient failure rather than revoking existing claims.
+  X_API_BEARER_TOKEN?: string;
+  X_API_RL_PER_HOUR?: string; // default 200 (worker-wide cap on metered X API reads)
+
   // Optional: Enable claim verification notifications
   // If enabled, stores email in plaintext (as _email in profile) for notifications
   ENABLE_CLAIM_NOTIFICATIONS?: string; // "true" to enable

@@ -182,7 +182,7 @@ Items to tackle in future sessions, organized by priority and category.
 
 - [ ] **Additional proof types** (future)
   - [ ] Mastodon/ActivityPub proof
-  - [ ] Twitter/X proof (if API available)
+  - [x] Twitter/X proof — implemented as the `x` claim type (bio/website field via the X API); see docs/proofs/x.md
   - [ ] PGP key proof
   - [ ] Domain verification via meta tag (alternative to .well-known)
 

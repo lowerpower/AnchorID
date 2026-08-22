@@ -21,6 +21,7 @@ import { noncedHeaders, newScriptNonce, injectScriptNonce } from "../http";
 import { buildProfile, mergeSameAs } from "../domain/profile";
 import { loadClaims } from "../claims/store";
 import { formatErrorHtml } from "../claims/errors";
+import { xClaimOptionHtml } from "../claims/handlers";
 
 // ------------------ Cookie auth ------------------
 
@@ -1484,6 +1485,7 @@ ${claims.length === 0 ? `<div class="card" style="margin:14px 0">
     const typeDisplayName = c.type === "website" ? "WEBSITE"
       : c.type === "github" ? "GITHUB"
       : c.type === "dns" ? "DNS"
+      : c.type === "x" ? "X"
       : (c.type === "public" || c.type === "social") ? "PUBLIC PROFILE"  // Accept both new and old names
       : escapeHtml(c.type).toUpperCase();
 
@@ -1505,6 +1507,13 @@ ${claims.length === 0 ? `<div class="card" style="margin:14px 0">
       proofDetails = `
         <div style="margin-top:8px;font-size:12px;color:#555">
           <strong>Proof location:</strong> <code style="font-size:11px">${escapeHtml((c.proof as any).url || "")}</code>
+        </div>`;
+    } else if (c.proof.kind === "x_profile") {
+      proofDetails = `
+        <div style="margin-top:8px;font-size:12px;color:#555">
+          <strong>Proof location:</strong> bio or website field of
+          <code style="font-size:11px">${escapeHtml((c.proof as any).url || "")}</code><br>
+          <strong>Must contain:</strong> <code style="font-size:11px">${escapeHtml((c.proof as any).mustContain || "")}</code>
         </div>`;
     }
 
@@ -1557,6 +1566,7 @@ ${claims.length === 0 ? `<div class="card" style="margin:14px 0">
         <option value="github">GitHub (profile README)</option>
         <option value="dns">DNS (TXT record)</option>
         <option value="public">Public Profile (bio/description)</option>
+        ${xClaimOptionHtml(env)}
       </select>
 
       <label style="display:block;margin-bottom:8px">
@@ -1569,6 +1579,13 @@ ${claims.length === 0 ? `<div class="card" style="margin:14px 0">
         <strong>DNS Setup Instructions:</strong><br>
         Add a TXT record at <code>_anchorid.yourdomain.com</code> with value:<br>
         <code style="font-size:11px">anchorid=urn:uuid:${escapeHtml(uuid)}</code>
+      </div>
+
+      <div id="xHint" style="display:none;font-size:12px;color:#555;margin-bottom:12px;padding:10px;background:#fff;border:1px solid #e0e0e0;border-radius:6px">
+        <strong>X Setup Instructions:</strong><br>
+        Add this link to your X bio, or to the website field on your profile:<br>
+        <code style="font-size:11px">https://anchorid.net/resolve/${escapeHtml(uuid)}</code><br>
+        <span style="color:#777">Short on characters? <code style="font-size:11px">aid:${escapeHtml(uuid)}</code> also works.</span>
       </div>
 
       <button type="submit" style="padding:8px 16px;background:#111;color:#fff;border:1px solid #111;border-radius:6px;cursor:pointer">
@@ -1649,6 +1666,11 @@ ${(() => {
     const urlLabel = document.getElementById("urlLabel");
     const urlInput = document.getElementById("claimUrl");
     const dnsHint = document.getElementById("dnsHint");
+    const xHint = document.getElementById("xHint");
+
+    // Reset both hint boxes, then let the matching branch show its own.
+    dnsHint.style.display = "none";
+    if (xHint) xHint.style.display = "none";
 
     if (type === "website") {
       urlLabel.textContent = "Website URL";
@@ -1666,6 +1688,11 @@ ${(() => {
       urlLabel.textContent = "Profile URL or @handle";
       urlInput.placeholder = "@user@mastodon.social or https://bsky.app/profile/user.bsky.social";
       dnsHint.style.display = "none";
+    } else if (type === "x") {
+      urlLabel.textContent = "X handle or profile URL";
+      urlInput.placeholder = "@username or https://x.com/username";
+      dnsHint.style.display = "none";
+      if (xHint) xHint.style.display = "block";
     }
   });
 

@@ -13,8 +13,9 @@ import {
 } from './helpers';
 
 import { canonicalizeUrl, buildProfile } from '../src/domain/profile';
-import { validateProfileUrl, parseGitHubProfile, stripQueryAndFragment, profilePageHasUuidMarker, urlReflectsProofUuid } from '../src/claims/verify';
+import { validateProfileUrl, parseGitHubProfile, stripQueryAndFragment, profilePageHasUuidMarker, urlReflectsProofUuid, parseXProfile, claimIdForX, buildXProof, extractXProofCandidates, xCandidatesProveClaim } from '../src/claims/verify';
 import { claimsKey, upsertClaim } from '../src/claims/store';
+import { xClaimOptionHtml } from '../src/claims/handlers';
 import { clampKvTtl, kvTtlFromEnv, intFromEnv } from '../src/env';
 import { emailIndexHash, legacyEmailHash, lookupEmailUuid, emailPointerKey, deletedTombstoneKey } from '../src/email-index';
 import { STATIC_PAGE_SCRIPT_HASH } from '../src/http';
@@ -28,6 +29,7 @@ import proofsWebsiteHtml from '../src/content/proofs-website.html';
 import proofsDnsHtml from '../src/content/proofs-dns.html';
 import proofsGithubHtml from '../src/content/proofs-github.html';
 import proofsSocialHtml from '../src/content/proofs-social.html';
+import proofsXHtml from '../src/content/proofs-x.html';
 
 const STATIC_PAGES: Record<string, string> = {
   about: aboutHtml,
@@ -39,6 +41,7 @@ const STATIC_PAGES: Record<string, string> = {
   'proofs-dns': proofsDnsHtml,
   'proofs-github': proofsGithubHtml,
   'proofs-social': proofsSocialHtml,
+  'proofs-x': proofsXHtml,
 };
 
 /**
@@ -730,8 +733,8 @@ describe('CSP script-src hardening', () => {
       const bareTags = (html.match(/<script>/gi) || []).length;
       expect(`${name}: ${executableTags}`).toBe(`${name}: ${bareTags}`);
     }
-    // 8 of the 9 pages carry the footer script (proofs-social has none).
-    expect(executableScripts).toBe(8);
+    // 9 of the 10 pages carry the footer script (proofs-social has none).
+    expect(executableScripts).toBe(9);
   });
 
   it('keeps strict no-script CSP on JSON endpoints', async () => {
@@ -1013,5 +1016,280 @@ describe('peppered email index', () => {
     expect(res.status).toBe(200);
     const peppered = await emailIndexHash(env as any, email);
     expect(await env.ANCHOR_KV.get(`email:${peppered}`)).toBe(uuid);
+  });
+});
+
+
+// ------------------ X (Twitter) claim verification ------------------
+
+describe('X claim host validation', () => {
+  it('rejects a profile URL on a non-X host', () => {
+    // Same failure mode parseGitHubProfile guards against: the proof is read
+    // from the X account named by the path, so an unpinned host would publish a
+    // verified sameAs for a domain the claimant does not control.
+    expect(parseXProfile('https://bank.example.com/attacker')).toBeNull();
+    expect(parseXProfile('https://x.com.evil.example/mycal')).toBeNull();
+  });
+
+  it('rejects deep links, reserved paths and invalid handles', () => {
+    expect(parseXProfile('https://x.com/mycal/status/123')).toBeNull();
+    expect(parseXProfile('https://x.com/i/flow/login')).toBeNull();
+    expect(parseXProfile('https://x.com/i')).toBeNull();
+    expect(parseXProfile('https://x.com/home')).toBeNull();
+    expect(parseXProfile('https://x.com/')).toBeNull();
+    expect(parseXProfile('@bad-handle')).toBeNull();
+    expect(parseXProfile('@waytoolongforahandle')).toBeNull();
+    expect(parseXProfile('')).toBeNull();
+    expect(parseXProfile('@user@instance.social')).toBeNull();
+  });
+
+  it('accepts handle and URL forms and canonicalizes them to x.com', () => {
+    const expected = { username: 'mycal', canonicalUrl: 'https://x.com/mycal' };
+    expect(parseXProfile('@MyCal')).toEqual(expected);
+    expect(parseXProfile('MyCal')).toEqual(expected);
+    expect(parseXProfile('https://x.com/MyCal')).toEqual(expected);
+    expect(parseXProfile('https://twitter.com/MyCal')).toEqual(expected);
+    expect(parseXProfile('https://www.x.com/MyCal')).toEqual(expected);
+    expect(parseXProfile('https://x.com/@MyCal')).toEqual(expected);
+  });
+
+  it('builds a stable claim id and an absolute https proof url', () => {
+    expect(claimIdForX('@MyCal')).toBe('x:mycal');
+    // The stored url must survive canonicalizeUrl or the verified claim never
+    // reaches the published sameAs.
+    const proof = buildXProof('@MyCal', 'https://anchorid.net/resolve/abc');
+    expect(proof).toEqual({
+      kind: 'x_profile',
+      username: 'mycal',
+      url: 'https://x.com/mycal',
+      mustContain: 'https://anchorid.net/resolve/abc',
+    });
+    expect(buildXProof('https://bank.example.com/x', 'https://anchorid.net/resolve/abc')).toBeNull();
+  });
+
+  it('returns 400 for an x claim on another host', async () => {
+    await clearAllTestData();
+    const uuid = crypto.randomUUID();
+    await createMockProfile({ uuid });
+
+    const res = await SELF.fetch(createTestRequest('https://anchorid.net/claim', {
+      method: 'POST',
+      headers: withAdminAuth(env, { 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ uuid, type: 'x', url: 'https://bank.example.com/someuser' }),
+      ip: '198.51.100.30',
+    }));
+
+    expect(res.status).toBe(400);
+    await clearAllTestData();
+  });
+
+  it('stores an x claim from a bare handle', async () => {
+    await clearAllTestData();
+    const uuid = crypto.randomUUID();
+    await createMockProfile({ uuid });
+
+    const res = await SELF.fetch(createTestRequest('https://anchorid.net/claim', {
+      method: 'POST',
+      headers: withAdminAuth(env, { 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ uuid, type: 'x', url: '@MyCal' }),
+      ip: '198.51.100.31',
+    }));
+
+    expect(res.status).toBe(200);
+    const claims = await getKVJson(claimsKey(uuid));
+    expect(claims[0].type).toBe('x');
+    expect(claims[0].url).toBe('https://x.com/mycal');
+    expect(claims[0].proof.kind).toBe('x_profile');
+    expect(claims[0].status).toBe('self_asserted');
+    await clearAllTestData();
+  });
+
+  it('files an x.com profile submitted as a public claim as type x', async () => {
+    // A "public" claim on x.com can never verify — x.com serves a JS shell to
+    // unauthenticated fetchers — so it must not be stored as one.
+    await clearAllTestData();
+    const uuid = crypto.randomUUID();
+    await createMockProfile({ uuid });
+
+    const res = await SELF.fetch(createTestRequest('https://anchorid.net/claim', {
+      method: 'POST',
+      headers: withAdminAuth(env, { 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ uuid, type: 'public', url: 'https://x.com/mycal' }),
+      ip: '198.51.100.32',
+    }));
+
+    expect(res.status).toBe(200);
+    const claims = await getKVJson(claimsKey(uuid));
+    expect(claims[0].type).toBe('x');
+    expect(claims[0].proof.kind).toBe('x_profile');
+    await clearAllTestData();
+  });
+
+  it('still files a non-X public profile as type public', async () => {
+    await clearAllTestData();
+    const uuid = crypto.randomUUID();
+    await createMockProfile({ uuid });
+
+    const res = await SELF.fetch(createTestRequest('https://anchorid.net/claim', {
+      method: 'POST',
+      headers: withAdminAuth(env, { 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ uuid, type: 'public', url: '@mycal@noauthority.social' }),
+      ip: '198.51.100.33',
+    }));
+
+    expect(res.status).toBe(200);
+    const claims = await getKVJson(claimsKey(uuid));
+    expect(claims[0].type).toBe('public');
+    expect(claims[0].proof.kind).toBe('profile_page');
+    await clearAllTestData();
+  });
+});
+
+describe('X payload matching', () => {
+  const RESOLVER = 'https://anchorid.net/resolve/8f3ac1de-1b2c-4d3e-8f90-a1b2c3d4e5f6';
+
+  it('matches a t.co-wrapped link in the bio via expanded_url', () => {
+    // X linkifies bio URLs, so `description` only carries a truncated display
+    // form. Matching the description text alone would fail on every correctly
+    // configured profile — this is the regression that matters most here.
+    const payload = {
+      data: {
+        id: '123',
+        username: 'mycal',
+        description: 'Builder. anchorid.net/resolve/8f3ac1de…',
+        entities: {
+          description: {
+            urls: [{ url: 'https://t.co/abc123', expanded_url: RESOLVER, display_url: 'anchorid.net/resolve/8f3…' }],
+          },
+        },
+      },
+    };
+    const candidates = extractXProofCandidates(payload);
+    expect(candidates.expandedUrls).toContain(RESOLVER);
+    expect(xCandidatesProveClaim(candidates, RESOLVER)).toBe(true);
+  });
+
+  it('matches the profile website field', () => {
+    const payload = {
+      data: {
+        id: '123',
+        username: 'mycal',
+        description: 'Builder.',
+        url: 'https://t.co/xyz',
+        entities: { url: { urls: [{ url: 'https://t.co/xyz', expanded_url: RESOLVER }] } },
+      },
+    };
+    expect(xCandidatesProveClaim(extractXProofCandidates(payload), RESOLVER)).toBe(true);
+  });
+
+  it('does NOT match a truncated display form with no backing entity', () => {
+    const payload = {
+      data: { id: '123', username: 'mycal', description: 'Builder. anchorid.net/resolve/8f3ac1de…' },
+    };
+    expect(xCandidatesProveClaim(extractXProofCandidates(payload), RESOLVER)).toBe(false);
+  });
+
+  it('accepts the short marker forms a 160-char bio can hold', () => {
+    const uuid = '8f3ac1de-1b2c-4d3e-8f90-a1b2c3d4e5f6';
+    for (const bio of [`Builder. aid:${uuid}`, `Builder. AnchorID: ${uuid}`, `anchorid.net/${uuid}`, `urn:uuid:${uuid}`]) {
+      const payload = { data: { id: '1', username: 'mycal', description: bio } };
+      expect(xCandidatesProveClaim(extractXProofCandidates(payload), RESOLVER)).toBe(true);
+    }
+  });
+
+  it('rejects a bare UUID and near-miss markers', () => {
+    const uuid = '8f3ac1de-1b2c-4d3e-8f90-a1b2c3d4e5f6';
+    for (const bio of [`just mentioning ${uuid} here`, `paid:${uuid}`, `said:${uuid}`]) {
+      const payload = { data: { id: '1', username: 'mycal', description: bio } };
+      expect(xCandidatesProveClaim(extractXProofCandidates(payload), RESOLVER)).toBe(false);
+    }
+  });
+
+  it('handles an empty or malformed payload without throwing', () => {
+    expect(extractXProofCandidates({})).toEqual({ description: '', expandedUrls: [] });
+    expect(extractXProofCandidates({ data: { entities: { description: { urls: 'nope' } } } }))
+      .toEqual({ description: '', expandedUrls: [] });
+    expect(xCandidatesProveClaim({ description: '', expandedUrls: [] }, RESOLVER)).toBe(false);
+  });
+});
+
+describe('X verification transient failures', () => {
+  it('does not revoke a verified claim when the X API is unusable', async () => {
+    // The test env pins X_API_RL_PER_HOUR to 0, so verification short-circuits
+    // on the budget guard before any request reaches X. That is the same
+    // transient path a real quota ceiling or outage takes. A verified claim must
+    // survive it — otherwise an upstream hiccup silently strips entries from the
+    // published sameAs.
+    await clearAllTestData();
+    const uuid = crypto.randomUUID();
+    await createMockProfile({ uuid });
+
+    const claim = {
+      id: 'x:mycal',
+      type: 'x',
+      url: 'https://x.com/mycal',
+      status: 'verified',
+      proof: {
+        kind: 'x_profile',
+        username: 'mycal',
+        url: 'https://x.com/mycal',
+        mustContain: `https://anchorid.net/resolve/${uuid}`,
+      },
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      verifiedAt: new Date().toISOString(),
+    };
+    await setKV(claimsKey(uuid), JSON.stringify([claim]));
+
+    const res = await SELF.fetch(createTestRequest('https://anchorid.net/claim/verify', {
+      method: 'POST',
+      headers: withAdminAuth(env, { 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ uuid, claimId: 'x:mycal' }),
+      ip: '198.51.100.34',
+    }));
+
+    expect(res.status).toBe(503);
+    const body = await res.json() as any;
+    expect(body.transient).toBe(true);
+    expect(body.failReason).toBe('x_budget_exceeded');
+
+    const stored = await getKVJson(claimsKey(uuid));
+    expect(stored[0].status).toBe('verified');
+    expect(stored[0].verifiedAt).toBe(claim.verifiedAt);
+    expect(stored[0].lastCheckedAt).toBeTruthy();
+    await clearAllTestData();
+  });
+});
+
+
+describe('X claim UI gating', () => {
+  async function editPageHtml(uuid: string, token: string, ip: string): Promise<string> {
+    const res = await SELF.fetch(createTestRequest(
+      `https://anchorid.net/edit?token=${token}`, { ip }
+    ));
+    expect(res.status).toBe(200);
+    return res.text();
+  }
+
+  it('emits no X option when no X API token is configured', () => {
+    // Offering a claim type the server cannot verify is a dead end: the user
+    // files a claim that can only ever sit at self_asserted.
+    expect(xClaimOptionHtml({} as any)).toBe('');
+    expect(xClaimOptionHtml({ X_API_BEARER_TOKEN: '' } as any)).toBe('');
+    expect(xClaimOptionHtml({ X_API_BEARER_TOKEN: 'tok' } as any)).toContain('<option value="x">');
+  });
+
+  it('offers the X claim type and its setup hint when the token is configured', async () => {
+    await clearAllTestData();
+    const uuid = crypto.randomUUID();
+    await createMockProfile({ uuid });
+    const token = await createLoginSession(uuid);
+
+    const html = await editPageHtml(uuid, token, '198.51.100.41');
+    expect(html).toContain('<option value="x">');
+    expect(html).toContain('id="xHint"');
+    // The hint must show this profile's own resolver URL.
+    expect(html).toContain(`https://anchorid.net/resolve/${uuid}`);
+    await clearAllTestData();
   });
 });

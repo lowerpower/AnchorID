@@ -255,7 +255,7 @@
         "The verification process: AnchorID fetches the public page HTML and searches for your resolver URL, short URL, or a labeled UUID marker ('AnchorID: <UUID>' or 'aid:<UUID>') in the page content",
         "Security: SSRF protection blocks localhost, private IPs (192.168.x.x, 10.x.x.x), cloud metadata endpoints (169.254.169.254), and non-HTTPS URLs",
         "Social/public proof provides moderate signal strength - proves page/account control at a moment in time, not infrastructure ownership",
-        "No authentication or OAuth is used - only public page fetching",
+        "No authentication or OAuth is used for this proof type - only public page fetching. X (Twitter) is the exception and has its own proof type at /proofs/x, because x.com does not serve profile bios to anonymous fetchers",
         "Privacy: AnchorID only sees public HTML during verification, never private messages, credentials, or follower lists"
       ]
     },
@@ -606,7 +606,9 @@ aid:4ff7ed97-b78f-4ae6-9011-5af714ee241c</code></pre>
       <li>Follower lists or private information</li>
     </ul>
 
-    <p>AnchorID only fetches the public profile page to verify your resolver URL appears in the bio. No authentication is used.</p>
+    <p>AnchorID only fetches the public profile page to verify your resolver URL appears in the bio. No authentication is used for this proof type.</p>
+
+    <p><strong>X (Twitter) is the exception.</strong> <code>x.com</code> does not serve profile bios to anonymous fetchers, so X has its own proof type that reads the public bio through the X API. It still reads nothing but your public bio and website field, and still requires no login from you — see <a href="/proofs/x">X proof</a>.</p>
 
     <hr />
 

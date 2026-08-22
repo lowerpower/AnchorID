@@ -119,6 +119,11 @@ Rate limits are enforced in KV with automatic TTL expiration (1 hour).
   any proof URL that itself contains the claim's UUID (raw or percent-encoded) is
   rejected — otherwise an echo endpoint that reflects its query or path into the
   response would "verify" without the claimant controlling the page
+- X claims require the same deliberate marker as public profile claims, read from the
+  profile bio or website field through the X API, and the submitted handle must
+  actually be an `x.com`/`twitter.com` profile (host-pinned like GitHub claims).
+  Only the bio and website field are read — a marker in a display name, location or
+  pinned post does not verify
 - Verification fetches proof from the authoritative source
 - Claims are marked `pending` until verification succeeds
 - Failed verifications are recorded in the claims ledger
@@ -129,6 +134,9 @@ Rate limits are enforced in KV with automatic TTL expiration (1 hour).
 - A page with attacker-injectable public content (comment sections, wikis) can carry
   a deliberate marker planted by a third party; the marker rules raise the bar from
   "mentions the UUID" to "displays an explicit AnchorID reference", not to zero
+- X handles can be released and re-registered by a different person. A verified X
+  claim is a statement about the account that held the handle at check time; the
+  claim is keyed on the handle, not on the account's numeric id
 - These are time-bounded: subsequent verification would fail after access is lost
 
 ---
@@ -150,6 +158,28 @@ Rate limits are enforced in KV with automatic TTL expiration (1 hour).
 - Public auditability allows third parties to verify independently
 
 **Residual Risk**: Sophisticated network-level attackers could potentially manipulate verification. This is a fundamental limitation of URL-based proofs.
+
+**Exception — X claims and the trust boundary.** Every other proof type is fetched with
+an anonymous HTTPS request, so "public auditability allows third parties to verify
+independently" holds literally: anyone can re-run the check with `curl`. X claims cannot
+be. `x.com` serves a JavaScript shell to non-browser clients, so AnchorID reads the
+profile through the X API with a server-side credential. Two consequences follow, and
+both are accepted deliberately:
+
+1. **Weaker auditability.** The proof remains publicly *visible* — anyone can open the
+   profile in a browser and see the marker — but a third party cannot machine-re-check it
+   without their own X API credentials.
+2. **A new failure mode inside the trust boundary.** X is the first proof source whose
+   availability AnchorID depends on, and the first where verification can fail because of
+   AnchorID's own configuration (an expired token, an exhausted quota). Treating such
+   failures as `failed` would let an upstream outage silently revoke good claims and strip
+   them from published `sameAs` records. They are therefore classified as **transient**:
+   the check is recorded via `lastCheckedAt`, and the claim's status, `verifiedAt` and
+   `failReason` are left untouched. Only a successful read that genuinely lacks the marker
+   can move a claim to `failed`.
+
+Consumers weighing an X claim should treat it as a good but not top-tier signal, on par
+with a public profile claim rather than with DNS or website proof.
 
 ---
 
