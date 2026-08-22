@@ -1411,3 +1411,112 @@ describe('Legacy x.com public claims upgrade on verify', () => {
     await clearAllTestData();
   });
 });
+
+describe('Admin: change login email', () => {
+  // The admin POST handler always supported is_email_update on a profile that
+  // already had an email, but the form was only rendered for profiles with
+  // none, and the handler left the previous mapping in place — so the old
+  // address kept opening the profile forever and a swap between two profiles
+  // was impossible. Locks: the form renders when an email exists, a change
+  // retires the old mapping(s), retirement is value-checked, and an address
+  // owned by another profile is still refused.
+  async function changeEmail(uuid: string, email: string, ip: string) {
+    const { headers, csrfToken } = await withAdminSessionAndCsrf();
+    const fd = new FormData();
+    fd.append('_csrf', csrfToken);
+    fd.append('is_email_update', '1');
+    fd.append('email', email);
+    return SELF.fetch(createTestRequest(`https://anchorid.net/admin/save/${uuid}`, {
+      method: 'POST', headers, body: fd, redirect: 'manual', ip,
+    }));
+  }
+
+  it('renders the change form on a profile that already has an email', async () => {
+    await clearAllTestData();
+    const { uuid } = await createMockProfile({ email: 'has@example.com' });
+    const { headers } = await withAdminSessionAndCsrf();
+    const res = await SELF.fetch(createTestRequest(`https://anchorid.net/admin/edit/${uuid}`, { headers, ip: '198.51.100.81' }));
+    expect(res.status).toBe(200);
+    const html = await res.text();
+    expect(html).toContain('Change Login Email');
+    expect(html).toContain('name="is_email_update"');
+    await clearAllTestData();
+  });
+
+  it('changing the email retires the old mapping and records the new one', async () => {
+    await clearAllTestData();
+    const oldEmail = 'old@example.com', newEmail = 'new@example.com';
+    const { uuid, emailHash: oldLegacy } = await createMockProfile({ email: oldEmail });
+    // Simulate a profile that has logged in since the pepper went live: the
+    // live key is peppered, the pointer names it, and the legacy key is gone.
+    await lookupEmailUuid(env as any, oldEmail);
+    const oldPeppered = await emailIndexHash(env as any, oldEmail);
+    expect(await env.ANCHOR_KV.get(`email:${oldPeppered}`)).toBe(uuid);
+
+    const res = await changeEmail(uuid, newEmail, '198.51.100.82');
+    expect(res.status).toBe(303);
+    expect(res.headers.get('location')).toContain('success=email_changed');
+
+    const newHash = await emailIndexHash(env as any, newEmail);
+    expect(await env.ANCHOR_KV.get(`email:${newHash}`)).toBe(uuid);
+    expect(await env.ANCHOR_KV.get(emailPointerKey(uuid))).toBe(newHash);
+    // Old address no longer opens the profile, under either hash.
+    expect(await env.ANCHOR_KV.get(`email:${oldPeppered}`)).toBeNull();
+    expect(await env.ANCHOR_KV.get(`email:${oldLegacy}`)).toBeNull();
+    expect((await lookupEmailUuid(env as any, oldEmail)).uuid).toBeNull();
+    expect((await lookupEmailUuid(env as any, newEmail)).uuid).toBe(uuid);
+
+    const profile = await getKVJson(`profile:${uuid}`);
+    expect(profile._emailHash).toBe(newHash);
+    const audit = await getKVJson(`audit:${uuid}`);
+    expect(audit.some((e: any) => /Email changed/.test(e.summary))).toBe(true);
+    await clearAllTestData();
+  });
+
+  it('works on a profile whose document lost _emailHash but still has a live index key', async () => {
+    // The 2026-01 early-signup shape: index says yes, document says no.
+    await clearAllTestData();
+    const orphanEmail = 'orphan@example.com';
+    const { uuid } = await createMockProfile({});
+    const peppered = await emailIndexHash(env as any, orphanEmail);
+    await env.ANCHOR_KV.put(`email:${peppered}`, uuid);
+    await env.ANCHOR_KV.put(emailPointerKey(uuid), peppered);
+
+    const res = await changeEmail(uuid, 'fresh@example.com', '198.51.100.83');
+    expect(res.status).toBe(303);
+    expect(res.headers.get('location')).toContain('success=email_changed');
+    expect(await env.ANCHOR_KV.get(`email:${peppered}`)).toBeNull();
+    expect((await lookupEmailUuid(env as any, 'fresh@example.com')).uuid).toBe(uuid);
+    await clearAllTestData();
+  });
+
+  it('never deletes a previous-hash key that now belongs to another profile', async () => {
+    await clearAllTestData();
+    const shared = 'moved@example.com';
+    const { uuid: a, emailHash: sharedLegacy } = await createMockProfile({ email: shared });
+    const { uuid: b } = await createMockProfile({});
+    // The address has since been re-pointed at profile b (document on a is stale).
+    await env.ANCHOR_KV.put(`email:${sharedLegacy}`, b);
+
+    const res = await changeEmail(a, 'a-new@example.com', '198.51.100.84');
+    expect(res.status).toBe(303);
+    expect(await env.ANCHOR_KV.get(`email:${sharedLegacy}`)).toBe(b);
+    expect((await lookupEmailUuid(env as any, 'a-new@example.com')).uuid).toBe(a);
+    await clearAllTestData();
+  });
+
+  it('refuses an address that belongs to another profile, changing nothing', async () => {
+    await clearAllTestData();
+    const { uuid: a, emailHash: aHash } = await createMockProfile({ email: 'a@example.com' });
+    const { uuid: b } = await createMockProfile({ email: 'b@example.com' });
+
+    const res = await changeEmail(a, 'b@example.com', '198.51.100.85');
+    expect(res.status).toBe(303);
+    expect(res.headers.get('location')).toContain('error=email_exists');
+    expect(await env.ANCHOR_KV.get(`email:${aHash}`)).toBe(a);
+    expect((await lookupEmailUuid(env as any, 'b@example.com')).uuid).toBe(b);
+    expect((await getKVJson(`profile:${a}`))._emailHash).toBe(aHash);
+    await clearAllTestData();
+  });
+});
+

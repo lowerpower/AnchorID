@@ -1187,6 +1187,7 @@ export async function handleAdminEditGet(req: Request, env: Env, uuid: string): 
     saved: "Profile saved successfully.",
     no_changes: "No changes detected.",
     email_added: "Email address added successfully. Magic link login is now enabled.",
+    email_changed: "Login email changed. The previous address no longer opens this profile.",
     verified_updated: "Email verification status updated.",
   };
 
@@ -1282,6 +1283,17 @@ ${error ? `<div class="alert alert-error">${escapeHtml(errorMessages[error] || e
       <button type="submit" style="padding:6px 10px;font-size:12px">
         ${stored?._emailVerified ? 'Mark Unverified' : 'Mark Verified'}
       </button>
+    </form>
+    <form method="post" action="/admin/save/${escapeHtml(uuid)}" style="margin-top:12px;padding-top:10px;border-top:1px solid #eee">
+      ${csrf}
+      <input type="hidden" name="is_email_update" value="1">
+      <label style="font-size:13px;font-weight:600;display:block;margin-bottom:4px">Change Login Email</label>
+      <div class="hint" style="margin-top:0;margin-bottom:6px">
+        Replaces the current login email. The old address stops working for this profile immediately.
+      </div>
+      <input type="email" name="email" placeholder="new@example.com" required
+        style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font:inherit;margin-bottom:8px">
+      <button type="submit" style="padding:6px 12px;font-size:13px">Change Email</button>
     </form>
   </div>
   ` : `
@@ -2014,18 +2026,49 @@ export async function handleAdminSavePost(
       updatedProfile._email = email;
     }
 
-    // Save profile and email mapping
+    // The mappings this profile was reachable under before: the frozen
+    // _emailHash on the document, and the live key named by the pointer
+    // (which diverges from _emailHash once the lazy pepper migration has
+    // run). A profile whose document lost _emailHash but still has a live
+    // index key — the 2026-01 early signups — is covered by the pointer.
+    const previousHashes = new Set<string>();
+    if (stored._emailHash) previousHashes.add(String(stored._emailHash));
+    const pointer = await env.ANCHOR_KV.get(emailPointerKey(uuid));
+    if (pointer) previousHashes.add(pointer);
+    previousHashes.delete(emailHash);
+    const isChange = previousHashes.size > 0;
+
+    // Save profile, the new mapping, and the pointer to it.
     await Promise.all([
       env.ANCHOR_KV.put(`profile:${uuid}`, JSON.stringify(updatedProfile)),
       env.ANCHOR_KV.put(`email:${emailHash}`, uuid),
+      env.ANCHOR_KV.put(emailPointerKey(uuid), emailHash),
     ]);
 
+    // Retire the old mappings — value-checked, so a key that has since come
+    // to belong to another profile is never touched. Without this step every
+    // previous address would keep opening the profile forever.
+    const retired: string[] = [];
+    for (const h of previousHashes) {
+      const mapped = await env.ANCHOR_KV.get(`email:${h}`);
+      if (mapped === uuid) {
+        await env.ANCHOR_KV.delete(`email:${h}`);
+        retired.push(h);
+      }
+    }
+
     // Audit log
-    await appendAuditLog(env, uuid, req, "update", "admin", ["_emailHash"], "Email added");
+    await appendAuditLog(
+      env, uuid, req, "update", "admin", ["_emailHash"],
+      isChange ? `Email changed (${retired.length} previous mapping${retired.length === 1 ? "" : "s"} retired)` : "Email added"
+    );
 
     return new Response(null, {
       status: 303,
-      headers: { Location: `/admin/edit/${uuid}?success=email_added`, "cache-control": "no-store" },
+      headers: {
+        Location: `/admin/edit/${uuid}?success=${isChange ? "email_changed" : "email_added"}`,
+        "cache-control": "no-store",
+      },
     });
   }
 

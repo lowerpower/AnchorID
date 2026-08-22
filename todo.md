@@ -186,6 +186,13 @@ Security hardening complete as of 2026-01-24:
 - [ ] Delete the 4 test-junk profiles leaked during the 2026-08-18 incident
       (63396ed1, 6bc1cd65, 8d2933e0, d6ade89d — nameless, no email, created
       06:02Z mid-test-run)
+- [ ] `scripts/restore-from-backup.py`: also restore `email:` keys whose *value* is a
+      restored uuid, not only the one re-derived from `_emailHash` — four 2026-01
+      profiles had lost `_emailHash` from the document while their index key was
+      live, and the 2026-08-19 restore dropped their logins (re-restored by hand
+      2026-08-22). While there: write `_emailHash` back onto those four documents
+      (`a696638c`, `8cbf961a`, `bbf7372e`, `fe4814de`) so the admin page agrees
+      with login
 - [ ] Admin UI copy still claims email is "never in plaintext" — inaccurate while
       `email:unhashed:<uuid>` (7d) and `profile._email` exist
 

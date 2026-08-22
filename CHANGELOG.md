@@ -45,6 +45,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   `{key: value}` shape `scripts/restore-from-backup.py` consumes. First run
   2026-08-22 (106 keys), taken before merging PR #8
 
+### Fixed - 2026-08-22
+
+#### Admin "Change Login Email" + retirement of previous mappings
+
+- `/admin/edit/<uuid>` now offers "Change Login Email" on profiles that already
+  have one (the form used to render only when no email was configured, even
+  though the POST handler accepted updates)
+- The update handler now retires the profile's previous mapping(s) — the frozen
+  `_emailHash` key and the live key named by `emailkey:<uuid>` — **value-checked**
+  so a key that has since come to belong to another profile is never touched.
+  Previously every prior address kept opening the profile forever, and moving an
+  address between two profiles was impossible
+- Also covers the 2026-01 early-signup shape where the profile document lost
+  `_emailHash` but the index key is live (the admin page shows "no email" while
+  login still works); the pointer identifies the mapping to retire
+- Audit summary records how many mappings were retired
+
+#### Email index keys dropped by the 2026-08-19 restore
+
+- Four pre-spam profiles (`a696638c`, `8cbf961a`, `bbf7372e`, `fe4814de`) had
+  lost `_emailHash` from their documents while their `email:` keys were live in
+  the March dump; `scripts/restore-from-backup.py` only re-derives `email:`
+  keys from `_emailHash`, so they came back without a login mapping. Restored
+  by hand from `backup/kv-2026-03-25-163808.json` on 2026-08-22. Script fix
+  tracked in `todo.md`
+
 ### Changed - 2026-08-18
 
 #### `compatibility_date` 2025-09-27 → 2026-03-10
