@@ -68,8 +68,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   lost `_emailHash` from their documents while their `email:` keys were live in
   the March dump; `scripts/restore-from-backup.py` only re-derives `email:`
   keys from `_emailHash`, so they came back without a login mapping. Restored
-  by hand from `backup/kv-2026-03-25-163808.json` on 2026-08-22. Script fix
-  tracked in `todo.md`
+  by hand from `backup/kv-2026-03-25-163808.json` on 2026-08-22
+- `scripts/restore-from-backup.py` now selects `email:` keys by the uuid they
+  point at and also restores `emailkey:` pointers; the `_emailHash`-derived key
+  is only a fallback. It warns about uuids absent from the dump and lists
+  restored profiles that end up with no login mapping
+- `_emailHash` written back onto the three affected documents that still lacked
+  it, so the admin page and login agree
 
 ### Changed - 2026-08-18
 
