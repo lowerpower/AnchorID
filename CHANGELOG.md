@@ -45,6 +45,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   `{key: value}` shape `scripts/restore-from-backup.py` consumes. First run
   2026-08-22 (106 keys), taken before merging PR #8
 
+### Fixed - 2026-08-23
+
+#### `/about` served a 148-byte test stub since 2026-08-18
+
+- The CSP footer-hash regression test writes a minimal `page:about`; during the
+  08-18 incident the suite ran against production KV and overwrote the real
+  page. The 08-19 restore skipped `page:` keys by design, so the stub stayed
+  for five days. Re-uploaded from `src/content/about.html`
+- New `npm run pages:check` (`scripts/check-pages.sh`) diffs every `page:*` key
+  in production against `src/content/` and prints the exact re-upload command
+  for any drift
+
+#### Stale "last updated" stamps on content pages
+
+- Visible stamps and JSON-LD `dateModified` on about, guide, privacy, proofs,
+  proofs-website/github/dns/social, and the sitemap `<lastmod>` entries still
+  said January 2026; set to each file's last content commit (Aug 14–21)
+
 ### Fixed - 2026-08-22
 
 #### Admin "Change Login Email" + retirement of previous mappings
