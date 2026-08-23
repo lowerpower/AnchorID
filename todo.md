@@ -199,6 +199,16 @@ Security hardening complete as of 2026-01-24:
 
 ## 🔁 Recurring Ops
 
+- [ ] **Put `npm run backup` and `npm run pages:check` on a cron** (Mike, 2026-08-23).
+      Neither runs automatically today, and each would have caught a silent prod
+      problem within minutes instead of days (08-19 restore dropped 4 login
+      mappings; /about served a 148-byte test stub 08-18 → 08-23). Both need an
+      authenticated wrangler (`CLOUDFLARE_API_TOKEN` from `.key`, or a logged-in
+      shell) and run from the repo root. Suggested: weekly backup, daily
+      pages:check, mail/notify on non-zero exit. pages:check prints the exact
+      re-upload command for any drift; backups land in `backup/` (gitignored) —
+      copy them off-box, apart from the pepper.
+
 - [ ] Periodic offline backup: `npm run backup` (`scripts/backup-kv.sh` — dumps
       every key to `backup/kv-<timestamp>.json`, restorable with
       `scripts/restore-from-backup.py`), or download `/admin/backup` (POST,
