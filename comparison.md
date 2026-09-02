@@ -2,6 +2,7 @@
 
 **Companion to:** `anchorid-package-signing-spec-v0.1.md`
 **Compiled:** 2026-08-13 · facts verified against primary sources on this date
+**Revised:** 2026-08-29 — added SSH signing and expanded OpenPGP coverage across all six axes (§2.3, §5.5, §5.6); facts in those sections verified on this date
 **Status:** Point-in-time snapshot. Several systems below changed within the last 12 months; §11 lists the contested and fast-moving entries.
 
 ---
@@ -83,7 +84,9 @@ A system can be excellent on one axis and absent on another. Sigstore is world-c
 | **WhatsApp / Messenger KT** | Auditable key directory, one external auditor |
 | **Apple IMCKV** | CONIKS-derived, internal auditing only, no published spec |
 | **IETF KEYTRANS** | Standardization in progress, no RFC yet |
-| **SSH `allowed_signers`** | Flat allowlist of keys for git commit/tag signing |
+| **SSH `allowed_signers`** | Per-principal key allowlist with time-scoped validity, for git commit/tag signing |
+| **SSH certificate authority** | `cert-authority` lines delegate to a CA that mints principal-bearing certs |
+| **OpenPGP WKD** | Key discovery from the domain in the UID, at a well-known HTTPS path |
 
 ### 1.4 Quorum and threshold
 
@@ -121,6 +124,8 @@ The load-bearing question is not "is there a key" but **what is the subject**, a
 | **TUF** | A role in one repository | ✓ | ~ via root rotation | Quorum holders of the role's keys |
 | **Notation** | X.509 subject | ~ | ✗ **no rotation mechanism** | The issuing CA |
 | **OpenPGP** | Key fingerprint | ✗ | ~ via cross-signed transition | Anyone holding your key |
+| **SSH `allowed_signers`** | Principal string in the verifier's own file | ~ if old key kept with `valid-before` | ✗ | Whoever writes the verifier's file |
+| **SSH CA** | Principal named in the cert | ✓ CA reissues | ✗ | The CA, silently |
 | **npm provenance** | Repo + workflow | ✗ | ✗ | GitHub (OIDC issuer); npm |
 | **PyPI attestations** | Trusted Publisher (repo/workflow) | ✗ | ✗ | The forge; PyPI |
 | **crates.io** | **none** | n/a | n/a | Anyone who can publish; the CDN |
@@ -163,6 +168,38 @@ v3.1 (block ID `0x1b93ad61`, min SDK 33) exists because the v3.1 block is *unrec
 
 **Borrow candidate:** Android's per-ancestor capability flags are more expressive than AnchorID's `purpose` field. "This retired key may still validate installed data but may not authorize a rollback" is a distinction §5.2 currently cannot express.
 
+### 2.3 SSH signing: the floor, and why the floor matters
+
+SSH signing is the most widely deployed *non-PGP* developer signing mechanism in existence, and it is almost entirely absent from supply-chain discussions because it has no infrastructure to talk about. That absence is the point.
+
+Mechanically: `ssh-keygen -Y sign` / `-Y verify` sign arbitrary data under a namespace. Git wired this up in **2.34** (Nov 2021) behind `gpg.format = ssh`, and it needs OpenSSH 8.8+. Verification consults an `allowed_signers` file patterned after `authorized_keys`: each line is `principals options keytype base64-key`. The options are more than an allowlist:
+
+- **`valid-after=` / `valid-before=`** (OpenSSH 8.7+) give each key a validity window. Git passes the *commit* timestamp as the verification time, so a rotated-out key still verifies the commits it signed while it was valid. This is a real, deployed answer to "old signatures must keep verifying after rotation."
+- **`namespaces=`** scopes a key to a purpose (`git`, or anything else). A key valid for git commits is not thereby valid for other signed payloads.
+- **`cert-authority`** delegates: the line names a CA, and any cert that CA mints for a matching principal verifies.
+
+Revocation is `gpg.ssh.revocationFile`, holding either an SSH KRL or a plain list of revoked public keys; a match forces trust level `never`.
+
+| | SSH `allowed_signers` | AnchorID |
+|---|---|---|
+| Subject | Principal string, asserted locally | UUID (§4.1) |
+| Who defines identity | **Each verifier, in its own file** | The lineage, globally (§5.2) |
+| Rotation | Time windows on keys | Append-only lineage (§5.2) |
+| Old signatures survive rotation | ✓ via `valid-before` + commit-time verification | ✓ via lineage |
+| Purpose scoping | ✓ `namespaces=` | ~ `purpose` field |
+| Delegation | ✓ `cert-authority` | ✗ forbidden (§8.1) |
+| Transparency log | ✗ | ✓ required (§10) |
+| Reputation | ✗ | ✓ (§11) |
+| Infrastructure required | **None** | Log, witnesses, evidence graph |
+
+**The two things worth taking from this.**
+
+First, `valid-after`/`valid-before` is a **second precedent for the §5.2 gap**, and a better-shaped one than Android's capability flags. Android answers "what is this retired key still good for"; SSH answers "*when* was this key good," which is the question that actually makes historical signatures verifiable after rotation. §5.2's `purpose` field expresses neither. The pair — Android's capability flags plus SSH's validity windows — is what a complete retired-key model looks like, and `namespaces=` is a third axis on top.
+
+Second, and less comfortable: **SSH signing's identity model is that there isn't one.** The principal is whatever string the verifier put in its own file; no issuer, no namespace, nothing global. That looks like a devastating weakness until you notice it is why SSH signing got deployed — it required no PKI, no keyserver, no registry, no consensus. Git and OpenSSH already shipped everywhere, so adoption cost was a config line.
+
+In practice the file gets outsourced: GitHub and GitLab maintain the account→key mapping and render a **Verified** badge from it, which quietly makes the forge the naming authority and the impersonation risk (§2.1's last column). AnchorID's whole thesis is that this mapping should be durable, public, and not owned by a forge — but the comparison cuts both ways, because SSH signing shipped and the systems with real identity models mostly did not. This is §16.1 and §7.2's adoption problem viewed from the other end: the floor won on cost.
+
 ---
 
 ## 3. Axis: Authorization and quorum
@@ -182,6 +219,9 @@ v3.1 (block ID `0x1b93ad61`, min SDK 33) exists because the v3.1 block is *unrec
 | **Debian** | Keyring membership | ✗ flat | ✓ | ✓ via keyring maintainers |
 | **Guix** | Authorized committer | ~ | ✓ per commit | ✓ via `.guix-authorizations` |
 | **Notation** | Cert | ✗ | ✓ | ✓ CA |
+| **SSH `allowed_signers`** | Principal | ✗ | ✓ principal named | ✓ **anyone who edits the file** |
+| **SSH CA** | Cert principal | ✗ | ✓ | ✓ CA, for any principal |
+| **OpenPGP** | Key | ✗ flat | ✓ | ~ certify, but verifier decides |
 | **Sigstore** | OIDC identity | ✗ | ✓ | ✗ |
 | **Apple / Windows / Play** | Account | ✗ | ✗ | n/a |
 
@@ -216,6 +256,8 @@ One caveat worth knowing if FROST ever comes up: FROST signatures are **not dete
 - **Arch**: master keys certify packager keys. (Note the correct model here: the 5 master keys carry **marginal** ownertrust, and the "3 signatures" requirement is just GnuPG's `--marginals-needed` default, not an Arch-specific constant. There is no root CA; the masters are peers.)
 - **Debian**: keyring maintainers admit members.
 - **Gnosis Safe**: existing owners vote to add an address, and nothing binds that address to the person they claim it belongs to.
+- **SSH `allowed_signers`**: the most extreme case in the table. Any line in the file binds any key to any principal string, with no signature from that principal and no artifact anywhere attesting that they consented. A `cert-authority` line hands that power wholesale to a CA. When a forge maintains the mapping, the forge can attribute a signature to any account it hosts.
+- **OpenPGP**: anyone may certify any UID on any key. §5.5 covers what happened when that was combined with an append-only distribution layer.
 
 Every one of these has a path by which a compromised administrator introduces a key that *appears* to belong to someone else. AnchorID closes it. A fully compromised co-owner can sign as themselves and vote on owner changes, but cannot manufacture a key that verification will attribute to a co-maintainer. Combined with mandatory attribution (§8.2), the forensic record after a compromise stays honest.
 
@@ -251,6 +293,7 @@ This is a real gap, not a documentation gap. The Gnosis atomic-change pattern is
 | **Apple notarization** | ✗ | ✗ | n/a | ✓ stapled ticket | ✓ |
 | **Android / Play** | ✗ | ✗ | n/a | ✓ in APK | ✓ |
 | **OpenPGP** | ✗ | ✗ | n/a | ✓ detached sig | ✓ |
+| **SSH signing** | ✗ | ✗ | n/a | ✓ detached sig | ✓ **wholly local, no network path exists** |
 | **C2PA** | ~ optional | ✗ | n/a | ✓ manifest | ✓ |
 
 ### 4.1 Stapling is the strongest engineering claim in the spec
@@ -294,6 +337,7 @@ Contrast with the two systems that got it right:
 | **Arch** | Marginal-trust web, 3-of-5 masters | ✓ GnuPG semantics | ✓ | n/a | ~ key revocation |
 | **cargo-crev** | Signed human reviews of code | ✓ | ✓ | n/a — reviews artifacts | ✓ negative reviews |
 | **OpenSSF Scorecard** | Automated repo heuristics | ✓ | ✓ | n/a | ~ |
+| **SSH signing** | **None** — the file *is* the policy | n/a | n/a | n/a | ~ local revocation file only |
 | **Sigstore / TUF / Go / Notation** | **None** | n/a | n/a | n/a | n/a |
 | **EV code signing** | The validation *is* the standing | ~ CA/B rules public | ✗ unreproducible | Transfers with the entity | ✗ |
 
@@ -319,6 +363,7 @@ The five-bucket model with `legal-entity` explicitly *not* atop a ladder (§11.3
 |---|---|
 | **AnchorID** | ✓ `corroborated` by explicit design (§11.3) |
 | **cargo-crev** | ✓ |
+| **SSH signing** | n/a — no standing exists; the principal is an arbitrary string |
 | **Arch / Debian** | ~ pseudonymous handles exist, but keysigning assumes in-person ID |
 | **OpenPGP WoT** | ✓ in principle; key-signing parties assumed legal ID in practice |
 | **Sigstore** | ✗ needs an OIDC account; the email is written into the certificate |
@@ -339,6 +384,36 @@ Azure Artifact Signing is the sharpest contrast available. Individual validation
 
 Both belong in §15. They demonstrate the failure mode the section warns about, in production, in systems with far more identity assurance than AnchorID proposes to require.
 
+### 5.5 The OpenPGP web of trust died at the distribution layer — and §11 has the same shape
+
+§8.3 says bootstrapping "killed PGP's WoT." That is true but misdiagnosed, and the actual mechanism is the sharpest warning in this document for AnchorID's evidence graph.
+
+The WoT did not merely fail to bootstrap. **Its distribution layer was weaponised and then deliberately dismantled.**
+
+The SKS keyserver network was append-only and unauthenticated by design: anyone could attach a third-party certification to anyone else's key, and the network synchronised it without validation. OpenPGP places no limit on how many signatures a certificate may carry. In **June 2019** attackers used exactly this to poison the certificates of two prominent OpenPGP contributors with ~150,000 signatures each (**CVE-2019-13050**). Importing a poisoned certificate rendered the victim's local GnuPG unusable — a persistent denial of service delivered *through the trust infrastructure itself*, targeting anyone who tried to fetch the victim's key. The SKS software was already unmaintained, so it was never fixed. In June 2021 the `pool.sks-keyservers.net` DNS records were pulled entirely, under GDPR takedown pressure the write-only design could not satisfy.
+
+The replacement is the part that should worry §11. `keys.openpgp.org` (Hagrid) is now the default keyserver in Debian and Ubuntu, and **it does not distribute third-party signatures at all** — precisely because, in its own words, they are "a mechanism to attach arbitrary data to anyone's key, which can be problematic if a third party can unilaterally cause them to be published with the target certificate." The only exception is certifications the *key holder* has explicitly marked as attested and re-uploaded. Identities are distributed only with verified consent, and one address maps to exactly one key.
+
+So the surviving OpenPGP infrastructure works by **refusing to carry the web of trust**. The WoT is not unsupported; it is unshipped, on purpose, by the people who kept OpenPGP alive.
+
+**Why this lands directly on AnchorID §11.** The evidence graph is a WoT-shaped object: third parties contribute evidence about a subject, and standing is computed over the accumulated graph. §5.2's append-only log plus §11.5's *permanent negative evidence* reproduces SKS's exact structural preconditions — unbounded third-party writes to someone else's record, in an append-only store that by design cannot forget. Three attacks follow without needing any new idea:
+
+- **Flooding.** Bulk low-quality evidence inflates a subject's record until fetching or evaluating it is expensive. §11.2's cost-to-forge weighting bounds the *score* but not the *bytes*, and §9.3 staples the full lineage into every bundle, so the cost lands in every verification.
+- **Griefing via permanent negative evidence.** §11.5 makes negative evidence permanent. If a hostile party can write it, a permanent unremovable smear is a supported operation. If only the operator can write it, §12's no-gatekeeping rule is compromised.
+- **Unerasable PII.** GDPR is what actually killed the SKS pool. An append-only public graph of statements about identified people has the same exposure, and §16 does not raise it.
+
+§8.1 already contains the correct instinct for keys — *a key entry must be signed by the owner it names.* Nothing in §11 extends that instinct to evidence.
+
+**Recommendation:** adopt Hagrid's consent model explicitly. Third-party evidence should be **pull, not push**: publishable in the subject's record only when the subject counter-signs it, exactly as `keys.openpgp.org` requires attestation. Hostile parties may still publish evidence — in their own records, where their own standing is what backs it, and where a consumer who has chosen to weight that party can find it. This preserves §11.2's re-derivability by a hostile party (they can still gather and weight everything themselves) while removing the unilateral write to someone else's identity that destroyed SKS. Negative evidence and data-erasure obligations need the same treatment, and both belong in §16.
+
+The one piece of OpenPGP infrastructure worth borrowing outright is **WKD** — key discovery from the domain in the UID at a well-known HTTPS path, no keyserver in the loop. It is the same insight as §4.3's domain + DNS dual anchor, already deployed, and worth citing.
+
+### 5.6 OpenPGP is not one system right now
+
+Anything in this document that says "OpenPGP" should be read with a caveat that did not apply before 2024. **RFC 9580** (July 2024) obsoleted RFC 4880 and introduced v6 keys. GnuPG declined to implement it; in late 2023 Werner Koch forked the specification as **LibrePGP**, taking Gpg4win and RNP along. The largest OpenPGP installed base now sits outside the IETF standard, while Sequoia and others implement RFC 9580.
+
+For this comparison the axis results are unaffected — neither branch adds a transparency log, lineage, or reputation model. But "we could just use OpenPGP" is a weaker option in 2026 than in 2020, because there is no longer a single OpenPGP to use. That is worth one sentence wherever the spec compares itself to PGP.
+
 ---
 
 ## 6. Axis: Failure — recovery, revocation, theft, transfer
@@ -348,6 +423,8 @@ Both belong in §15. They demonstrate the failure mode the section warns about, 
 | **AnchorID 0.1** | ✗ forbidden (§13.1) | key revoke + revoke-for-cause (§12) | ~ only for cause | ✓ fork is visible (§13.2) | ✓ 30d recommended |
 | **Sigstore** | ✓ via OIDC recovery | Certs are ephemeral; log is permanent | ✗ | ~ log shows unexpected signings | ✗ |
 | **OpenPGP** | ✗ | Revocation cert, if pre-made and distributed | ✗ | ✗ | ✗ |
+| **SSH `allowed_signers`** | n/a — no operator; ✓ if a forge holds the file | KRL or revoked-key list, per verifier | ✗ | ✗ | ✗ |
+| **SSH CA** | ✓ the CA | Short cert validity; KRL | ✗ | ✗ | ✗ |
 | **TUF** | n/a | Root rotation, key removal | ~ | ✗ | ✗ |
 | **Notation** | n/a | OCSP / CRL / delta CRL | ~ | ✗ | ✗ |
 | **Authenticode** | ✓ CA reissues | CRL / OCSP | ~ CA may backdate | ✗ | ✗ |
@@ -392,6 +469,8 @@ AnchorID's four structural mitigations — expiring cross-signatures, owner-chan
 | **Authenticode** | ✓ CA validates the org name | ✓ | ~ OS dialog, undocumented | ✗ |
 | **Apple** | ✓ bundle ID + team ID | ✓ | ~ Gatekeeper dialog | ✗ |
 | **Android** | ✓ package name, first-come | ✓ Play | ~ | ✗ |
+| **OpenPGP** | ✗ UIDs self-asserted; ~ email control at `keys.openpgp.org` | ✗ | ✗ | ✗ |
+| **SSH signing** | ✗ in the protocol; **the forge, in practice** | ~ the forge | ✗ | ✗ |
 | **Sigstore / TUF / Notation** | ✗ | ✗ | ✗ | ✗ |
 | **C2PA** | ~ | ✗ | ✓ UX Guidance 1.0 (2026-02-05) | ~ |
 
@@ -405,6 +484,8 @@ AnchorID's four structural mitigations — expiring cross-signatures, owner-chan
 - **§14.3**: change is a first-class display state. `same package since 2019 · owner changed 3 weeks ago` has no counterpart in any shipping installer.
 
 §14.2's "SHOULD NOT present a spectrum of increasingly worried icons; graduated warnings are clicked through at uniform rates" matches the browser-security literature that pushed Chrome and Firefox from graduated SSL warnings to hard interstitials.
+
+**The live counter-example §14.2 should cite by name is GitHub's Verified badge on SSH-signed commits.** The badge means "a key registered to this account signed this," which is precisely the "a signature exists" checkmark §14.2 argues is worse than no checkmark: it is routinely read as *the commit is trustworthy* and as *this person wrote it*, and it collapses the two assertions §3 insists must never collapse. It also inherits the naming authority — the badge is GitHub's claim about GitHub's own account→key mapping, so it says nothing a party outside GitHub can check. It is the most widely seen signing UI in the industry and the clearest available demonstration of the failure §14 exists to prevent.
 
 ### 7.2 The PyPI warning: mandating verifier behavior is the hard part
 
@@ -432,7 +513,7 @@ The lesson for AnchorID: §14 is normatively binding on implementations, but a s
 | Thresholds and delegation | TUF | §8.4 |
 | Append-only key lineage | Android APK v3 | §5.2 |
 | Never delete retired keys | Guix keyring branch | §8.3 |
-| Domain + DNS dual anchor | DANE / DKIM patterns | §4.3 |
+| Domain + DNS dual anchor | DANE / DKIM patterns; OpenPGP WKD | §4.3 |
 
 §9.1's "reuse, do not reinvent" and §10's "the log is not a differentiator and operating one is the hardest infrastructure problem in this design" are the right calls and unusually honest for a draft.
 
@@ -442,7 +523,7 @@ The lesson for AnchorID: §14 is normatively binding on implementations, but a s
 |---|---|---|---|
 | Verification MUST emit two non-collapsible assertions | §3 | none | No system separates "key was authorized" from "who this is" |
 | Confidence ceiling at the lowest current owner | §7.4 | none | Reputation transfer is unmitigated everywhere else |
-| Key must be authorized by the owner it names | §8.1 | none | TUF/Arch/Debian/Safe all allow admin-attributed keys |
+| Key must be authorized by the owner it names | §8.1 | none | TUF/Arch/Debian/Safe all allow admin-attributed keys; SSH `allowed_signers` binds any key to any principal with no consent artifact at all |
 | Threshold over distinct *owners*, not keys | §8.4 | TUF (keys), Safe (addresses) | Inverts threshold crypto's aggregation goal |
 | Signed-at-`unverified` renders as unsigned | §14.2 | none | Everyone shows an affirmative badge |
 | Operator forbidden from gatekeeping who may sign | §12 | none | Every CA and store gates on identity |
@@ -460,6 +541,10 @@ The lesson for AnchorID: §14 is normatively binding on implementations, but a s
 | Malware detection | Apple notarization actually scans | §15 correctly disclaims it, but users conflate them |
 | Threshold policy edge cases | Gnosis Safe's atomic owner+threshold change | §16.5 can strand a package |
 | Capability-scoping of retired keys | Android's five per-ancestor flags | §5.2's `purpose` field is coarser |
+| **Time-scoping** of retired keys | SSH `valid-after` / `valid-before`, checked against commit time | §5.2 cannot express *when* a key was good — see §2.3 |
+| Namespace-scoping a key to a purpose | SSH `namespaces=` | `purpose` is descriptive, not enforced at verification |
+| Consent-gated third-party evidence | `keys.openpgp.org` attested certifications | §11's graph rebuilds SKS's flooding preconditions — see §5.5 |
+| Zero-infrastructure on-ramp | SSH signing: git 2.34 + OpenSSH, no PKI, one config line | §16.1's bootstrapping is a *cost* problem, and the floor won on cost |
 | Verifier adoption | npm, PyPI, Maven ship today | A spec nothing verifies is worth nothing — see §7.2 |
 
 ### 8.4 Verdict
@@ -475,13 +560,16 @@ AnchorID's contribution is a durable subject with attributable multi-owner autho
 Ordered by value.
 
 1. **§10 — require verifiers to enforce a witness quorum policy**, with a minimum count and maximum cosignature age, named in output alongside the confidence policy. Signal's "three independent auditors, signatures ≤7 days old, client refuses without all three" is the model. Without this, AnchorID inherits Go's failure mode: a witness ecosystem that looks like split-view protection but is only out-of-band detection. **This is the single highest-value change in this list.**
-2. **§16 — add verifier adoption as an open question.** PEP 740 shipped production and distribution and has zero consumption. That is the failure mode most likely to make this spec irrelevant, and it is currently unacknowledged.
-3. **§16.5 — adopt the Gnosis Safe atomic-change pattern**: owner removal and threshold amendment as one signed event, so a package cannot be stranded.
-4. **§15 — cite the 2025 empirical cases.** Azure Artifact Signing's certificates signing Lumma Stealer, and the Nikon Z6 III C2PA break with full certificate revocation. Both are stronger evidence than the EV precedent already cited, and both are recent.
-5. **§5.2 — borrow Android's per-ancestor capability flags.** "This retired key may still validate installed data but may not authorize a rollback" is a distinction the `purpose` field cannot currently express.
-6. **Cite the prior art throughout.** §5.2 → Android signing lineage; §8.3 → Guix's never-remove-keys rule; §13.1 → domain transfer locks and timelocked recovery modules; §10 → Certificate Transparency by name.
-7. **§11 — study cargo-crev before finalizing.** It is the only system that shipped a re-derivable public reputation function, and its adoption curve is data about §16.1.
-8. **§14 — say what the on-ramp is.** §12 correctly refuses to gatekeep, but a new identity is `unverified` and §14.2 says render that as unsigned. State plainly that early adopters get no display benefit, and why that is acceptable.
+2. **§11 — gate third-party evidence on subject consent.** The evidence graph currently reproduces the exact structural preconditions of the 2019 SKS certificate-flooding attack: unbounded third-party writes to someone else's record, in an append-only store, with §11.5 making negative evidence permanent. Require that evidence about a subject enter the subject's record only when the subject counter-signs it — the model `keys.openpgp.org` adopted after SKS collapsed. Hostile parties keep publishing in their own records, so §11.2's re-derivability survives intact. **This is a vulnerability, not a refinement, and §5.5 works through the three attacks it enables.**
+3. **§16 — add verifier adoption as an open question.** PEP 740 shipped production and distribution and has zero consumption. That is the failure mode most likely to make this spec irrelevant, and it is currently unacknowledged.
+4. **§16.5 — adopt the Gnosis Safe atomic-change pattern**: owner removal and threshold amendment as one signed event, so a package cannot be stranded.
+5. **§15 — cite the 2025 empirical cases.** Azure Artifact Signing's certificates signing Lumma Stealer, and the Nikon Z6 III C2PA break with full certificate revocation. Both are stronger evidence than the EV precedent already cited, and both are recent.
+6. **§5.2 — replace `purpose` with three scopes, not one.** Android's per-ancestor capability flags give *what a retired key may still do*; SSH's `valid-after`/`valid-before` give *when it was valid*, verified against the artifact's own timestamp; SSH's `namespaces=` gives *what payloads it applies to*. The time dimension is the one that makes historical signatures survive rotation, and `purpose` expresses none of the three.
+7. **§16 — add data erasure.** GDPR takedown pressure is what actually finished off the SKS pool, not the flooding. An append-only public graph of statements about identified people has the same exposure and the spec does not raise it.
+8. **Cite the prior art throughout.** §5.2 → Android signing lineage *and* SSH `allowed_signers` validity windows; §8.3 → Guix's never-remove-keys rule; §13.1 → domain transfer locks and timelocked recovery modules; §10 → Certificate Transparency by name; §4.3 → OpenPGP WKD; §11 → the SKS collapse and Hagrid's response.
+9. **§11 — study cargo-crev before finalizing.** It is the only system that shipped a re-derivable public reputation function, and its adoption curve is data about §16.1.
+10. **§14 — say what the on-ramp is, and name GitHub's Verified badge.** §12 correctly refuses to gatekeep, but a new identity is `unverified` and §14.2 says render that as unsigned. State plainly that early adopters get no display benefit, and why that is acceptable. The badge on SSH-signed commits is the most-seen signing UI in the industry and the clearest live example of the failure §14.2 describes — cite it rather than arguing the point abstractly.
+11. **Add one sentence wherever the spec says "OpenPGP."** Since RFC 9580 and the LibrePGP fork there is no single OpenPGP to compare against or fall back to — see §5.6.
 
 ---
 
@@ -514,5 +602,8 @@ Known-contested or fast-moving, hedge if citing:
 | Rekor v1 sunset date | **None exists.** Any specific date is fabricated; a freeze would be announced a year ahead |
 | DNSSEC root KSK | Rollover in progress — KSK-2024 (tag 38696) takes over **2026-10-11**. Separate algorithm rollover to ECDSA planned 2027–2029 |
 | CA/B code signing cert lifetime | Cut to **460 days** for certs issued on/after 2026-03-01 (was 39 months). Most write-ups still say 39 months |
+| "OpenPGP" as a single system | **No longer accurate.** RFC 9580 (July 2024) vs. the LibrePGP fork — GnuPG, Gpg4win and RNP sit outside the IETF revision. Always say which. See §5.6 |
+| SSH signing version floors | git **2.34+** for `gpg.format=ssh`, OpenSSH **8.8+** to sign, OpenSSH **8.7+** for `valid-after`/`valid-before`. Write-ups routinely conflate these three |
+| Attribution of the SKS attack | CVE-2019-13050 is well documented; the *attackers* were never identified. Do not assign motive or actor |
 
 Do not cite: the Trail of Bits "Are we PEP 740 yet?" tracker (currently serves an unrendered template), the "132,360 packages with attestations" figure (unsourced), or any claim that CNCF archived Notary or TUF (only the Notary v1 *repo* was archived, 2025-07-31; TUF graduated CNCF in 2019).
