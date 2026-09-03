@@ -1,6 +1,7 @@
 # Dependencies
 node_modules/
 
+
 # Wrangler / Cloudflare
 .wrangler/
 .dev.vars
@@ -10,6 +11,7 @@ node_modules/
 
 # Logs
 npm-debug.log*
+logs/
 
 # Editor / OS
 .vscode/

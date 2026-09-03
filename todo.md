@@ -183,9 +183,9 @@ Security hardening complete as of 2026-01-24:
       verified against live endpoints too
 - [x] Organization profile `4c785577-…` 404 — resolved by the 2026-08-19 restore
       (profile + 3 verified claims back in KV)
-- [ ] Delete the 4 test-junk profiles leaked during the 2026-08-18 incident
-      (63396ed1, 6bc1cd65, 8d2933e0, d6ade89d — nameless, no email, created
-      06:02Z mid-test-run)
+- [x] Delete the 4 test-junk profiles leaked during the 2026-08-18 incident
+      (63396ed1, 6bc1cd65, 8d2933e0, d6ade89d) — done via admin UI; confirmed
+      2026-09-02 (KV shows 29 profiles + 4 `deleted:` tombstones)
 - [x] `scripts/restore-from-backup.py` now selects `email:` keys by *value* (the uuid
       they map to) and restores `emailkey:` pointers, with the `_emailHash`-derived key
       only as a fallback (2026-08-22). Four 2026-01 profiles had lost `_emailHash` from
@@ -199,15 +199,14 @@ Security hardening complete as of 2026-01-24:
 
 ## 🔁 Recurring Ops
 
-- [ ] **Put `npm run backup` and `npm run pages:check` on a cron** (Mike, 2026-08-23).
-      Neither runs automatically today, and each would have caught a silent prod
-      problem within minutes instead of days (08-19 restore dropped 4 login
-      mappings; /about served a 148-byte test stub 08-18 → 08-23). Both need an
-      authenticated wrangler (`CLOUDFLARE_API_TOKEN` from `.key`, or a logged-in
-      shell) and run from the repo root. Suggested: weekly backup, daily
-      pages:check, mail/notify on non-zero exit. pages:check prints the exact
-      re-upload command for any drift; backups land in `backup/` (gitignored) —
-      copy them off-box, apart from the pepper.
+- [x] **Cron for `npm run backup` + `npm run pages:check`** — installed 2026-09-02
+      via `scripts/cron-run.sh` (fixes nvm PATH, sources `.key`, logs to `logs/`,
+      alerts through the mycal-style mailer on failure — this box has no MTA).
+      Daily 03:00 pages:check, weekly Sun 04:00 backup; both verified end-to-end
+      in a simulated cron env. See `scripts/anchorid.crontab.example`.
+      REMAINING: create gitignored `.env.cron` (exports `MAIL_SEND_SECRET` +
+      `MYCAL_MAIL_ENDPOINT`) and run `scripts/cron-run.sh test-alert` once —
+      until then failures only land in `logs/`, they don't email.
 
 - [ ] Periodic offline backup: `npm run backup` (`scripts/backup-kv.sh` — dumps
       every key to `backup/kv-<timestamp>.json`, restorable with

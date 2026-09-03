@@ -1,0 +1,33 @@
+# AnchorID recurring ops — crontab entries
+#
+# Install: crontab -e, paste the two job lines below (adjust the repo path).
+# All the real logic lives in scripts/cron-run.sh, which:
+#   - fixes PATH for nvm-installed node (cron's PATH has neither node nor npm)
+#   - cds to the repo and sources .key (CLOUDFLARE_API_TOKEN for wrangler)
+#   - logs to <repo>/logs/<task>.log (this box's /var/log isn't user-writable)
+#   - on non-zero exit, emails mike@mycal.net through the mycal-style mailer
+#     (this box has no MTA, so `mail -s` would silently do nothing) — needs
+#     a gitignored .env.cron at the repo root:
+#         export MAIL_SEND_SECRET=<same secret the Worker uses>
+#         export MYCAL_MAIL_ENDPOINT=<https endpoint, e.g. the mycal.net send API>
+#     Verify delivery once with:  scripts/cron-run.sh test-alert
+#
+# What these guard against (both bit us in August 2026):
+#   - pages:check → /about served a 148-byte test stub 08-18 → 08-23 because
+#                   nothing compared prod KV to src/content
+#   - backup      → the 08-19 restore had to work from a March dump; a recent
+#                   backup would have carried the 4 login mappings it lost
+#
+# Cadence: pages:check daily (cheap: 13 reads), backup weekly (~4 min, 100+
+# reads — bulk get falls back to per-key). Backups land in backup/
+# (gitignored). Copy them off-box, and keep them apart from the EMAIL_PEPPER
+# offline copy — together they weaken each other.
+
+# Daily 03:00 — verify every page:* key in prod KV matches src/content/
+0 3 * * *   /home/mike/github/anchorid/scripts/cron-run.sh pages:check
+
+# Weekly Sunday 04:00 — full prod KV dump to backup/kv-<utc-timestamp>.json
+0 4 * * 0   /home/mike/github/anchorid/scripts/cron-run.sh backup
+
+# Optional monthly prune — keep the 12 newest backups (each ~250 KB today)
+# 30 4 1 * *  cd /home/mike/github/anchorid/backup && ls -1t kv-*.json | tail -n +13 | xargs -r rm --
