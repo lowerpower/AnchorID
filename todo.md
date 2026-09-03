@@ -204,9 +204,9 @@ Security hardening complete as of 2026-01-24:
       alerts through the mycal-style mailer on failure — this box has no MTA).
       Daily 03:00 pages:check, weekly Sun 04:00 backup; both verified end-to-end
       in a simulated cron env. See `scripts/anchorid.crontab.example`.
-      REMAINING: create gitignored `.env.cron` (exports `MAIL_SEND_SECRET` +
-      `MYCAL_MAIL_ENDPOINT`) and run `scripts/cron-run.sh test-alert` once —
-      until then failures only land in `logs/`, they don't email.
+      Failure emails armed 2026-09-03: `.env.cron` created (gitignored;
+      `MAIL_SEND_SECRET` + `MYCAL_MAIL_ENDPOINT`) and `test-alert` delivered
+      through the mycal mailer.
 
 - [ ] Periodic offline backup: `npm run backup` (`scripts/backup-kv.sh` — dumps
       every key to `backup/kv-<timestamp>.json`, restorable with
