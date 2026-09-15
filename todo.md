@@ -192,11 +192,18 @@ Security hardening complete as of 2026-01-24:
       the document while their index key was live, and the 08-19 restore dropped their
       logins; re-restored by hand, and `_emailHash` written back onto `a696638c`,
       `8cbf961a`, `fe4814de` (`bbf7372e` got it via the admin email change)
-- [x] Plaintext-email copy fixed everywhere (2026-09-15): admin form, signup form,
-      and the privacy page now state the 7-day plaintext window for signup email
-      and registration IP (spam screening) and the peppered long-term hash.
+- [x] Plaintext-email copy fixed everywhere (2026-09-15, `f09b6c7`): admin form,
+      signup form, and the privacy page (email + IP sections, security list,
+      JSON-LD abstract) now state the 7-day plaintext window for signup email and
+      registration IP (spam screening) and the peppered long-term hash; privacy
+      stamps + sitemap lastmod bumped, page:privacy/page:sitemap re-uploaded.
       (`profile._email` only exists if ENABLE_CLAIM_NOTIFICATIONS is ever enabled —
       not set in prod)
+- [x] Login page rate-limit hint (2026-09-15, `fd67bc0`): the silent 3/hour
+      per-email limit is now disclosed on the login form and on EVERY POST /login
+      outcome (identical on all paths — anti-enumeration preserved; regression
+      test locks byte-identical unknown-email vs rate-limited bodies). Closes the
+      trap that cost 40 minutes on 2026-08-22
 
 ---
 
@@ -210,6 +217,9 @@ Security hardening complete as of 2026-01-24:
       Failure emails armed 2026-09-03: `.env.cron` created (gitignored;
       `MAIL_SEND_SECRET` + `MYCAL_MAIL_ENDPOINT`) and `test-alert` delivered
       through the mycal mailer.
+      Monthly heartbeat added 2026-09-15 (`a913a2b`, crontab: 1st 05:30): mails an
+      ok/DEGRADED summary — flags pages:check >48h stale or newest backup >8d old —
+      so a dead crontab shows up as a missing monthly email. Delivery live-tested.
 
 - [ ] Periodic offline backup: `npm run backup` (`scripts/backup-kv.sh` — dumps
       every key to `backup/kv-<timestamp>.json`, restorable with
