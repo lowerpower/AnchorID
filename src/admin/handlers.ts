@@ -884,7 +884,7 @@ ${error ? `<div class="alert alert-error">${escapeHtml(errorMessages[error] || e
       class="${errorField === "email" ? "error" : ""}"
       value="${escapeHtml(prefillEmail)}">
     ${errorField === "email" ? `<div class="error-msg">${escapeHtml(errorMessages[error] || "Invalid email")}</div>` : ""}
-    <div class="hint">Used for magic-link edit access. Stored as a hash, never in plaintext.</div>
+    <div class="hint">Used for magic-link edit access. Stored long-term only as a peppered hash; a plaintext copy is kept 7 days for spam screening, then auto-deleted.</div>
   </div>
 
   <div class="card" style="margin-top:14px">

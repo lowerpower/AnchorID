@@ -1195,7 +1195,7 @@ async function handleSignupPage(request: Request, env: Env): Promise<Response> {
     <div class="hint">
       • You'll receive a setup link at this address<br>
       • Used for magic link authentication (no passwords!)<br>
-      • Never shared publicly, stored as one-way hash only<br>
+      • Never shared publicly. Stored long-term as a one-way hash; a plaintext copy is kept 7 days for spam screening, then auto-deleted<br>
       • Cannot be changed after creation (you can add recovery options)
     </div>
   </div>

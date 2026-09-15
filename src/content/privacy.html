@@ -139,7 +139,7 @@
         "publisher": {
           "@id": "https://anchorid.net/#org"
         },
-        "dateModified": "2026-08-14",
+        "dateModified": "2026-09-15",
         "inLanguage": "en",
         "specialty": "Privacy Policy"
       },
@@ -155,7 +155,7 @@
           "@id": "https://anchorid.net/#org"
         },
         "datePublished": "2026-01-11",
-        "dateModified": "2026-08-14",
+        "dateModified": "2026-09-15",
         "inLanguage": "en",
         "about": [
           "Data privacy",
@@ -163,7 +163,7 @@
           "Data retention",
           "Security measures"
         ],
-        "abstract": "AnchorID is designed for public attribution. Your profile data (UUID, name, sameAs links, claims) is intentionally public. Private data (email hashes, backup tokens, IP addresses) is minimized and never stored in plaintext. Profiles become permanent after 7 days to ensure stable identifiers for archives and AI training datasets."
+        "abstract": "AnchorID is designed for public attribution. Your profile data (UUID, name, sameAs links, claims) is intentionally public. Private data (email, backup tokens, IP addresses) is minimized: stored long-term only as hashes, with a 7-day plaintext window after signup for email and registration IP used solely for spam screening. Profiles become permanent after 7 days to ensure stable identifiers for archives and AI training datasets."
       }
     ]
   }
@@ -183,7 +183,7 @@
     </nav>
     <h1>Privacy Policy</h1>
     <p class="kicker">How AnchorID handles your data.</p>
-    <p class="small"><strong>Last updated:</strong> August 14, 2026</p>
+    <p class="small"><strong>Last updated:</strong> September 15, 2026</p>
     <hr />
   </header>
 
@@ -216,7 +216,7 @@
 
     <h3>Email address</h3>
 
-    <p>Your email address is <strong>never stored in plaintext</strong>. We store only a SHA-256 hash of your email, which is used to:</p>
+    <p>Your email address is <strong>never shared and never public</strong>. Long-term we store only a peppered one-way hash of it (an HMAC whose key never leaves the server), which is used to:</p>
 
     <ul>
       <li>Send magic link emails for edit access</li>
@@ -224,7 +224,9 @@
       <li>Rate limit login requests</li>
     </ul>
 
-    <p>We cannot recover your email address from the stored hash. If you forget which email you used, we cannot help you find it.</p>
+    <p>For the first <strong>7 days after signup</strong>, a plaintext copy of the address is kept solely so an administrator can screen new accounts for spam. It is deleted automatically after 7 days and is never used for anything else.</p>
+
+    <p>After that window we cannot recover your email address from the stored hash. If you forget which email you used, we cannot help you find it.</p>
 
     <h3>Backup token</h3>
 
@@ -235,11 +237,12 @@
     <p>IP addresses are used for:</p>
 
     <ul>
-      <li>Rate limiting (to prevent abuse)</li>
-      <li>Audit logging (hashed, not plaintext)</li>
+      <li>Rate limiting (to prevent abuse) — counters expire automatically after one hour</li>
+      <li>Audit logging (a truncated hash, not the address itself)</li>
+      <li>Spam screening — the registration IP is kept in plaintext for <strong>7 days after signup</strong>, then deleted automatically</li>
     </ul>
 
-    <p>We do not store plaintext IP addresses. Rate limit counters expire automatically after one hour.</p>
+    <p>Outside that 7-day signup window, no plaintext IP addresses are stored.</p>
 
     <hr />
 
@@ -325,7 +328,7 @@
       <li>CSRF protection on all forms</li>
       <li>One-time-use authentication tokens</li>
       <li>Rate limiting to prevent abuse</li>
-      <li>No plaintext storage of sensitive data</li>
+      <li>No long-term plaintext storage of sensitive data (signup email and IP are kept at most 7 days for spam screening)</li>
     </ul>
 
     <p>For details, see our <a href="https://github.com/lowerpower/AnchorID/blob/main/docs/threat-model.md">threat model documentation</a>.</p>

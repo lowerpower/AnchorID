@@ -8,6 +8,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Changed - 2026-09-15
 
+#### Honest plaintext-storage copy (admin form, signup form, privacy policy)
+
+- The privacy page claimed email is "never stored in plaintext" and "we do not
+  store plaintext IP addresses"; in fact signup writes both in plaintext with a
+  7-day TTL for spam screening (`email:unhashed:<uuid>`, `ip:<uuid>`), and the
+  long-term email hash has been a peppered HMAC (not bare SHA-256) since
+  2026-08-17. All three surfaces now state the 7-day window and the peppered
+  hash. Privacy page stamps bumped to 2026-09-15
+
 #### Login page: standing rate-limit hint
 
 - The per-email login limit (3/hour) fails silently by design, so a

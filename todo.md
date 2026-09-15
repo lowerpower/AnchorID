@@ -192,8 +192,11 @@ Security hardening complete as of 2026-01-24:
       the document while their index key was live, and the 08-19 restore dropped their
       logins; re-restored by hand, and `_emailHash` written back onto `a696638c`,
       `8cbf961a`, `fe4814de` (`bbf7372e` got it via the admin email change)
-- [ ] Admin UI copy still claims email is "never in plaintext" — inaccurate while
-      `email:unhashed:<uuid>` (7d) and `profile._email` exist
+- [x] Plaintext-email copy fixed everywhere (2026-09-15): admin form, signup form,
+      and the privacy page now state the 7-day plaintext window for signup email
+      and registration IP (spam screening) and the peppered long-term hash.
+      (`profile._email` only exists if ENABLE_CLAIM_NOTIFICATIONS is ever enabled —
+      not set in prod)
 
 ---
 
