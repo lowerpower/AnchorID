@@ -29,5 +29,10 @@
 # Weekly Sunday 04:00 — full prod KV dump to backup/kv-<utc-timestamp>.json
 0 4 * * 0   /home/mike/github/anchorid/scripts/cron-run.sh backup
 
+# Monthly 1st 05:30 — "still alive" summary email (a dead crontab can't report
+# its own death, but a monthly mail that stops arriving can). Also flags a
+# pages:check older than 48h or a backup older than 8 days.
+30 5 1 * *  $REPO/scripts/cron-run.sh heartbeat
+
 # Optional monthly prune — keep the 12 newest backups (each ~250 KB today)
 # 30 4 1 * *  cd /home/mike/github/anchorid/backup && ls -1t kv-*.json | tail -n +13 | xargs -r rm --

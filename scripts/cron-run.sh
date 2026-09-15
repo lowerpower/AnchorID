@@ -4,6 +4,11 @@
 #   scripts/cron-run.sh pages:check    # daily: prod KV page:* vs src/content/
 #   scripts/cron-run.sh backup         # weekly: full prod KV dump to backup/
 #   scripts/cron-run.sh test-alert     # send a test failure email and exit
+#   scripts/cron-run.sh heartbeat      # monthly: "still alive" summary email
+#                                        (also flags a job that hasn't run on
+#                                        schedule — a dead crontab can't report
+#                                        its own death, but a live monthly mail
+#                                        that stops arriving can)
 #
 # Exists because a bare `npm run …` line in a crontab fails here three ways:
 #   - cron's PATH has no node/npm (nvm install) → PATH is fixed up below
@@ -16,7 +21,7 @@
 #   .env.cron  exports MAIL_SEND_SECRET and MYCAL_MAIL_ENDPOINT (failure alerts)
 set -uo pipefail
 
-TASK="${1:?usage: cron-run.sh <pages:check|backup|test-alert>}"
+TASK="${1:?usage: cron-run.sh <pages:check|backup|test-alert|heartbeat>}"
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 LOGDIR="$REPO/logs"
 LOG="$LOGDIR/${TASK//:/-}.log"
@@ -60,6 +65,39 @@ alert() {
 if [ "$TASK" = "test-alert" ]; then
   echo "=== $(date -u +%FT%TZ) test-alert ===" >> "$LOG"
   alert "anchorid cron: test alert — if you can read this, failure emails work"
+  exit $?
+fi
+
+if [ "$TASK" = "heartbeat" ]; then
+  echo "=== $(date -u +%FT%TZ) heartbeat ===" >> "$LOG"
+  # Summarize the other jobs into this task's own log, then mail it. alert()
+  # sends the last 30 lines of $LOG, so the summary IS the email body.
+  now="$(date +%s)"
+  status="ok"
+
+  last_check="$(grep -E "pages:check exit=" "$LOGDIR/pages-check.log" 2>/dev/null | tail -1)"
+  echo "last pages:check: ${last_check:-NEVER RAN}" >> "$LOG"
+  check_age_h=999
+  if [ -f "$LOGDIR/pages-check.log" ]; then
+    check_age_h=$(( (now - $(stat -c %Y "$LOGDIR/pages-check.log")) / 3600 ))
+  fi
+  echo "pages-check log age: ${check_age_h}h (daily job; >48h is late)" >> "$LOG"
+  [ "$check_age_h" -gt 48 ] && status="DEGRADED"
+  echo "$last_check" | grep -q "exit=0" || status="DEGRADED"
+
+  last_backup="$(ls -1t "$REPO"/backup/kv-*.json 2>/dev/null | head -1)"
+  if [ -n "$last_backup" ]; then
+    backup_age_d=$(( (now - $(stat -c %Y "$last_backup")) / 86400 ))
+    echo "last backup: $(basename "$last_backup") ($(wc -c < "$last_backup") bytes, ${backup_age_d}d old; weekly job, >8d is late)" >> "$LOG"
+    [ "$backup_age_d" -gt 8 ] && status="DEGRADED"
+  else
+    echo "last backup: NONE FOUND in backup/" >> "$LOG"
+    status="DEGRADED"
+  fi
+
+  echo "disk free on $REPO: $(df -h "$REPO" | awk 'NR==2{print $4}')" >> "$LOG"
+  echo "overall: $status" >> "$LOG"
+  alert "anchorid cron heartbeat: $status — jobs $([ "$status" = ok ] && echo "running on schedule" || echo "NEED ATTENTION")"
   exit $?
 fi
 
