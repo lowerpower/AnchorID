@@ -1520,3 +1520,50 @@ describe('Admin: change login email', () => {
   });
 });
 
+describe('Login responses stay indistinguishable, with a standing rate-limit hint', () => {
+  // The per-email login limit fails SILENTLY by design (anti-enumeration).
+  // That cost a real user 40 minutes on 2026-08-22: three sends looked
+  // identical to zero sends. The fix is a hint that appears on EVERY
+  // outcome, so the page still reveals nothing about the address while
+  // telling a legitimate user why an email might not arrive. These tests
+  // lock both halves: the hint is always present, and the bodies for
+  // "unknown email" and "rate limited" are byte-identical.
+  async function postLogin(email: string, ip: string): Promise<Response> {
+    const csrf = 'test-csrf-token-login-hint';
+    const fd = new FormData();
+    fd.append('email', email);
+    fd.append('_csrf', csrf);
+    return SELF.fetch(createTestRequest('https://anchorid.net/login', {
+      method: 'POST',
+      headers: { 'Cookie': `anchor_csrf=${csrf}` },
+      body: fd,
+      ip,
+    }));
+  }
+
+  it('shows the hint on the form and on every submit outcome, identically', async () => {
+    await clearAllTestData();
+
+    const form = await SELF.fetch(createTestRequest('https://anchorid.net/login', { ip: '198.51.100.91' }));
+    expect(await form.text()).toContain('3 links per address per hour');
+
+    // Unknown email.
+    const unknown = await postLogin('nobody@example.com', '198.51.100.92');
+    expect(unknown.status).toBe(200);
+    const unknownBody = await unknown.text();
+    expect(unknownBody).toContain('at most 3 links per address per hour');
+
+    // Same email pushed past the per-email limit (LOGIN_RL_PER_HOUR).
+    let limitedBody = '';
+    for (let i = 0; i < 5; i++) {
+      const r = await postLogin('nobody@example.com', '198.51.100.93');
+      expect(r.status).toBe(200);
+      limitedBody = await r.text();
+    }
+    // Rate-limited response is byte-identical to the unknown-email response.
+    expect(limitedBody).toBe(unknownBody);
+
+    await clearAllTestData();
+  });
+});
+

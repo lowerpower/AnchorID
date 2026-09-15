@@ -6,6 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Changed - 2026-09-15
+
+#### Login page: standing rate-limit hint
+
+- The per-email login limit (3/hour) fails silently by design, so a
+  legitimate user who requested several links saw nothing but identical
+  "check your email" pages (cost a real user 40 minutes on 2026-08-22).
+  A hint now appears on the login form and on EVERY submit outcome —
+  unknown email, rate limited, or real send — so the page still reveals
+  nothing about any address while explaining why an email might not
+  arrive. Regression test locks the hint's presence and that the
+  unknown-email and rate-limited responses stay byte-identical
+
 ### Added - 2026-08-22
 
 #### X (Twitter) Claim Type (PR #8, by Thel)

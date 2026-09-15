@@ -1628,13 +1628,14 @@ function htmlError(title: string, message: string, backLink: string): Response {
 }
 
 // Helper for success pages
-function htmlSuccess(title: string, message: string, email: string): Response {
+function htmlSuccess(title: string, message: string, email: string, hint?: string): Response {
   const html = `<!doctype html>
 <html><head><meta charset="utf-8"><title>${escapeHtml(title)}</title></head>
 <body style="font-family:system-ui;max-width:720px;margin:40px auto;padding:0 16px;line-height:1.45">
 <h1>${escapeHtml(title)}</h1>
 <p>${escapeHtml(message)}</p>
 <p style="color:#555;font-size:14px">Sent to: <strong>${escapeHtml(email)}</strong></p>
+${hint ? `<p style="color:#777;font-size:13px">${escapeHtml(hint)}</p>` : ""}
 <p><a href="/">Return home</a></p>
 </body></html>`;
   return new Response(html, {
@@ -1645,6 +1646,16 @@ function htmlSuccess(title: string, message: string, email: string): Response {
     },
   });
 }
+
+// Shown on EVERY /login outcome — real send, unknown email, invalid input,
+// or rate limited — so the page stays indistinguishable (anti-enumeration)
+// while still telling a legitimate user why an email might not arrive: the
+// per-address limit is enforced silently.
+const LOGIN_RESPONSE_BODY = "If this email is registered, you'll receive an edit link shortly.";
+const LOGIN_RESPONSE_HINT =
+  "No email after a few minutes? Check your spam folder — and note that at most " +
+  "3 links per address per hour are sent. Requests beyond that are silently " +
+  "ignored, so wait an hour before trying again.";
 
 // GET /login - Public login form (request magic link or use backup token)
 async function handleLoginPage(request: Request, env: Env): Promise<Response> {
@@ -1691,7 +1702,8 @@ async function handleLoginPage(request: Request, env: Env): Promise<Response> {
     <div class="card">
       <label>Email</label>
       <input name="email" type="email" placeholder="you@example.com" required>
-      <div class="hint">We'll send a secure edit link if this email has an AnchorID.</div>
+      <div class="hint">We'll send a secure edit link if this email has an AnchorID.<br>
+      Limit: 3 links per address per hour — extra requests are silently ignored.</div>
     </div>
 
     <div style="margin-top:14px">
@@ -1829,7 +1841,7 @@ async function handleLogin(request: Request, env: Env): Promise<Response> {
   // Always same response to avoid user enumeration
   if (!isValidEmail(email)) {
     if (isFormSubmit) {
-      return htmlSuccess("Check Your Email", "If this email is registered, you'll receive an edit link shortly.", email || "");
+      return htmlSuccess("Check Your Email", LOGIN_RESPONSE_BODY, email || "", LOGIN_RESPONSE_HINT);
     }
     return json({ ok: true }, 200, { "cache-control": "no-store" });
   }
@@ -1841,7 +1853,7 @@ async function handleLogin(request: Request, env: Env): Promise<Response> {
   const rl = await incrWithTtl(env.ANCHOR_KV, `rl:login:${emailHash}`, 3600);
   if (rl > maxPerHour) {
     if (isFormSubmit) {
-      return htmlSuccess("Check Your Email", "If this email is registered, you'll receive an edit link shortly.", email);
+      return htmlSuccess("Check Your Email", LOGIN_RESPONSE_BODY, email, LOGIN_RESPONSE_HINT);
     }
     return json({ ok: true }, 200, { "cache-control": "no-store" });
   }
@@ -1851,7 +1863,7 @@ async function handleLogin(request: Request, env: Env): Promise<Response> {
   if (!uuid) {
     // Don't reveal if email exists
     if (isFormSubmit) {
-      return htmlSuccess("Check Your Email", "If this email is registered, you'll receive an edit link shortly.", email);
+      return htmlSuccess("Check Your Email", LOGIN_RESPONSE_BODY, email, LOGIN_RESPONSE_HINT);
     }
     return json({ ok: true }, 200, { "cache-control": "no-store" });
   }
@@ -1870,7 +1882,7 @@ async function handleLogin(request: Request, env: Env): Promise<Response> {
   ].join("\n"));
 
   if (isFormSubmit) {
-    return htmlSuccess("Check Your Email", "If this email is registered, you'll receive an edit link shortly.", email);
+    return htmlSuccess("Check Your Email", LOGIN_RESPONSE_BODY, email, LOGIN_RESPONSE_HINT);
   }
   return json({ ok: true }, 200, { "cache-control": "no-store" });
 }
